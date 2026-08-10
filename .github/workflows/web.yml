@@ -1,0 +1,45 @@
+name: Web (iPhone + tests)
+
+# Automatique : c'est la seule façon de tester quand on n'a qu'un téléphone.
+# Chaque push met le jeu à jour à l'adresse GitHub Pages, jouable dans le
+# navigateur et installable sur l'écran d'accueil (y compris sur iPhone).
+on:
+  push:
+    branches:
+      - main
+      - claude/android-surcouche-custom-klcq7l
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploie:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.pages.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Assemble www/
+        run: node build.mjs
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: www
+
+      - id: pages
+        uses: actions/deploy-pages@v4

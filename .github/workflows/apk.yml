@@ -1,0 +1,66 @@
+name: APK Android
+
+# Volontairement manuel : on ne construit un APK que quand on veut vraiment
+# une nouvelle version installable. Pour les essais du quotidien, la version
+# web se déploie toute seule à chaque push (voir web.yml).
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Nom de la version (ex. 0.2)"
+        required: false
+        default: "dev"
+
+permissions:
+  contents: write
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Dépendances
+        run: npm install
+
+      - name: Assemble www/
+        run: npm run build
+
+      # Le dossier android/ n'est pas versionné : Capacitor le régénère à
+      # chaque build, ce qui évite de trimballer 200 fichiers Gradle dans git.
+      - name: Génère le projet Android
+        run: npx cap add android
+
+      - name: Compile l'APK
+        run: |
+          chmod +x android/gradlew
+          ./android/gradlew -p android assembleDebug
+
+      - name: Renomme
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk arcade-${{ inputs.version }}.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: arcade-apk
+          path: arcade-${{ inputs.version }}.apk
+
+      # La release donne un lien direct téléchargeable depuis le téléphone,
+      # là où un artefact d'Actions arrive sous forme de zip.
+      - name: Publie la release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="v${{ inputs.version }}-${{ github.run_number }}"
+          gh release create "$TAG" "arcade-${{ inputs.version }}.apk" \
+            --target "${{ github.sha }}" \
+            --title "Arcade ${{ inputs.version }}" \
+            --notes "APK de debug, à installer directement sur le téléphone (autoriser les sources inconnues)."

@@ -1,12 +1,10 @@
 /**
- * Le catalogue. Ajouter un micro-jeu = créer un fichier à côté et
- * l'ajouter ici. Rien d'autre à toucher dans le moteur.
+ * Le catalogue. Ajouter un jeu = créer un fichier à côté et l'ajouter ici.
+ * Rien d'autre à toucher dans le moteur.
  */
 import esquive from './esquive.js'
-import immobile from './immobile.js'
-import attrape from './attrape.js'
-import jauge from './jauge.js'
-import pasLeRouge from './pasLeRouge.js'
-import gonfle from './gonfle.js'
+import casseBrique from './casseBrique.js'
+import serpent from './serpent.js'
+import cibles from './cibles.js'
 
-export const GAMES = [esquive, immobile, attrape, jauge, pasLeRouge, gonfle]
+export const GAMES = [esquive, casseBrique, serpent, cibles]

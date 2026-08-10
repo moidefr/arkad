@@ -6,10 +6,15 @@ import { C } from './palette.js'
 
 export const POLICE = 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif'
 
-export function texte(ctx, s, x, y, taille, couleur = C.texte, poids = 800) {
+/**
+ * `largeurMax` condense le texte au lieu de le laisser déborder — pratique
+ * pour tout ce qui vient des jeux, dont on ne maîtrise pas la longueur.
+ */
+export function texte(ctx, s, x, y, taille, couleur = C.texte, poids = 800, largeurMax) {
   ctx.fillStyle = couleur
   ctx.font = `${poids} ${taille}px ${POLICE}`
-  ctx.fillText(s, x, y)
+  if (largeurMax) ctx.fillText(s, x, y, largeurMax)
+  else ctx.fillText(s, x, y)
 }
 
 export function rect(ctx, x, y, w, h, couleur, rayon = 0) {
@@ -28,6 +33,10 @@ export function cercle(ctx, x, y, r, couleur) {
 
 export function dist(ax, ay, bx, by) {
   return Math.hypot(ax - bx, ay - by)
+}
+
+export function borne(v, min, max) {
+  return v < min ? min : v > max ? max : v
 }
 
 /** Rapproche `a` de `b` d'au plus `pas`. Pratique pour tout ce qui glisse. */

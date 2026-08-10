@@ -1,45 +1,71 @@
 import { C } from '../palette.js'
-import { rect, vers } from '../dessin.js'
+import { rect, cercle, borne, vers } from '../dessin.js'
+
+const RAYON = 14
+const SOL = 90 // hauteur du joueur au-dessus du bas de l'écran
 
 export default {
   id: 'esquive',
-  consigne: 'ESQUIVE !',
-  duree: 4,
-  siTempsEcoule: 'gagne',
+  nom: 'ESQUIVE',
+  pitch: 'Survis sous les blocs, ramasse les étoiles',
+  couleur: C.joueur,
+  unite: 'm',
 
-  init(g) {
-    g.e.x = g.W / 2
-    g.e.cible = g.W / 2
-    g.e.blocs = []
-    g.e.prochain = 0.2
+  init(j) {
+    j.e.x = j.W / 2
+    j.e.blocs = []
+    j.e.etoiles = []
+    j.e.prochainBloc = 0.5
+    j.e.prochaineEtoile = 2
   },
 
-  maj(g, dt) {
-    g.e.x = vers(g.e.x, g.e.cible, 460 * dt)
+  maj(j, dt) {
+    // Tout se durcit avec le temps : la vitesse de chute et la cadence.
+    const vitesse = 180 + j.t * 11
+    const cadence = Math.max(0.26, 0.8 - j.t * 0.012)
 
-    g.e.prochain -= dt
-    if (g.e.prochain <= 0) {
-      g.e.prochain = 0.3 + g.hasard() * 0.25
-      const w = 40 + g.hasard() * 70
-      g.e.blocs.push({ x: g.hasard() * (g.W - w), y: -40, w, vy: 300 + g.hasard() * 180 })
+    j.e.x = vers(j.e.x, borne(j.pointer.x, RAYON, j.W - RAYON), 640 * dt)
+    j.score += dt * 10
+
+    j.e.prochainBloc -= dt
+    if (j.e.prochainBloc <= 0) {
+      j.e.prochainBloc = cadence * (0.7 + j.hasard() * 0.6)
+      const w = 45 + j.hasard() * 95
+      j.e.blocs.push({ x: j.hasard() * (j.W - w), y: -34, w, h: 26 })
     }
 
-    for (const b of g.e.blocs) b.y += b.vy * dt
-    g.e.blocs = g.e.blocs.filter((b) => b.y < g.H + 60)
-
-    const px = g.e.x - 16
-    const py = g.H - 100
-    for (const b of g.e.blocs) {
-      if (b.y + 28 > py && b.y < py + 32 && b.x < px + 32 && b.x + b.w > px) g.perd()
+    j.e.prochaineEtoile -= dt
+    if (j.e.prochaineEtoile <= 0) {
+      j.e.prochaineEtoile = 2.4 + j.hasard() * 2.5
+      j.e.etoiles.push({ x: 24 + j.hasard() * (j.W - 48), y: -20 })
     }
+
+    for (const b of j.e.blocs) b.y += vitesse * dt
+    for (const s of j.e.etoiles) s.y += vitesse * 0.85 * dt
+    j.e.blocs = j.e.blocs.filter((b) => b.y < j.H + 40)
+
+    const py = j.H - SOL
+    for (const b of j.e.blocs) {
+      if (cercleRect(j.e.x, py, RAYON, b.x, b.y, b.w, b.h)) return j.perdu()
+    }
+    j.e.etoiles = j.e.etoiles.filter((s) => {
+      if (Math.hypot(s.x - j.e.x, s.y - py) < RAYON + 12) {
+        j.score += 25
+        return false
+      }
+      return s.y < j.H + 30
+    })
   },
 
-  dessine(g, ctx) {
-    for (const b of g.e.blocs) rect(ctx, b.x, b.y, b.w, 28, C.danger, 6)
-    rect(ctx, g.e.x - 16, g.H - 100, 32, 32, C.joueur, 8)
+  dessine(j, ctx) {
+    for (const s of j.e.etoiles) cercle(ctx, s.x, s.y, 8, C.or)
+    for (const b of j.e.blocs) rect(ctx, b.x, b.y, b.w, b.h, C.danger, 7)
+    cercle(ctx, j.e.x, j.H - SOL, RAYON, C.joueur)
   },
+}
 
-  appui(g, p) {
-    g.e.cible = Math.max(20, Math.min(g.W - 20, p.x))
-  },
+function cercleRect(cx, cy, r, rx, ry, rw, rh) {
+  const px = borne(cx, rx, rx + rw)
+  const py = borne(cy, ry, ry + rh)
+  return Math.hypot(cx - px, cy - py) < r
 }

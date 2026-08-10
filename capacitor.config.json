@@ -1,0 +1,11 @@
+{
+  "appId": "fr.ndc26.arcade",
+  "appName": "Arcade",
+  "webDir": "www",
+  "android": {
+    "backgroundColor": "#0d0b1aff"
+  },
+  "server": {
+    "androidScheme": "https"
+  }
+}

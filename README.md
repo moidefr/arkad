@@ -1,91 +1,129 @@
 # ARCADE
 
-Une arcade de micro-jeux : 5 secondes chacun, une seule action, ça accélère,
-4 vies. Un seul code pour PC et téléphone.
+Une borne d'arcade : plusieurs petits jeux, une partie de deux à trois minutes,
+une seule action pour jouer. Un seul code pour le web et pour Android.
 
-## Lancer
+## Où ça tourne
+
+| | comment | mise à jour |
+|---|---|---|
+| **Android** | vraie app, APK installable | on relance le workflow quand on veut une nouvelle version |
+| **iPhone / iPad** | web, « Ajouter à l'écran d'accueil » | automatique à chaque push |
+| **PC** | navigateur | automatique à chaque push |
+
+Le natif iOS demanderait un Mac et l'Apple Developer Program à 99 $/an, donc
+sur Apple c'est la version web — en plein écran, hors-ligne, avec son icône.
+Pour un jeu en Canvas, la différence ne se voit pas.
+
+## Jouer / tester
+
+**Depuis le téléphone**, il n'y a rien à installer : chaque push met à jour la
+page GitHub Pages du dépôt. C'est la boucle de test du quotidien.
+
+**Sur un ordinateur**, si tu en as un sous la main :
 
 ```bash
-python3 -m http.server 8000
+npm run dev      # assemble www/ et sert le tout sur http://localhost:8000
 ```
 
-Puis <http://localhost:8000>. (Un serveur est nécessaire : le projet utilise
-des modules ES, qui ne se chargent pas en `file://`.)
+## Construire l'APK
 
-Pour jouer sur ton téléphone pendant que tu développes, mets ton PC et ton
-téléphone sur le même wifi et ouvre `http://<ip-de-ton-pc>:8000`.
+Onglet **Actions** → **APK Android** → *Run workflow*. Ça se fait très bien
+depuis un téléphone.
 
-Pour publier : pousse sur GitHub, active GitHub Pages sur la branche, et tu as
-un lien à envoyer. Sur mobile, « Ajouter à l'écran d'accueil » installe le jeu
-en plein écran.
+Au bout de quelques minutes, l'APK apparaît dans les **Releases** du dépôt :
+un lien direct, téléchargeable et installable en un appui (il faut autoriser
+l'installation depuis des sources inconnues la première fois).
 
-## Commandes
+C'est un APK de debug, non signé pour le Play Store — parfait pour installer
+soi-même et faire tourner autour de soi.
 
-Une seule action, partout la même : **appuyer**.
-Doigt sur mobile, clic ou barre d'espace sur PC. Certains jeux utilisent
-*où* tu as appuyé, d'autres le moment où tu **relâches**.
+### À faire une fois dans les réglages du dépôt
 
-## Ajouter un micro-jeu
+*Settings → Pages → Source : **GitHub Actions***, sinon la version web ne se
+déploie pas.
+
+## Ajouter un jeu
 
 Crée `src/games/monJeu.js` :
 
 ```js
 import { C } from '../palette.js'
-import { texte, rect, cercle, dist, vers } from '../dessin.js'
+import { texte, rect, cercle, dist, borne, vers } from '../dessin.js'
 
 export default {
-  id: 'mon-jeu',
-  consigne: 'FAIS UN TRUC !',   // le mot d'ordre affiché avant le jeu
-  duree: 4,                     // secondes, à vitesse 1
-  siTempsEcoule: 'perd',        // 'gagne' si survivre suffit
+  id: 'mon-jeu',              // sert de clé pour le record, ne le change plus
+  nom: 'MON JEU',
+  pitch: 'Une ligne pour dire comment on joue',
+  couleur: C.violet,          // la barre de couleur sur l'accueil
+  unite: 'pts',
 
-  init(g) { g.e.x = g.W / 2 },
-  maj(g, dt) { g.e.x += 60 * dt },
-  dessine(g, ctx) { rect(ctx, g.e.x, 300, 40, 40, C.joueur, 8) },
-  appui(g, p) { if (p.x > g.W / 2) g.gagne() },
-  relache(g, p) {},
+  init(j) { j.e.x = j.W / 2 },
+  maj(j, dt) { j.score += dt },
+  dessine(j, ctx) { rect(ctx, j.e.x, 300, 40, 40, C.joueur, 8) },
+  appui(j, p) {},
+  relache(j, p) {},
 }
 ```
 
-Puis ajoute-le dans `src/games/index.js`. C'est tout : il entre dans la
-rotation et apparaît dans le mode libre.
+Puis ajoute-le dans `src/games/index.js`. C'est tout.
 
-### Ce que contient `g`
+### Ce que contient `j`
 
 | | |
 |---|---|
-| `g.W`, `g.H` | taille de l'écran logique (360 × 640) |
-| `g.t`, `g.restant`, `g.duree` | temps écoulé / restant / total, en secondes |
-| `g.e` | ton état à toi, vide au départ |
-| `g.gagne()`, `g.perd()` | termine le jeu ; le premier appel gagne |
-| `g.hasard()` | nombre aléatoire 0..1 |
-| `g.entier(a, b)` | entier dans `[a, b[` |
-| `g.pointer` | dernière position d'appui |
-| `g.maintenu` | vrai tant que c'est appuyé |
-| `g.vitesse`, `g.score` | pour les jeux qui veulent tricher avec le méta |
+| `j.W`, `j.H` | l'écran logique, 360 × 640 |
+| `j.HUD` | hauteur du bandeau du haut — ne dessine rien dessous |
+| `j.t` | temps écoulé depuis le début de la partie |
+| `j.score` | à toi de l'augmenter ; le moteur l'affiche et le sauvegarde |
+| `j.meilleur` | le record du joueur sur ce jeu |
+| `j.e` | ton état à toi, vide au départ |
+| `j.perdu()` | termine la partie |
+| `j.pointer` | position du dernier appui (suit la souris sur PC) |
+| `j.maintenu` | vrai tant que c'est appuyé |
+| `j.hasard()`, `j.entier(a, b)` | aléatoire |
 
-`dt` est déjà multiplié par la vitesse de la partie : écris ton jeu comme s'il
-tournait à vitesse normale, l'accélération est gratuite.
+Le moteur s'occupe du reste : accueil, pause, écran de fin, records.
 
 ## Les règles qui font que ça marche
 
-1. **Une seule action.** Pas de clavier, pas de deux doigts. C'est ce qui rend
-   PC et mobile identiques — et c'est la contrainte qui rend les idées bonnes.
-2. **Pas de tutoriel.** Si la consigne en deux mots ne suffit pas, l'idée est
-   à revoir.
-3. **Le mode libre est ton outil de dev.** Menu → MODE LIBRE → ton jeu tourne
-   en boucle, sans perdre de vies.
+1. **Une seule action.** Appuyer. C'est ce qui rend PC et mobile identiques,
+   et ça oblige à trouver des idées plutôt qu'à empiler des boutons.
+2. **Une partie dure deux à trois minutes.** Donc il faut une difficulté qui
+   monte : sans ça, c'est mou à la fin ou impossible au début.
+3. **Zéro texte d'explication en jeu.** Si le pitch d'une ligne ne suffit pas,
+   le jeu est trop compliqué.
 
-## Idées de micro-jeux à écrire
+## Structure
 
-Des mécaniques classiques : viser, suivre, compter, mémoriser, trier,
-équilibrer, freiner, relâcher au bon moment.
+```
+index.html          la page, trois lignes
+build.mjs           assemble www/ (aucune dépendance)
+capacitor.config.json
+src/
+  engine.js         accueil, pause, fin, records — ne connaît aucun jeu
+  input.js          souris / doigt / espace -> appui + relâche
+  dessin.js         texte, rect, cercle, dist, borne, vers
+  palette.js        les couleurs communes
+  games/            les jeux + le catalogue
+.github/workflows/
+  web.yml           déploie la version web à chaque push
+  apk.yml           construit l'APK, uniquement à la demande
+```
 
-Et celles qui tordent les codes, plus drôles à écrire :
+## Astuces
 
-- la consigne ment (« TAPE ! » alors qu'il ne faut surtout pas)
-- le jeu réutilise ton score comme élément de décor
-- il se joue à l'envers du précédent
-- il ressemble à un écran de chargement, mais c'est déjà le jeu
-- il utilise l'heure réelle du téléphone
-- il n'affiche rien du tout pendant deux secondes
+- `moteur` est accessible depuis la console du navigateur : `moteur.j` donne
+  l'état du jeu en cours, en direct.
+- La touche Échap met en pause.
+
+## La suite
+
+- une interface pour publier des jeux sans passer par git
+- des scores en ligne
+- du son
+
+Note pour plus tard : le code des jeux reste dans git — c'est lui qui donne
+l'historique et le retour arrière gratuits. Un backend (Supabase ou autre) ne
+servira que pour ce que des fichiers statiques ne savent pas faire : les
+comptes, les classements, la modération.
