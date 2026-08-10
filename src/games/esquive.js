@@ -51,6 +51,7 @@ export default {
     j.e.etoiles = j.e.etoiles.filter((s) => {
       if (Math.hypot(s.x - j.e.x, s.y - py) < RAYON + 12) {
         j.score += 25
+        j.son.ramasse()
         return false
       }
       return s.y < j.H + 30

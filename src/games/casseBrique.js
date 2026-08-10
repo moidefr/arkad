@@ -42,9 +42,9 @@ export default {
       b.x += b.vx * dt * 0.5
       b.y += b.vy * dt * 0.5
 
-      if (b.x < BALLE_R) (b.x = BALLE_R), (b.vx = Math.abs(b.vx))
-      if (b.x > j.W - BALLE_R) (b.x = j.W - BALLE_R), (b.vx = -Math.abs(b.vx))
-      if (b.y < j.HUD + BALLE_R) (b.y = j.HUD + BALLE_R), (b.vy = Math.abs(b.vy))
+      if (b.x < BALLE_R) (b.x = BALLE_R), (b.vx = Math.abs(b.vx)), j.son.rebond()
+      if (b.x > j.W - BALLE_R) (b.x = j.W - BALLE_R), (b.vx = -Math.abs(b.vx)), j.son.rebond()
+      if (b.y < j.HUD + BALLE_R) (b.y = j.HUD + BALLE_R), (b.vy = Math.abs(b.vy)), j.son.rebond()
 
       const ry = j.H - RAQUETTE_Y
       if (
@@ -61,6 +61,7 @@ export default {
         b.vx = Math.cos(angle) * v
         b.vy = Math.sin(angle) * v
         b.y = ry - BALLE_R
+        j.son.rebond()
       }
 
       for (const q of j.e.briques) {
@@ -69,6 +70,8 @@ export default {
         if (b.y + BALLE_R < q.y || b.y - BALLE_R > q.y + BRIQUE_H) continue
         q.morte = true
         j.score += 10 * j.e.niveau
+        // La note dépend de la rangée : vider une colonne fait une gamme.
+        j.son.casse(RANGS - 1 - q.rang)
         // On rebondit sur l'axe où la balle est le moins enfoncée.
         const dx = Math.min(Math.abs(b.x - q.x), Math.abs(b.x - (q.x + q.w)))
         const dy = Math.min(Math.abs(b.y - q.y), Math.abs(b.y - (q.y + BRIQUE_H)))
@@ -81,12 +84,14 @@ export default {
     if (b.y > j.H + 20) {
       j.e.vies--
       if (j.e.vies <= 0) return j.perdu()
+      j.son.rate()
       poseBalle(j)
     }
 
     if (j.e.briques.every((q) => q.morte)) {
       j.e.niveau++
       j.score += 100
+      j.son.niveau()
       poseBriques(j)
       poseBalle(j)
     }
@@ -121,6 +126,7 @@ function poseBriques(j) {
         x: MARGE + c * (w + 6),
         y: j.HUD + 30 + r * (BRIQUE_H + 6),
         w,
+        rang: r,
         couleur: TEINTES[r % TEINTES.length],
         morte: false,
       })

@@ -84,6 +84,7 @@ function avance(j) {
   if (tete.x === j.e.fruit.x && tete.y === j.e.fruit.y) {
     j.score += 10
     j.e.cadence = Math.min(14, j.e.cadence + 0.25)
+    j.son.ramasse()
     poseFruit(j)
   } else {
     j.e.corps.pop()

@@ -82,8 +82,39 @@ Puis ajoute-le dans `src/games/index.js`. C'est tout.
 | `j.pointer` | position du dernier appui (suit la souris sur PC) |
 | `j.maintenu` | vrai tant que c'est appuyé |
 | `j.hasard()`, `j.entier(a, b)` | aléatoire |
+| `j.son` | les bruitages (voir plus bas) |
 
 Le moteur s'occupe du reste : accueil, pause, écran de fin, records.
+
+## Le son
+
+Tout est synthétisé à la volée dans `src/son.js` : aucun fichier audio, donc
+rien à télécharger, et surtout la hauteur des notes se calcule. Le
+casse-brique monte d'un demi-ton par rangée — vider une colonne fait une
+gamme — et les cibles montent avec le combo, donc on *entend* qu'on enchaîne.
+
+Depuis un jeu :
+
+```js
+j.son.rebond()        // impact court
+j.son.casse(rang)     // note qui dépend de la rangée
+j.son.ramasse()       // bonus attrapé
+j.son.touche(combo)   // monte avec le combo
+j.son.rate()          // raté
+j.son.niveau()        // petite fanfare
+```
+
+Le moteur joue tout seul le clic des boutons, la mort et le record.
+
+Pour inventer un bruitage, tu as deux briques : `_note({type, de, a, duree,
+volume})` pour une note (avec glissando de `de` vers `a`), et `_bruit({duree,
+coupe, type})` pour les impacts. Depuis la console du navigateur, `son` est
+accessible : tape `son.casse(3)` pour essayer.
+
+Le bouton ♪ en haut à droite de l'accueil coupe le son, et le choix est
+retenu. À savoir : sur iPhone, le son ne peut démarrer qu'après un vrai appui
+(le moteur s'en charge), et l'interrupteur latéral de silence coupe tout,
+comme pour n'importe quelle page web.
 
 ## Les règles qui font que ça marche
 
@@ -103,6 +134,7 @@ capacitor.config.json
 src/
   engine.js         accueil, pause, fin, records — ne connaît aucun jeu
   input.js          souris / doigt / espace -> appui + relâche
+  son.js            les bruitages, synthétisés (aucun fichier audio)
   dessin.js         texte, rect, cercle, dist, borne, vers
   palette.js        les couleurs communes
   games/            les jeux + le catalogue
@@ -121,7 +153,6 @@ src/
 
 - une interface pour publier des jeux sans passer par git
 - des scores en ligne
-- du son
 
 Note pour plus tard : le code des jeux reste dans git — c'est lui qui donne
 l'historique et le retour arrière gratuits. Un backend (Supabase ou autre) ne

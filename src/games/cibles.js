@@ -46,6 +46,7 @@ export default {
     if (j.e.cibles.length < avant) {
       j.e.combo = 1
       j.e.jauge = Math.max(0, j.e.jauge - 0.6)
+      j.son.rate()
     }
   },
 
@@ -75,10 +76,12 @@ export default {
       j.e.combo = 1
       j.e.jauge = Math.max(0, j.e.jauge - 0.8)
       j.e.flash = 1
+      j.son.rate()
       return
     }
     j.e.cibles.splice(i, 1)
     j.score += 10 * j.e.combo
+    j.son.touche(j.e.combo)
     j.e.combo = Math.min(9, j.e.combo + 1)
     j.e.jauge = Math.min(12, j.e.jauge + 0.75)
   },

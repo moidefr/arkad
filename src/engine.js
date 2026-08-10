@@ -8,6 +8,7 @@
 import { GAMES } from './games/index.js'
 import { Input } from './input.js'
 import { C } from './palette.js'
+import { son } from './son.js'
 import { texte, rect } from './dessin.js'
 
 export const W = 360
@@ -84,6 +85,7 @@ export class Moteur {
       score: 0,
       meilleur: this.meilleur(def.id),
       pointer: this.input.pointer,
+      son,
       __input: this.input,
       get maintenu() {
         return this.__input.held
@@ -106,6 +108,9 @@ export class Moteur {
     this.record = this._enregistre(this.def.id, this.j.score)
     this.phase = 'fin'
     this.phaseT = 0
+    son.mort()
+    // La fanfare passe après le son de mort, pas par-dessus.
+    if (this.record) setTimeout(() => son.record(), 450)
   }
 
   _quitte() {
@@ -134,28 +139,55 @@ export class Moteur {
   // --- Entrées --------------------------------------------------------------
 
   _appui(p) {
+    // On est ici dans le geste de l'utilisateur : c'est le seul moment où
+    // iOS accepte de démarrer le son.
+    son.reveille()
+
     if (this.phase === 'accueil') {
+      if (dansRect(p, BTN_SON.x, BTN_SON.y, BTN_SON.w, BTN_SON.h)) return son.bascule()
       const i = indexCarte(p)
-      if (i !== null && i < GAMES.length) this.lance(GAMES[i])
+      if (i !== null && i < GAMES.length) {
+        son.clic()
+        this.lance(GAMES[i])
+      }
       return
     }
 
     if (this.phase === 'jeu') {
-      if (dansRect(p, 0, 0, 56, HUD)) return this._bascullePause()
+      if (dansRect(p, 0, 0, 56, HUD)) {
+        son.clic()
+        return this._bascullePause()
+      }
       this.def.appui?.(this.j, p)
       return
     }
 
     if (this.phase === 'pause') {
-      if (dansRect(p, 50, 250, 260, 60)) return this._bascullePause()
-      if (dansRect(p, 50, 326, 260, 60)) return this.lance(this.def)
-      if (dansRect(p, 50, 402, 260, 60)) return this._quitte()
+      if (dansRect(p, 50, 250, 260, 60)) {
+        son.clic()
+        return this._bascullePause()
+      }
+      if (dansRect(p, 50, 326, 260, 60)) {
+        son.clic()
+        return this.lance(this.def)
+      }
+      if (dansRect(p, 50, 402, 260, 60)) {
+        son.clic()
+        return this._quitte()
+      }
+      if (dansRect(p, 50, 478, 260, 60)) return son.bascule()
       return
     }
 
     if (this.phase === 'fin' && this.phaseT > 0.4) {
-      if (dansRect(p, 50, 400, 260, 66)) return this.lance(this.def)
-      if (dansRect(p, 50, 482, 260, 56)) return this._quitte()
+      if (dansRect(p, 50, 400, 260, 66)) {
+        son.clic()
+        return this.lance(this.def)
+      }
+      if (dansRect(p, 50, 482, 260, 56)) {
+        son.clic()
+        return this._quitte()
+      }
     }
   }
 
@@ -183,6 +215,7 @@ export class Moteur {
   _accueil() {
     const ctx = this.ctx
     texte(ctx, 'ARCADE', W / 2, 66, 44, C.joueur, 900)
+    this._boutonSon()
 
     GAMES.forEach((def, i) => {
       const { x, y, w, h } = carte(i)
@@ -232,6 +265,23 @@ export class Moteur {
     bouton(ctx, 50, 250, 260, 60, 'REPRENDRE', C.joueur, C.fond)
     bouton(ctx, 50, 326, 260, 60, 'RECOMMENCER', C.fondClair, C.texte)
     bouton(ctx, 50, 402, 260, 60, 'QUITTER', C.fondClair, C.texte)
+    bouton(ctx, 50, 478, 260, 60, son.muet ? 'SON : NON' : 'SON : OUI', C.fondClair, son.muet ? C.faible : C.texte)
+  }
+
+  /** Petit bouton de sourdine, en haut à droite de l'accueil. */
+  _boutonSon() {
+    const ctx = this.ctx
+    const { x, y, w, h } = BTN_SON
+    rect(ctx, x, y, w, h, C.fondClair, 10)
+    texte(ctx, '♪', x + w / 2, y + h / 2 + 1, 19, son.muet ? C.faible : C.or, 900)
+    if (son.muet) {
+      ctx.strokeStyle = C.danger
+      ctx.lineWidth = 2.5
+      ctx.beginPath()
+      ctx.moveTo(x + 12, y + h - 9)
+      ctx.lineTo(x + w - 12, y + 9)
+      ctx.stroke()
+    }
   }
 
   _fin() {
@@ -253,6 +303,8 @@ export class Moteur {
 const CARTE_H = 96
 const CARTE_Y0 = 110
 const CARTE_ECART = 12
+
+const BTN_SON = { x: W - 64, y: 44, w: 46, h: 36 }
 
 function carte(i) {
   return { x: 24, y: CARTE_Y0 + i * (CARTE_H + CARTE_ECART), w: W - 48, h: CARTE_H }
