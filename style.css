@@ -1,0 +1,36 @@
+:root {
+  --fond: #0d0b1a;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  height: 100%;
+  background: var(--fond);
+  overflow: hidden;
+  /* Pas de sélection ni de zoom accidentel pendant qu'on tape comme un fou. */
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  overscroll-behavior: none;
+  touch-action: none;
+}
+
+body {
+  display: grid;
+  place-items: center;
+}
+
+#scene {
+  /* Le jeu vit dans une zone 360x640 : portrait, donc naturel sur téléphone
+     et lisible sur PC. Le CSS se contente de la mettre à l'échelle. */
+  aspect-ratio: 360 / 640;
+  max-width: 100vw;
+  max-height: 100dvh;
+  display: block;
+  cursor: crosshair;
+}
