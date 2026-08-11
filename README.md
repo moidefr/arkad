@@ -1,8 +1,8 @@
 # ARKAD
 
-Une borne d'arcade : un jeu d'aventure au centre, dix-huit mini-jeux autour.
-Une partie dure deux à trois minutes, une seule action pour jouer, et un seul
-code pour le web et pour Android.
+Une borne d'arcade rangée par durée de partie : vingt-cinq jeux, de trois
+minutes à sans fin. Une seule action pour jouer, et un seul code pour le web
+et pour Android.
 
 ## L'identité
 
@@ -44,28 +44,51 @@ npm run dev      # assemble www/ et sert sur http://localhost:8000
 
 ## Les jeux
 
-**AVENTURE** est le jeu central, en vedette sur l'accueil. Les dix-huit autres
-sont des mini-jeux, en grille dessous.
+Ils sont rangés par **durée de partie**, et c'est la seule hiérarchie du
+projet. Un dossier par catégorie, sous `src/`.
 
-*Adresse* — **ESQUIVE** survivre sous les blocs · **VOLTIGE** maintenir pour
-monter dans un tunnel · **GRIMPE** rebondir de plateforme en plateforme ·
-**SLALOM** zigzaguer entre les portes · **FUSÉE** se poser en douceur sur la
-piste · **BRIQUES** casse-brique
+### COURT — 2 à 3 minutes (18 jeux)
 
-*Réflexe* — **SERPENT** tourner à gauche ou à droite · **ORBITE** inverser son
-sens de rotation · **BALANCE** redresser un mât qui penche · **PILE** empiler
-sans dépasser · **CORDE** sauter quand la corde passe · **CIBLES** toucher
-avant que le chrono se vide · **RYTHME** taper quand la note passe la ligne ·
-**GARDIEN** plonger du bon côté
+*Adresse* — **ESQUIVE** survivre sous les blocs · **VOLTIGE** monter dans un
+tunnel · **GRIMPE** rebondir de plateforme en plateforme · **SLALOM** zigzaguer
+entre les portes · **FUSÉE** se poser en douceur · **BRIQUES** casse-brique
 
-*Tête* — **TRI** envoyer chaque bloc dans son bac · **MÉMOIRE** refaire la
-séquence · **COULEUR** l'encre, pas le mot · **CALCUL** vrai ou faux, vite
+*Réflexe* — **SERPENT** · **ORBITE** inverser son sens · **BALANCE** redresser
+un mât · **PILE** empiler sans dépasser · **CORDE** sauter au bon moment ·
+**CIBLES** · **RYTHME** · **GARDIEN** plonger du bon côté
 
-Tous se jouent d'une seule main, avec un seul geste.
+*Tête* — **TRI** · **MÉMOIRE** · **COULEUR** l'encre, pas le mot · **CALCUL**
+
+Un décompte de trois temps précède chaque partie : ces jeux démarrent à pleine
+vitesse, sans lui on perd la première seconde à comprendre où on est.
+
+### MOYEN — 5 à 15 minutes (3 jeux)
+
+**DÉMINEUR** appui court pour creuser, appui long pour marquer · **2048** on
+glisse pour tout pousser · **TAQUIN** remettre les nombres dans l'ordre
+
+Une grille, une solution, on y réfléchit. Rien ne se sauvegarde : une partie
+se termine dans la séance.
+
+### LONG — 20 minutes à 10 heures (3 jeux)
+
+**DONJON** un roguelike au tour par tour, on descend et on frappe en avançant
+dessus · **USINE** un incrémental qui produit même fermé · **EXPÉDITION** neuf
+cents kilomètres, un choix par jour
+
+Ces trois-là **écrivent leur état à chaque tour**. On ferme l'application au
+milieu d'un couloir, on la rouvre trois jours plus tard au même endroit.
+
+### MASSIF — sans fin (1 jeu)
+
+**ASCENSION** — une échelle de rangs sans plafond contre une IA qui compte ce
+que tu joues et te contre d'autant mieux que tu montes. Les améliorations sont
+permanentes, une défaite ne coûte qu'un rang. C'est la catégorie qui n'a pas
+vocation à se terminer.
 
 ## Ajouter un mini-jeu
 
-Crée `src/games/monJeu.js` :
+Crée `src/court/monJeu.js` (ou le dossier qui correspond à sa durée) :
 
 ```js
 import { C } from '../palette.js'
@@ -86,7 +109,8 @@ export default {
 }
 ```
 
-Puis ajoute-le à `MINIS` dans `src/games/index.js`. C'est tout.
+Range-le dans le dossier de sa durée (`src/court/`, `src/moyen/`, `src/long/`,
+`src/massif/`) et ajoute-le à sa catégorie dans `src/catalogue.js`. C'est tout.
 
 ### Ce que contient `j`
 
@@ -104,6 +128,12 @@ Puis ajoute-le à `MINIS` dans `src/games/index.js`. C'est tout.
 | `j.son` | les bruitages |
 | `j.fx` | les effets : gerbes, bulles de score, secousse |
 | `j.hasard()`, `j.entier(a, b)` | aléatoire |
+| `j.sauve(o)`, `j.charge()`, `j.efface()` | l'état d'une partie longue |
+
+Un jeu peut aussi déclarer `persistant: true` (il gère sa propre sauvegarde),
+`sansScore: true` avec `titreHud(j)` (le bandeau affiche autre chose qu'un
+score), et `finTitre(j)` pour choisir le titre de l'écran de fin — « RÉSOLU »
+n'est pas « GAME OVER ».
 
 ### La boîte à dessin
 
@@ -127,43 +157,9 @@ Le moteur dessine tout par-dessus le jeu, dans son repère, et secoue l'image
 sans jamais bouger le bandeau du haut. Il ajoute lui-même la gerbe et la
 secousse au moment de la mort.
 
-**Attention aux jeux qui ont une caméra** (GRIMPE, l'aventure) : les grains
+**Attention aux jeux qui ont une caméra** (GRIMPE, DONJON) : les grains
 vivent dans le repère de l'écran, il faut donc leur passer des coordonnées
 déjà décalées.
-
-## L'aventure
-
-C'est le jeu central, et pour l'instant un squelette qui tourne : le
-personnage court tout seul, l'appui le fait sauter, et les niveaux sont
-écrits en texte.
-
-Un niveau, dans `src/aventure/niveaux.js` :
-
-```js
-{
-  nom: 'PREMIERS PAS',
-  indice: 'appuie pour sauter',
-  carte: [
-    '....o..................o.................X..',
-    '...####...............####..............####',
-    '@...........................................',
-    '#########...#########...##########..########',
-  ],
-}
-```
-
-`#` bloc · `^` pic · `o` pièce · `X` sortie · `@` départ · `.` vide
-
-Les lignes n'ont pas besoin d'être de la même longueur ni de remplir la
-hauteur : le chargeur complète à droite et ajoute le ciel au-dessus. On
-n'écrit que ce qui compte.
-
-**Repères pour concevoir :** le personnage saute environ 3 cases de long et
-2 cases de haut. Un trou de 3 cases se franchit, un trou de 4 non.
-
-La progression est retenue, et un niveau ne s'ouvre que si le précédent est
-fait. Ce qu'il reste à faire : de vrais niveaux, un décor, et une raison
-d'avancer.
 
 ## Le son
 
@@ -192,12 +188,14 @@ l'interrupteur latéral de silence coupe tout.
 
 ## Les règles qui font que ça marche
 
-1. **Une seule action.** Appuyer. C'est ce qui rend PC et mobile identiques,
-   et ça oblige à trouver des idées plutôt qu'à empiler des boutons.
-2. **Une partie dure deux à trois minutes.** Donc il faut une difficulté qui
-   monte : sans ça, c'est mou à la fin ou impossible au début.
+1. **Une seule action.** Appuyer, ou glisser. C'est ce qui rend PC et mobile
+   identiques, et ça oblige à trouver des idées plutôt qu'à empiler des boutons.
+2. **Un jeu annonce sa durée, et la tient.** C'est le rangement du projet :
+   trois minutes, un quart d'heure, une soirée, ou jamais.
 3. **Zéro texte d'explication en jeu.** Si le pitch d'une ligne ne suffit pas,
    le jeu est trop compliqué.
+4. **Ce qui dure plus d'une séance s'écrit à chaque tour.** Personne ne
+   rejouera dix heures parce qu'on a fermé l'onglet.
 
 ## Structure
 
@@ -213,8 +211,8 @@ src/
   stockage.js       records, sourdine, progression — un seul préfixe
   son.js            les bruitages, synthétisés
   effets.js         gerbes, bulles de score, secousse d'écran
-  games/            les mini-jeux + le catalogue
-  aventure/         le jeu principal et ses niveaux
+  catalogue.js      les quatre catégories, et rien d'autre à toucher
+  court/  moyen/  long/  massif/     les jeux, rangés par durée
 .github/workflows/
   web.yml           déploie la version web, à la demande
   apk.yml           construit l'APK, à la demande
@@ -228,7 +226,7 @@ src/
 
 ## La suite
 
-- de vrais niveaux d'aventure
+- d'autres jeux massifs — la catégorie n'en a qu'un
 - une interface pour publier des jeux sans passer par git
 - des scores en ligne
 
