@@ -83,7 +83,11 @@ export default {
     // Plus on tape près de la ligne, plus ça rapporte.
     const ecart = Math.abs(j.e.notes[i].y - LIGNE)
     j.e.notes.splice(i, 1)
-    j.score += (ecart < 10 ? 20 : 10) * j.e.combo
+    const gain = (ecart < 10 ? 20 : 10) * j.e.combo
+    j.score += gain
+    const cx = voie * (j.W / 2) + j.W / 4
+    j.fx.eclat(cx, LIGNE, ecart < 10 ? C.accent : C.cyan, { n: 12, vitesse: 160, taille: 5 })
+    j.fx.bulle(cx, LIGNE - 30, (ecart < 10 ? 'PARFAIT +' : '+') + gain, C.accent, 14)
     j.e.combo = Math.min(9, j.e.combo + 1)
     j.son.touche(j.e.combo)
   },

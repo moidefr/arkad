@@ -8,13 +8,14 @@ code pour le web et pour Android.
 
 Un terminal à phosphore ambré. Trois règles, tenues partout :
 
-1. **Tout est en gros pixels.** La toile fait exactement 360 × 640 pixels et
-   c'est le navigateur qui l'agrandit sans lissage. Aucun coin arrondi, aucun
-   dégradé, tout est aligné sur une grille de 2 px.
-2. **Une seule couleur d'accent**, l'ambre, pour ce qui compte. Trois teintes
+1. **Les formes sont en gros pixels.** Tout est aligné sur une grille de
+   2 px, aucun coin arrondi, aucun dégradé, les disques sont des empilements
+   de rectangles.
+2. **Le texte, lui, est net.** On a essayé de le rastériser petit puis de
+   l'agrandir pour lui donner du grain : joli en grand, illisible en petit.
+   Le style vient des formes, pas de la typo — mais le monospace reste.
+3. **Une seule couleur d'accent**, l'ambre, pour ce qui compte. Trois teintes
    secondaires servent uniquement à distinguer les jeux entre eux.
-3. **Du monospace partout**, rastérisé petit puis agrandi — c'est de là que
-   vient le grain du texte, sans embarquer de police bitmap.
 
 Si tu ajoutes quelque chose et que ça jure, c'est presque toujours qu'une de
 ces trois règles a sauté.
@@ -101,6 +102,7 @@ Puis ajoute-le à `MINIS` dans `src/games/index.js`. C'est tout.
 | `j.pointer` | position du dernier appui (suit la souris sur PC) |
 | `j.maintenu` | vrai tant que c'est appuyé |
 | `j.son` | les bruitages |
+| `j.fx` | les effets : gerbes, bulles de score, secousse |
 | `j.hasard()`, `j.entier(a, b)` | aléatoire |
 
 ### La boîte à dessin
@@ -108,6 +110,26 @@ Puis ajoute-le à `MINIS` dans `src/games/index.js`. C'est tout.
 `rect`, `cadre` (une boîte creuse), `pastille` (un disque en gros pixels),
 `trame` (une grille de points), `texte`, plus `dist`, `borne`, `vers`. Aucune
 ne prend de rayon d'arrondi : c'est volontaire.
+
+## Les effets
+
+C'est ce qui sépare un jeu qui marche d'un jeu qui fait plaisir. Trois appels,
+depuis n'importe quel jeu :
+
+```js
+j.fx.eclat(x, y, couleur, { n: 12, vitesse: 160 })   // une gerbe de grains
+j.fx.bulle(x, y, '+40', C.accent)                    // un nombre qui monte
+j.fx.secoue(8)                                       // une secousse d'écran
+j.fx.jet(x, y, couleur, { angle, n: 3 })             // un jet dirigé
+```
+
+Le moteur dessine tout par-dessus le jeu, dans son repère, et secoue l'image
+sans jamais bouger le bandeau du haut. Il ajoute lui-même la gerbe et la
+secousse au moment de la mort.
+
+**Attention aux jeux qui ont une caméra** (GRIMPE, l'aventure) : les grains
+vivent dans le repère de l'écran, il faut donc leur passer des coordonnées
+déjà décalées.
 
 ## L'aventure
 
@@ -190,6 +212,7 @@ src/
   palette.js        les couleurs
   stockage.js       records, sourdine, progression — un seul préfixe
   son.js            les bruitages, synthétisés
+  effets.js         gerbes, bulles de score, secousse d'écran
   games/            les mini-jeux + le catalogue
   aventure/         le jeu principal et ses niveaux
 .github/workflows/

@@ -72,6 +72,8 @@ export default {
         j.score += 10 * j.e.niveau
         // La note dépend de la rangée : vider une colonne fait une gamme.
         j.son.casse(RANGS - 1 - q.rang)
+        j.fx.eclat(q.x + q.w / 2, q.y + BRIQUE_H / 2, q.couleur, { n: 9, vitesse: 130, taille: 5 })
+        j.fx.secoue(1.5)
         // On rebondit sur l'axe où la balle est le moins enfoncée.
         const dx = Math.min(Math.abs(b.x - q.x), Math.abs(b.x - (q.x + q.w)))
         const dy = Math.min(Math.abs(b.y - q.y), Math.abs(b.y - (q.y + BRIQUE_H)))
@@ -85,6 +87,7 @@ export default {
       j.e.vies--
       if (j.e.vies <= 0) return j.perdu()
       j.son.rate()
+      j.fx.secoue(7)
       poseBalle(j)
     }
 
@@ -113,10 +116,10 @@ export default {
 
     for (let i = 0; i < j.e.vies; i++) rect(ctx, 16 + i * 14, j.H - 24, 8, 8, C.cyan)
     ctx.textAlign = 'right'
-    texte(ctx, `NIV ${j.e.niveau}`, j.W - 14, j.H - 20, 11, C.faible, 700)
+    texte(ctx, `NIV ${j.e.niveau}`, j.W - 14, j.H - 20, 13, C.faible, 700)
     ctx.textAlign = 'center'
 
-    if (j.e.balle.collee) texte(ctx, 'appuie pour lancer', j.W / 2, j.H - 150, 12, C.faible, 700)
+    if (j.e.balle.collee) texte(ctx, 'appuie pour lancer', j.W / 2, j.H - 150, 13, C.faible, 700)
   },
 
   appui(j) {

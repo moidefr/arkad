@@ -42,9 +42,16 @@ export default {
         j.score += 1
         j.e.eclat = 1
         j.son.touche(Math.min(9, 1 + Math.floor(j.score / 3)))
+        const x = t.voie * (j.W / VOIES) + j.W / VOIES / 2
+        j.fx.eclat(x, BUT_Y + 20, C.vert, { n: 14, vitesse: 180, taille: 5 })
+        j.fx.bulle(x, BUT_Y - 20, 'ARRÊT', C.accent, 15)
+        j.fx.secoue(3)
       } else {
         j.e.vies--
         j.son.rate()
+        const x = t.voie * (j.W / VOIES) + j.W / VOIES / 2
+        j.fx.eclat(x, BUT_Y + 30, C.rouge, { n: 16, vitesse: 200, taille: 5 })
+        j.fx.secoue(7)
       }
     }
     if (j.e.vies <= 0) j.perdu()
@@ -74,7 +81,7 @@ export default {
     ctx.textAlign = 'left'
     for (let i = 0; i < j.e.vies; i++) rect(ctx, 16 + i * 14, j.H - 26, 8, 8, C.rouge)
     ctx.textAlign = 'center'
-    texte(ctx, 'appuie à gauche ou à droite', j.W / 2, j.H - 22, 11, C.faible, 700)
+    texte(ctx, 'appuie à gauche ou à droite', j.W / 2, j.H - 22, 13, C.faible, 700)
   },
 
   appui(j, p) {

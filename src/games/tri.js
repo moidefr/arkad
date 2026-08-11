@@ -62,7 +62,7 @@ export default {
     ctx.textAlign = 'left'
     for (let i = 0; i < j.e.vies; i++) rect(ctx, 16 + i * 14, j.H - 22, 8, 8, C.rouge)
     ctx.textAlign = 'center'
-    texte(ctx, 'appuie du côté du bon bac', j.W / 2, j.H - 18, 11, C.faible, 700)
+    texte(ctx, 'appuie du côté du bon bac', j.W / 2, j.H - 18, 13, C.faible, 700)
 
     if (j.e.flash > 0) {
       ctx.fillStyle = `rgba(255, 95, 86, ${j.e.flash * 0.22})`
@@ -82,11 +82,15 @@ export default {
     if (versGauche === o.gauche) {
       j.score += 10
       j.son.ramasse()
+      const bx = versGauche ? j.W / 4 : (j.W * 3) / 4
+      j.fx.eclat(bx, BAC_Y + BAC_H / 2, versGauche ? GAUCHE : DROITE, { n: 10, vitesse: 130 })
+      j.fx.bulle(bx, BAC_Y - 10, '+10', C.accent, 14)
       return
     }
     j.e.vies--
     j.e.flash = 1
     j.son.rate()
+    j.fx.secoue(6)
     if (j.e.vies <= 0) j.perdu()
   },
 }

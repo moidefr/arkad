@@ -10,6 +10,7 @@ import { PRINCIPAL, MINIS } from './games/index.js'
 import { Input } from './input.js'
 import { C } from './palette.js'
 import { son } from './son.js'
+import { Effets } from './effets.js'
 import { lis, ecris } from './stockage.js'
 import { texte, rect, cadre, scanlines, largeurTexte, PX } from './dessin.js'
 
@@ -77,12 +78,13 @@ export class Moteur {
   }
 
   _redim() {
-    // Volontairement sans densité d'écran : la toile fait exactement
-    // 360 x 640 pixels et c'est le CSS qui l'agrandit sans lissage. C'est de
-    // là que vient le grain.
-    this.canvas.width = W
-    this.canvas.height = H
-    this.ctx.imageSmoothingEnabled = false
+    // On dessine à la densité réelle de l'écran : c'est ce qui rend le texte
+    // net. Le côté pixel vient des formes — grille de 2, angles droits — pas
+    // d'une toile basse résolution, qui rendait les petits textes illisibles.
+    const dpr = Math.min(devicePixelRatio || 1, 3)
+    this.canvas.width = Math.round(W * dpr)
+    this.canvas.height = Math.round(H * dpr)
+    this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
     this.ctx.textAlign = 'center'
     this.ctx.textBaseline = 'middle'
   }
@@ -121,6 +123,7 @@ export class Moteur {
         return this.__input.held
       },
       e: {},
+      fx: new Effets(),
       hasard: Math.random,
       entier: (a, b) => a + Math.floor(Math.random() * (b - a)),
       fini: false,
@@ -139,6 +142,8 @@ export class Moteur {
     this.phase = 'fin'
     this.phaseT = 0
     son.mort()
+    this.j.fx.secoue(11)
+    this.j.fx.eclat(W / 2, H / 2, C.rouge, { n: 26, vitesse: 260, taille: 6, duree: 0.9 })
     if (this.record) setTimeout(() => son.record(), 450)
   }
 
@@ -157,7 +162,12 @@ export class Moteur {
 
   _maj(dt) {
     this.phaseT += dt
+    if (!this.j) return
+    // Les effets continuent de vivre pendant l'écran de fin : la secousse
+    // retombe et les grains achèvent leur chute, au lieu de se figer.
+    if (this.phase !== 'pause') this.j.fx.maj(dt)
     if (this.phase !== 'jeu') return
+
     const j = this.j
     j.t += dt
     this.def.maj?.(j, dt)
@@ -225,7 +235,13 @@ export class Moteur {
     else {
       // La dernière image du jeu reste visible sous la pause et sous l'écran
       // de fin : on ne perd jamais de vue ce qui vient de se passer.
+      const fx = this.j.fx
+      ctx.save()
+      ctx.translate(Math.round(fx.dx), Math.round(fx.dy))
       this.def.dessine?.(this.j, ctx)
+      fx.dessine(ctx)
+      ctx.restore()
+      ctx.textAlign = 'center'
       this._bandeau()
       if (this.phase === 'pause') this._pause()
       if (this.phase === 'fin') this._fin()
@@ -245,7 +261,7 @@ export class Moteur {
     // Curseur clignotant, calé après le titre : deux lignes de code, et
     // l'écran a l'air vivant.
     if (Math.floor(this.phaseT * 2) % 2 === 0) {
-      rect(ctx, 20 + largeurTexte(titre, 26) + 8, 22, 12, 18, C.accent)
+      rect(ctx, 20 + largeurTexte(ctx, titre, 26) + 8, 22, 12, 18, C.accent)
     }
     ctx.textAlign = 'center'
 
@@ -262,9 +278,9 @@ export class Moteur {
     MINIS.forEach((def, i) => this._tuile(def, i))
 
     ctx.textAlign = 'left'
-    texte(ctx, `${MINIS.length + 1} jeux`, 20, 612, 11, C.faible, 700)
+    texte(ctx, `${MINIS.length + 1} jeux`, 20, 612, 12, C.faible, 700)
     ctx.textAlign = 'right'
-    texte(ctx, 'une seule touche', 340, 612, 11, C.faible, 700)
+    texte(ctx, 'une seule touche', 340, 612, 12, C.faible, 700)
     ctx.textAlign = 'center'
   }
 
@@ -277,7 +293,7 @@ export class Moteur {
 
     ctx.textAlign = 'left'
     texte(ctx, PRINCIPAL.nom, x + 14, y + 26, 26, C.accent, 700)
-    texte(ctx, PRINCIPAL.pitch, x + 14, y + 50, 11, C.faible, 700, w - 28)
+    texte(ctx, PRINCIPAL.pitch, x + 14, y + 50, 12, C.faible, 700, w - 28)
 
     // Barre de progression en gros blocs, comme un chargement de terminal.
     const { faits, total } = PRINCIPAL.progression?.() ?? { faits: 0, total: 0 }
@@ -287,9 +303,9 @@ export class Moteur {
       rect(ctx, x + 14 + i * 12, y + 68, 10, 10, i < pleines ? C.accent : C.bord)
     }
     ctx.textAlign = 'right'
-    texte(ctx, `${faits}/${total}`, x + w - 14, y + 88, 12, C.faible, 700)
+    texte(ctx, `${faits}/${total}`, x + w - 14, y + 88, 13, C.faible, 700)
     ctx.textAlign = 'left'
-    texte(ctx, 'NIVEAUX', x + 14, y + 88, 12, C.faible, 700)
+    texte(ctx, 'NIVEAUX', x + 14, y + 88, 13, C.faible, 700)
     ctx.textAlign = 'center'
   }
 
@@ -300,9 +316,9 @@ export class Moteur {
     rect(ctx, x, y, w, h, C.panneau)
     rect(ctx, x, y, w, 4, def.couleur)
 
-    texte(ctx, def.nom, x + w / 2, y + 24, 10, C.texte, 700, w - 8)
+    texte(ctx, def.nom, x + w / 2, y + 24, 13, C.texte, 700, w - 8)
     const best = this.meilleur(def.id)
-    texte(ctx, best ? String(best) : '--', x + w / 2, y + 48, 14, best ? C.accent : C.bord, 700, w - 10)
+    texte(ctx, best ? String(best) : '--', x + w / 2, y + 48, 17, best ? C.accent : C.bord, 700, w - 10)
   }
 
   _boutonSon() {
@@ -332,7 +348,7 @@ export class Moteur {
     if (!this.def.sansScore) {
       ctx.textAlign = 'right'
       const best = Math.max(this.j.meilleur, Math.floor(this.j.score))
-      texte(ctx, `REC ${best}`, W - 12, 26, 11, C.faible, 700)
+      texte(ctx, `REC ${best}`, W - 12, 26, 12, C.faible, 700)
       ctx.textAlign = 'center'
     }
   }
@@ -361,9 +377,9 @@ export class Moteur {
 
     if (!this.def.sansScore) {
       texte(ctx, `${Math.floor(this.j.score)}`, W / 2, 252, 60, C.texte, 700)
-      texte(ctx, this.def.unite, W / 2, 296, 13, C.faible, 700)
+      texte(ctx, this.def.unite, W / 2, 296, 14, C.faible, 700)
       if (this.record) texte(ctx, '* NOUVEAU RECORD *', W / 2, 342, 15, C.accent, 700)
-      else texte(ctx, `record ${this.meilleur(this.def.id)}`, W / 2, 342, 12, C.faible, 700)
+      else texte(ctx, `record ${this.meilleur(this.def.id)}`, W / 2, 342, 13, C.faible, 700)
     }
 
     B_FIN.forEach((b, i) => bouton(ctx, b.y, b.h, b.libelle, i === 0))
@@ -376,7 +392,7 @@ function bouton(ctx, y, h, libelle, primaire) {
   const couleur = primaire ? C.accent : C.faible
   rect(ctx, MENU_X, y, MENU_W, h, C.panneau)
   cadre(ctx, MENU_X, y, MENU_W, h, couleur)
-  texte(ctx, libelle, MENU_X + MENU_W / 2, y + h / 2, 18, primaire ? C.accent : C.texte, 700, MENU_W - 24)
+  texte(ctx, libelle, MENU_X + MENU_W / 2, y + h / 2, 19, primaire ? C.accent : C.texte, 700, MENU_W - 24)
 }
 
 function tuile(i) {

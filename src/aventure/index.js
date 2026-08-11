@@ -224,6 +224,11 @@ function majNiveau(j, dt) {
         if (j.e.pieces.delete(cle)) {
           j.e.ramassees++
           j.son.ramasse()
+          // Repère de l'écran : la caméra bouge, les grains non.
+          j.fx.eclat(c * TUILE + TUILE / 2 - j.e.cam, r * TUILE + TUILE / 2 + decalage(j), C.accent, {
+            n: 10,
+            vitesse: 120,
+          })
         }
       }
     }
@@ -239,6 +244,8 @@ function majNiveau(j, dt) {
 function meurt(j) {
   j.e.morts++
   j.son.rate()
+  j.fx.eclat(j.e.j.x - j.e.cam, j.e.j.y + decalage(j), C.rouge, { n: 18, vitesse: 190, taille: 5 })
+  j.fx.secoue(8)
   reprend(j)
 }
 
@@ -312,9 +319,9 @@ function dessineNiveau(j, ctx) {
 
   // Repères en bas : pièces et morts.
   ctx.textAlign = 'left'
-  texte(ctx, `o ${j.e.ramassees}/${j.e.ramassees + j.e.pieces.size}`, 14, j.H - 12, 11, C.accent, 700)
+  texte(ctx, `o ${j.e.ramassees}/${j.e.ramassees + j.e.pieces.size}`, 14, j.H - 12, 13, C.accent, 700)
   ctx.textAlign = 'right'
-  texte(ctx, `morts ${j.e.morts}`, j.W - 14, j.H - 12, 11, C.faible, 700)
+  texte(ctx, `morts ${j.e.morts}`, j.W - 14, j.H - 12, 13, C.faible, 700)
   ctx.textAlign = 'center'
 
   if (j.e.t < 3) texte(ctx, NIVEAUX[j.e.n].indice, j.W / 2, j.HUD + 40, 13, C.faible, 700)
@@ -326,7 +333,7 @@ function dessineReussite(j, ctx) {
   texte(ctx, 'NIVEAU TERMINÉ', j.W / 2, 250, 22, C.accent, 700)
   texte(ctx, `pièces ${j.e.ramassees}`, j.W / 2, 300, 14, C.texte, 700)
   texte(ctx, `morts ${j.e.morts}`, j.W / 2, 324, 14, C.faible, 700)
-  texte(ctx, 'appuie pour continuer', j.W / 2, 400, 12, C.faible, 700)
+  texte(ctx, 'appuie pour continuer', j.W / 2, 400, 13, C.faible, 700)
 }
 
 function dessineCarte(j, ctx) {
@@ -343,12 +350,12 @@ function dessineCarte(j, ctx) {
     rect(ctx, 20, y, 4, 38, fini ? C.accent : dispo ? C.faible : C.bord)
 
     ctx.textAlign = 'left'
-    texte(ctx, `[${String(i + 1).padStart(2, '0')}]`, 34, y + 19, 12, C.faible, 700)
+    texte(ctx, `[${String(i + 1).padStart(2, '0')}]`, 34, y + 19, 13, C.faible, 700)
     texte(ctx, dispo ? n.nom : '???????', 74, y + 19, 15, dispo ? C.texte : C.bord, 700, 190)
     ctx.textAlign = 'right'
     texte(ctx, fini ? 'FAIT' : dispo ? '>' : 'x', 326, y + 19, 13, fini ? C.accent : C.faible, 700)
     ctx.textAlign = 'center'
   })
 
-  texte(ctx, 'squelette — les vrais niveaux viendront', j.W / 2, j.H - 60, 11, C.bord, 700)
+  texte(ctx, 'squelette — les vrais niveaux viendront', j.W / 2, j.H - 60, 12, C.bord, 700)
 }

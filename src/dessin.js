@@ -4,9 +4,7 @@
  * Trois règles tenues partout :
  *   1. tout est aligné sur une grille de PX pixels, donc rien n'est flou ;
  *   2. aucun coin arrondi, aucun dégradé ;
- *   3. le texte est rastérisé petit puis agrandi sans lissage, ce qui lui
- *      donne son grain de pixels sans avoir à embarquer une police bitmap
- *      (et les accents français continuent de marcher).
+ *   3. le texte, lui, est net : le style vient des formes, pas de la typo.
  */
 import { C } from './palette.js'
 
@@ -15,18 +13,6 @@ export const PX = 2
 
 /** Police d'écran : le monospace est la moitié de l'identité. */
 export const POLICE = 'ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace'
-
-/**
- * Facteur d'agrandissement du texte, choisi selon la taille demandée.
- * En dessous de 5 px, une lettre rastérisée n'a plus de forme lisible : les
- * petits textes s'agrandissent donc moins que les titres. Le facteur reste
- * entier, sinon les pixels sortent de largeurs inégales.
- */
-function echelle(taille) {
-  if (taille < 14) return 2
-  if (taille < 30) return 3
-  return 4
-}
 
 export function px(v) {
   return Math.round(v / PX) * PX
@@ -61,71 +47,39 @@ export function pastille(ctx, cx, cy, r, couleur) {
 
 // --- Texte -------------------------------------------------------------------
 
-const cache = new Map()
-
-function rasterise(s, taille, couleur, poids) {
-  const cle = `${s}|${taille}|${couleur}|${poids}`
-  const connu = cache.get(cle)
-  if (connu) return connu
-
-  // Les scores changent à chaque image : sans plafond, le cache gonflerait
-  // indéfiniment. On le vide d'un coup, c'est suffisant et simple.
-  if (cache.size > 400) cache.clear()
-
-  const petite = Math.max(5, Math.round(taille / echelle(taille)))
-  const mesure = document.createElement('canvas').getContext('2d')
-  mesure.font = `${poids} ${petite}px ${POLICE}`
-  const l = Math.max(1, Math.ceil(mesure.measureText(s).width))
-  const h = Math.ceil(petite * 1.4)
-
-  const toile = document.createElement('canvas')
-  toile.width = l
-  toile.height = h
-  const c = toile.getContext('2d')
-  c.font = `${poids} ${petite}px ${POLICE}`
-  c.textBaseline = 'middle'
-  c.textAlign = 'left'
-  c.fillStyle = couleur
-  c.fillText(s, 0, h / 2)
-
-  cache.set(cle, toile)
-  return toile
-}
-
 /**
- * Respecte `ctx.textAlign` ('left' | 'center' | 'right') et considère `y`
- * comme le milieu du texte, exactement comme fillText en baseline 'middle'.
+ * Le texte est dessiné directement, à la taille demandée et à la résolution
+ * de l'écran. On a essaye de le rasteriser petit puis de l'agrandir pour lui
+ * donner du grain : joli en grand, illisible en petit. Le style vient
+ * maintenant des formes — grille, angles droits, aplats — et la typo reste
+ * nette.
+ *
+ * Respecte `ctx.textAlign` et `ctx.textBaseline`, comme fillText.
  */
 export function texte(ctx, s, x, y, taille, couleur = C.texte, poids = 700, largeurMax) {
   const chaine = String(s)
   if (!chaine) return
-  const k = echelle(taille)
-  const img = rasterise(chaine, taille, couleur, poids)
-  let w = img.width * k
-  let h = img.height * k
-  if (largeurMax && w > largeurMax) {
-    h = Math.round(h * (largeurMax / w))
-    w = Math.round(largeurMax)
-  }
-  const a = ctx.textAlign
-  const dx = a === 'center' ? -w / 2 : a === 'right' ? -w : 0
-  const lisse = ctx.imageSmoothingEnabled
-  ctx.imageSmoothingEnabled = false
-  ctx.drawImage(img, Math.round(x + dx), Math.round(y - h / 2), w, h)
-  ctx.imageSmoothingEnabled = lisse
+  ctx.fillStyle = couleur
+  ctx.font = `${poids} ${taille}px ${POLICE}`
+  if (largeurMax) ctx.fillText(chaine, x, y, largeurMax)
+  else ctx.fillText(chaine, x, y)
 }
 
-/** Largeur qu'occupera un texte, pour aligner autre chose à côté. */
-export function largeurTexte(s, taille, poids = 700) {
-  return rasterise(String(s), taille, '#000', poids).width * echelle(taille)
+/** Largeur qu'occupera un texte, pour aligner autre chose a cote. */
+export function largeurTexte(ctx, s, taille, poids = 700) {
+  ctx.font = `${poids} ${taille}px ${POLICE}`
+  return ctx.measureText(String(s)).width
 }
 
 // --- Ambiance ----------------------------------------------------------------
 
-/** Lignes de balayage, comme sur un écran cathodique. Discret mais décisif. */
+/**
+ * Lignes de balayage, comme sur un écran cathodique. Fines et discrètes :
+ * plus épaisses, elles coupaient les lettres en deux.
+ */
 export function scanlines(ctx, w, h) {
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.18)'
-  for (let y = 0; y < h; y += 4) ctx.fillRect(0, y, w, 2)
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.11)'
+  for (let y = 0; y < h; y += 4) ctx.fillRect(0, y, w, 1)
 }
 
 /** Trame de points : donne du sol aux jeux sans encombrer l'écran. */

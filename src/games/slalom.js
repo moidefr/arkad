@@ -53,6 +53,8 @@ export default {
         }
         j.score += 1
         j.son.touche(Math.min(9, 1 + Math.floor(j.score / 4)))
+        j.fx.eclat(m.trou, Y_JOUEUR, C.cyan, { n: 5, vitesse: 90, gravite: 0, duree: 0.3 })
+        j.fx.eclat(m.trou + m.largeur, Y_JOUEUR, C.cyan, { n: 5, vitesse: 90, gravite: 0, duree: 0.3 })
       }
     }
     j.e.murs = j.e.murs.filter((m) => m.y < j.H + 40)
@@ -74,11 +76,12 @@ export default {
     rect(ctx, j.e.x - TAILLE / 2, Y_JOUEUR - TAILLE / 2, TAILLE, TAILLE, C.accent)
     rect(ctx, j.e.x - 2 + j.e.dir * 6, Y_JOUEUR - 2, 4, 4, C.fond)
 
-    if (j.t < 3) texte(ctx, 'appuie pour zigzaguer', j.W / 2, j.H - 40, 12, C.faible, 700)
+    if (j.t < 3) texte(ctx, 'appuie pour zigzaguer', j.W / 2, j.H - 40, 13, C.faible, 700)
   },
 
   appui(j) {
     j.e.dir *= -1
     j.son.rebond()
+    j.fx.jet(j.e.x, Y_JOUEUR + 8, C.bord, { angle: Math.PI / 2, ouverture: 1.6, n: 4, vitesse: 70, duree: 0.25 })
   },
 }

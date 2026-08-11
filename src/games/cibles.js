@@ -63,9 +63,9 @@ export default {
       rect(ctx, 22 + i * 13, HAUT - 30, 9, 12, couleur)
     }
     ctx.textAlign = 'left'
-    texte(ctx, 'CHRONO', 22, HAUT - 46, 10, C.faible, 700)
+    texte(ctx, 'CHRONO', 22, HAUT - 46, 13, C.faible, 700)
     ctx.textAlign = 'right'
-    if (j.e.combo > 1) texte(ctx, `COMBO x${j.e.combo}`, j.W - 22, HAUT - 46, 12, C.accent, 700)
+    if (j.e.combo > 1) texte(ctx, `COMBO x${j.e.combo}`, j.W - 22, HAUT - 46, 13, C.accent, 700)
     ctx.textAlign = 'center'
 
     // Cible : des carrés concentriques, pas des cercles — même grammaire que
@@ -95,11 +95,15 @@ export default {
       j.e.jauge = Math.max(0, j.e.jauge - 0.8)
       j.e.flash = 1
       j.son.rate()
+      j.fx.secoue(4)
       return
     }
-    j.e.cibles.splice(i, 1)
-    j.score += 10 * j.e.combo
+    const c = j.e.cibles.splice(i, 1)[0]
+    const gain = 10 * j.e.combo
+    j.score += gain
     j.son.touche(j.e.combo)
+    j.fx.eclat(c.x, c.y, C.accent, { n: 14, vitesse: 170, taille: 5, gravite: 120 })
+    j.fx.bulle(c.x, c.y - 20, '+' + gain, C.accent, 16)
     j.e.combo = Math.min(9, j.e.combo + 1)
     j.e.jauge = Math.min(12, j.e.jauge + 0.75)
   },

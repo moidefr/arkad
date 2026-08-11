@@ -48,7 +48,7 @@ export default {
 
     for (let i = 0; i < j.e.vies; i++) rect(ctx, 20 + i * 14, j.H - 30, 8, 8, C.rouge)
     ctx.textAlign = 'right'
-    if (j.e.serie > 1) texte(ctx, `série ${j.e.serie}`, j.W - 20, j.H - 26, 12, C.accent, 700)
+    if (j.e.serie > 1) texte(ctx, `série ${j.e.serie}`, j.W - 20, j.H - 26, 13, C.accent, 700)
     ctx.textAlign = 'center'
 
     if (j.e.flash > 0) {
@@ -61,8 +61,11 @@ export default {
     const repond = p.x >= j.W / 2 // droite = vrai
     if (repond === j.e.question.juste) {
       j.e.serie++
-      j.score += 10 + Math.min(j.e.serie, 10) * 2
+      const gain = 10 + Math.min(j.e.serie, 10) * 2
+      j.score += gain
       j.son.touche(Math.min(9, j.e.serie))
+      j.fx.eclat(j.W / 2, 260, C.accent, { n: 12, vitesse: 170, taille: 5 })
+      j.fx.bulle(j.W / 2, 210, '+' + gain, C.accent, 17)
       tire(j)
       return
     }
@@ -75,6 +78,7 @@ function rate(j) {
   j.e.vies--
   j.e.flash = 1
   j.son.rate()
+  j.fx.secoue(6)
   if (j.e.vies <= 0) return j.perdu()
   tire(j)
 }

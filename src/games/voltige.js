@@ -44,6 +44,12 @@ export default {
     // Le tunnel se resserre lentement : c'est toute la courbe de difficulté.
     j.e.ouverture = Math.max(96, 210 - j.t * 2.6)
 
+    // Réacteur : le seul retour visuel sur l'appui, et il montre la poussée.
+    if (j.maintenu) {
+      j.fx.jet(X_JOUEUR - 2, j.e.y + TAILLE / 2, C.rouge, { angle: Math.PI / 2, n: 2, vitesse: 130 })
+    }
+    j.fx.jet(X_JOUEUR - TAILLE, j.e.y, C.bord, { angle: Math.PI, ouverture: 0.3, n: 1, vitesse: 190 })
+
     const i = Math.floor((X_JOUEUR + j.e.decalage) / LARGEUR_COL)
     const col = j.e.cols[i]
     if (!col) return
@@ -60,10 +66,8 @@ export default {
     })
 
     rect(ctx, X_JOUEUR - TAILLE / 2, j.e.y - TAILLE / 2, TAILLE, TAILLE, C.accent)
-    // Une traînée quand ça pousse : le seul retour visuel sur l'appui.
-    if (j.maintenu) rect(ctx, X_JOUEUR - 4, j.e.y + TAILLE / 2, 8, 10, C.rouge)
 
-    if (j.t < 3) texte(ctx, 'maintiens appuyé', j.W / 2, j.H - 40, 12, C.faible, 700)
+    if (j.t < 3) texte(ctx, 'maintiens appuyé', j.W / 2, j.H - 40, 13, C.faible, 700)
   },
 }
 

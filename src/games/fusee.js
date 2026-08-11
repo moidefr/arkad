@@ -38,6 +38,10 @@ export default {
 
     if (j.e.y < j.HUD + 20) (j.e.y = j.HUD + 20), (j.e.vy = 0)
 
+    if (j.maintenu && j.e.carburant > 0) {
+      j.fx.jet(j.e.x, j.e.y + HAUT / 2, C.accent, { angle: Math.PI / 2, n: 3, vitesse: 160, duree: 0.3 })
+    }
+
     if (j.e.y + HAUT / 2 >= sol) {
       const centre = j.e.x
       const dedans = centre > j.e.piste.x && centre < j.e.piste.x + j.e.piste.w
@@ -47,12 +51,16 @@ export default {
         // franches plutôt que les longues hésitations.
         j.score += 50 + Math.round(j.e.carburant * 50)
         j.son.niveau()
+        j.fx.jet(j.e.x, sol - 4, C.accent, { angle: -Math.PI / 2, ouverture: 2.6, n: 14, vitesse: 130, gravite: 260 })
+        j.fx.bulle(j.e.x, sol - 40, '+' + (50 + Math.round(j.e.carburant * 50)), C.accent, 16)
         j.e.piste.w = Math.max(46, j.e.piste.w - 12)
         j.e.piste.x = 20 + Math.random() * (j.W - 40 - j.e.piste.w)
         depart(j)
         return
       }
       j.son.rate()
+      j.fx.eclat(j.e.x, sol - 10, C.rouge, { n: 24, vitesse: 220, taille: 6 })
+      j.fx.secoue(10)
       return j.perdu()
     }
   },
@@ -68,9 +76,6 @@ export default {
     const vite = j.e.vy >= VITESSE_MAX
     rect(ctx, x, y, LARGE, HAUT, vite ? C.rouge : C.texte)
     rect(ctx, x + 4, y + 4, 8, 6, C.fond)
-    if (j.maintenu && j.e.carburant > 0) {
-      rect(ctx, x + 4, y + HAUT, 8, 8 + Math.random() * 8, C.accent)
-    }
 
     // Jauge de carburant, en segments comme partout ailleurs.
     for (let i = 0; i < 16; i++) {
@@ -79,7 +84,7 @@ export default {
     ctx.textAlign = 'right'
     texte(ctx, `${Math.round(j.e.vy)}`, j.W - 16, j.HUD + 20, 13, vite ? C.rouge : C.faible, 700)
     ctx.textAlign = 'left'
-    texte(ctx, `posés ${j.e.poses}`, 16, j.HUD + 20, 12, C.faible, 700)
+    texte(ctx, `posés ${j.e.poses}`, 16, j.HUD + 20, 13, C.faible, 700)
     ctx.textAlign = 'center'
   },
 }

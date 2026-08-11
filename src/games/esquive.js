@@ -63,6 +63,8 @@ export default {
       if (s.x + 12 > px && s.x < px + TAILLE && s.y + 12 > py && s.y < py + TAILLE) {
         j.score += 25
         j.son.ramasse()
+        j.fx.eclat(s.x + 6, s.y + 6, C.accent, { n: 12, vitesse: 130, taille: 4 })
+        j.fx.bulle(s.x + 6, s.y, '+25', C.accent)
         return false
       }
       return s.y < j.H + 30

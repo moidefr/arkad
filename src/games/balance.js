@@ -61,12 +61,21 @@ export default {
     rect(ctx, 60 + 120 - 2, j.H - 66, 4, 22, C.bord)
     rect(ctx, 60 + 120 + part * 118 - 5, j.H - 62, 10, 14, chaud ? C.rouge : C.accent)
 
-    texte(ctx, 'appuie du côté opposé à la chute', j.W / 2, j.H - 26, 11, C.faible, 700)
+    texte(ctx, 'appuie du côté opposé à la chute', j.W / 2, j.H - 26, 13, C.faible, 700)
   },
 
   appui(j, p) {
-    j.e.vitesse += (p.x < j.W / 2 ? -1 : 1) * POUSSEE
+    const sens = p.x < j.W / 2 ? -1 : 1
+    j.e.vitesse += sens * POUSSEE
     j.e.eclat = 1
     j.son.rebond()
+    j.fx.jet(j.W / 2 - sens * 26, BASE_Y - 14, C.accent, {
+      angle: sens > 0 ? Math.PI : 0,
+      ouverture: 1,
+      n: 5,
+      vitesse: 130,
+      gravite: 220,
+      duree: 0.3,
+    })
   },
 }

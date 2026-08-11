@@ -46,6 +46,8 @@ export default {
         ) {
           j.e.vy = -REBOND
           j.son.rebond()
+          // Les grains vivent dans le repère de l'écran : on convertit.
+          j.fx.jet(j.e.x, p.y - j.e.cam, C.vert, { angle: Math.PI / 2, ouverture: 2.4, n: 6, vitesse: 90, duree: 0.3 })
           break
         }
       }
@@ -79,7 +81,7 @@ export default {
     rect(ctx, x + 5, y + 6, 4, 5, C.fond)
     rect(ctx, x + 13, y + 6, 4, 5, C.fond)
 
-    if (j.t < 3) texte(ctx, 'glisse le doigt', j.W / 2, j.H - 40, 12, C.faible, 700)
+    if (j.t < 3) texte(ctx, 'glisse le doigt', j.W / 2, j.H - 40, 13, C.faible, 700)
   },
 }
 

@@ -38,6 +38,7 @@ export default {
       j.e.cadence = Math.min(1.9, j.e.cadence + 0.035)
       j.e.eclat = 1
       j.son.touche(Math.min(9, 1 + Math.floor(j.score / 3)))
+      j.fx.jet(j.W / 2, SOL, C.vert, { angle: -Math.PI / 2, ouverture: 2.8, n: 8, vitesse: 110, gravite: 400, duree: 0.3 })
     }
   },
 
@@ -66,7 +67,7 @@ export default {
     rect(ctx, cx - 7, y + 7, 4, 5, C.fond)
     rect(ctx, cx + 3, y + 7, 4, 5, C.fond)
 
-    if (j.t < 4) texte(ctx, 'appuie pour sauter', j.W / 2, j.H - 60, 12, C.faible, 700)
+    if (j.t < 4) texte(ctx, 'appuie pour sauter', j.W / 2, j.H - 60, 13, C.faible, 700)
   },
 
   appui(j) {

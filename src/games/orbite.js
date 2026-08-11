@@ -21,6 +21,7 @@ export default {
   },
 
   maj(j, dt) {
+    const { cx, cy } = j.e
     const vitesse = 2 + j.t * 0.03
     j.e.ang += j.e.sens * vitesse * dt
 
@@ -42,6 +43,11 @@ export default {
       }
       if (o.r < 26) {
         j.score += 10
+        j.fx.eclat(cx + Math.cos(o.a) * o.r, cy + Math.sin(o.a) * o.r, C.bord, {
+          n: 6,
+          vitesse: 90,
+          gravite: 0,
+        })
         continue
       }
       restants.push(o)
@@ -71,7 +77,7 @@ export default {
     const py = cy + Math.sin(j.e.ang) * RAYON
     rect(ctx, px - TAILLE / 2, py - TAILLE / 2, TAILLE, TAILLE, C.accent)
 
-    if (j.t < 3) texte(ctx, 'appuie pour inverser', j.W / 2, j.H - 50, 12, C.faible, 700)
+    if (j.t < 3) texte(ctx, 'appuie pour inverser', j.W / 2, j.H - 50, 13, C.faible, 700)
   },
 
   appui(j) {

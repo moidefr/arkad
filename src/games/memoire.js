@@ -87,6 +87,8 @@ export default {
     }
 
     j.son.touche(i + 1)
+    const z = cases(j)[i]
+    j.fx.eclat(z.x + z.w / 2, z.y + z.h / 2, TEINTES[i], { n: 10, vitesse: 130, gravite: 60 })
     j.e.i++
     if (j.e.i >= j.e.suite.length) {
       j.score += 10 * j.e.suite.length

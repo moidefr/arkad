@@ -48,9 +48,9 @@ export default {
     rect(ctx, c.x, BASE_Y - BLOC_H, c.w, BLOC_H, C.texte)
 
     ctx.textAlign = 'left'
-    texte(ctx, `largeur ${Math.round(j.e.pile[j.e.pile.length - 1].w)}`, 16, j.H - 20, 11, C.faible, 700)
+    texte(ctx, `largeur ${Math.round(j.e.pile[j.e.pile.length - 1].w)}`, 16, j.H - 20, 13, C.faible, 700)
     ctx.textAlign = 'center'
-    if (j.e.pile.length < 3) texte(ctx, 'appuie pour poser', j.W / 2, j.HUD + 40, 12, C.faible, 700)
+    if (j.e.pile.length < 3) texte(ctx, 'appuie pour poser', j.W / 2, j.HUD + 40, 13, C.faible, 700)
   },
 
   appui(j) {
@@ -74,6 +74,13 @@ export default {
 
     j.e.pile.push({ x: gauche, w: large })
     j.score++
+    j.fx.eclat(gauche + large / 2, BASE_Y - BLOC_H / 2, TEINTES[j.e.pile.length % TEINTES.length], {
+      n: 8,
+      vitesse: 110,
+      taille: 4,
+    })
+    j.fx.secoue(2.5)
+    if (large > sous.w - 3) j.fx.bulle(gauche + large / 2, BASE_Y - 40, 'PILE !', C.accent, 16)
     j.e.v = Math.min(420, j.e.v + 9)
     j.son.casse(Math.min(11, j.e.pile.length))
     nouveau(j)

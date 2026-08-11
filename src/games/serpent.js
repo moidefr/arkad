@@ -63,8 +63,8 @@ export default {
     // La zone d'appui est indiquée en permanence : le jeu n'a pas de tutoriel.
     rect(ctx, 0, j.H - 34, j.W / 2 - 2, BANDE, C.panneau)
     rect(ctx, j.W / 2 + 2, j.H - 34, j.W / 2 - 2, BANDE, C.panneau)
-    texte(ctx, '< GAUCHE', j.W / 4, j.H - 24, 11, C.faible, 700)
-    texte(ctx, 'DROITE >', (j.W * 3) / 4, j.H - 24, 11, C.faible, 700)
+    texte(ctx, '< GAUCHE', j.W / 4, j.H - 24, 13, C.faible, 700)
+    texte(ctx, 'DROITE >', (j.W * 3) / 4, j.H - 24, 13, C.faible, 700)
   },
 
   appui(j, p) {
@@ -95,6 +95,11 @@ function avance(j) {
     j.score += 10
     j.e.cadence = Math.min(14, j.e.cadence + 0.25)
     j.son.ramasse()
+    j.fx.eclat(tete.x * CASE + CASE / 2, TOP + tete.y * CASE + CASE / 2, C.accent, {
+      n: 12,
+      vitesse: 110,
+      gravite: 0,
+    })
     poseFruit(j)
   } else {
     j.e.corps.pop()
