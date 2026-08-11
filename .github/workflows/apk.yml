@@ -46,12 +46,12 @@ jobs:
           ./android/gradlew -p android assembleDebug
 
       - name: Renomme
-        run: cp android/app/build/outputs/apk/debug/app-debug.apk arcade-${{ inputs.version }}.apk
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk arkad-${{ inputs.version }}.apk
 
       - uses: actions/upload-artifact@v4
         with:
-          name: arcade-apk
-          path: arcade-${{ inputs.version }}.apk
+          name: arkad-apk
+          path: arkad-${{ inputs.version }}.apk
 
       # La release donne un lien direct téléchargeable depuis le téléphone,
       # là où un artefact d'Actions arrive sous forme de zip.
@@ -60,7 +60,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           TAG="v${{ inputs.version }}-${{ github.run_number }}"
-          gh release create "$TAG" "arcade-${{ inputs.version }}.apk" \
+          gh release create "$TAG" "arkad-${{ inputs.version }}.apk" \
             --target "${{ github.sha }}" \
-            --title "Arcade ${{ inputs.version }}" \
+            --title "ARKAD ${{ inputs.version }}" \
             --notes "APK de debug, à installer directement sur le téléphone (autoriser les sources inconnues)."

@@ -10,6 +10,7 @@ import { PRINCIPAL, MINIS } from './games/index.js'
 import { Input } from './input.js'
 import { C } from './palette.js'
 import { son } from './son.js'
+import { lis, ecris } from './stockage.js'
 import { texte, rect, cadre, scanlines, largeurTexte, PX } from './dessin.js'
 
 export const W = 360
@@ -24,7 +25,7 @@ const VEDETTE = { x: 20, y: 74, w: 320, h: 104 }
 
 // Les mini-jeux sont en grille : au-delà de six ou sept, une liste ne tient
 // plus dans l'écran, et une liste qui défile se prête mal à une borne.
-const GRILLE = { x: 20, y: 214, cols: 3, w: 101, h: 80, ecart: 8 }
+const GRILLE = { x: 20, y: 208, cols: 4, w: 74, h: 70, ecart: 8 }
 
 // Zones des menus.
 const B_PAUSE = [
@@ -89,12 +90,12 @@ export class Moteur {
   // --- Records --------------------------------------------------------------
 
   meilleur(id) {
-    return Number(localStorage.getItem('arcade.record.' + id) || 0)
+    return Number(lis('record.' + id, 0))
   }
 
   _enregistre(id, score) {
     if (score <= this.meilleur(id)) return false
-    localStorage.setItem('arcade.record.' + id, String(Math.floor(score)))
+    ecris('record.' + id, Math.floor(score))
     return true
   }
 
@@ -239,7 +240,7 @@ export class Moteur {
     const ctx = this.ctx
 
     ctx.textAlign = 'left'
-    const titre = '> ARCADE'
+    const titre = '> ARKAD'
     texte(ctx, titre, 20, 30, 26, C.accent, 700)
     // Curseur clignotant, calé après le titre : deux lignes de code, et
     // l'écran a l'air vivant.
@@ -254,9 +255,9 @@ export class Moteur {
     this._vedette()
 
     ctx.textAlign = 'left'
-    texte(ctx, 'MINI-JEUX', 20, 196, 14, C.faible, 700)
+    texte(ctx, 'MINI-JEUX', 20, 192, 14, C.faible, 700)
     ctx.textAlign = 'center'
-    rect(ctx, 104, 196, 236, PX, C.bord)
+    rect(ctx, 104, 192, 236, PX, C.bord)
 
     MINIS.forEach((def, i) => this._tuile(def, i))
 
@@ -299,10 +300,9 @@ export class Moteur {
     rect(ctx, x, y, w, h, C.panneau)
     rect(ctx, x, y, w, 4, def.couleur)
 
-    texte(ctx, def.nom, x + w / 2, y + 26, 12, C.texte, 700, w - 10)
+    texte(ctx, def.nom, x + w / 2, y + 24, 10, C.texte, 700, w - 8)
     const best = this.meilleur(def.id)
-    texte(ctx, best ? String(best) : '--', x + w / 2, y + 52, 16, best ? C.accent : C.bord, 700, w - 12)
-    if (best) texte(ctx, def.unite, x + w / 2, y + 68, 10, C.faible, 700)
+    texte(ctx, best ? String(best) : '--', x + w / 2, y + 48, 14, best ? C.accent : C.bord, 700, w - 10)
   }
 
   _boutonSon() {

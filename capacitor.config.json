@@ -1,6 +1,6 @@
 {
-  "appId": "fr.ndc26.arcade",
-  "appName": "Arcade",
+  "appId": "fr.ndc26.arkad",
+  "appName": "Arkad",
   "webDir": "www",
   "android": {
     "backgroundColor": "#0b0e0dff"

@@ -14,8 +14,9 @@
 import { C } from '../palette.js'
 import { texte, rect, cadre, trame, borne } from '../dessin.js'
 import { NIVEAUX, TUILE, RANGS, normalise } from './niveaux.js'
+import { lis, ecris } from '../stockage.js'
 
-const CLE = 'arcade.aventure.faits'
+const CLE = 'aventure.faits'
 
 // Le personnage avance seul : le saut est la seule chose qu'on contrôle.
 const VX = 92
@@ -28,7 +29,7 @@ const HAUTEUR_J = 18
 
 export function faits() {
   try {
-    return new Set(JSON.parse(localStorage.getItem(CLE) || '[]'))
+    return new Set(JSON.parse(lis(CLE, '[]')))
   } catch {
     return new Set()
   }
@@ -37,7 +38,7 @@ export function faits() {
 function marque(i) {
   const f = faits()
   f.add(i)
-  localStorage.setItem(CLE, JSON.stringify([...f]))
+  ecris(CLE, JSON.stringify([...f]))
 }
 
 function ouvert(i, f = faits()) {

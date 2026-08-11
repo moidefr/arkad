@@ -1,8 +1,8 @@
-# ARCADE
+# ARKAD
 
-Une borne d'arcade : un jeu d'aventure au centre, des mini-jeux autour. Une
-partie dure deux à trois minutes, une seule action pour jouer, et un seul code
-pour le web et pour Android.
+Une borne d'arcade : un jeu d'aventure au centre, dix-huit mini-jeux autour.
+Une partie dure deux à trois minutes, une seule action pour jouer, et un seul
+code pour le web et pour Android.
 
 ## L'identité
 
@@ -43,15 +43,22 @@ npm run dev      # assemble www/ et sert sur http://localhost:8000
 
 ## Les jeux
 
-**AVENTURE** est le jeu central, en vedette sur l'accueil. Les douze autres
-sont des mini-jeux, en grille dessous :
+**AVENTURE** est le jeu central, en vedette sur l'accueil. Les dix-huit autres
+sont des mini-jeux, en grille dessous.
 
-| | | |
-|---|---|---|
-| **ESQUIVE** survivre sous les blocs | **VOLTIGE** maintenir pour monter dans un tunnel | **GRIMPE** rebondir de plateforme en plateforme |
-| **BRIQUES** casse-brique | **SERPENT** appui gauche/droite pour tourner | **ORBITE** inverser son sens de rotation |
-| **PILE** empiler sans dépasser | **CIBLES** toucher avant que le chrono se vide | **RYTHME** taper quand la note passe la ligne |
-| **TRI** envoyer chaque bloc dans son bac | **MÉMOIRE** refaire la séquence | **CALCUL** vrai ou faux, vite |
+*Adresse* — **ESQUIVE** survivre sous les blocs · **VOLTIGE** maintenir pour
+monter dans un tunnel · **GRIMPE** rebondir de plateforme en plateforme ·
+**SLALOM** zigzaguer entre les portes · **FUSÉE** se poser en douceur sur la
+piste · **BRIQUES** casse-brique
+
+*Réflexe* — **SERPENT** tourner à gauche ou à droite · **ORBITE** inverser son
+sens de rotation · **BALANCE** redresser un mât qui penche · **PILE** empiler
+sans dépasser · **CORDE** sauter quand la corde passe · **CIBLES** toucher
+avant que le chrono se vide · **RYTHME** taper quand la note passe la ligne ·
+**GARDIEN** plonger du bon côté
+
+*Tête* — **TRI** envoyer chaque bloc dans son bac · **MÉMOIRE** refaire la
+séquence · **COULEUR** l'encre, pas le mot · **CALCUL** vrai ou faux, vite
 
 Tous se jouent d'une seule main, avec un seul geste.
 
@@ -181,6 +188,7 @@ src/
   input.js          souris / doigt / espace -> appui + relâche
   dessin.js         la boîte à dessin, et le style pixel
   palette.js        les couleurs
+  stockage.js       records, sourdine, progression — un seul préfixe
   son.js            les bruitages, synthétisés
   games/            les mini-jeux + le catalogue
   aventure/         le jeu principal et ses niveaux

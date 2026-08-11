@@ -1,9 +1,9 @@
 {
-  "name": "arcade",
+  "name": "arkad",
   "version": "0.2.0",
   "private": true,
   "type": "module",
-  "description": "Une arcade de petits jeux, un seul code pour le web et Android",
+  "description": "ARKAD, une borne de petits jeux, un seul code pour le web et Android",
   "scripts": {
     "build": "node build.mjs",
     "dev": "node build.mjs && npx --yes http-server -p 8000 -c-1",

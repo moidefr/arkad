@@ -7,9 +7,11 @@
  * que depuis un vrai geste de l'utilisateur. D'où `reveille()`, appelé par le
  * moteur au premier appui.
  */
+import { lis, ecris } from './stockage.js'
+
 class Sons {
   constructor() {
-    this.muet = localStorage.getItem('arcade.muet') === '1'
+    this.muet = lis('muet') === '1'
     this.ctx = null
     this.maitre = null
   }
@@ -28,7 +30,7 @@ class Sons {
 
   bascule() {
     this.muet = !this.muet
-    localStorage.setItem('arcade.muet', this.muet ? '1' : '0')
+    ecris('muet', this.muet ? '1' : '0')
     if (!this.muet) this.clic()
   }
 
