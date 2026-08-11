@@ -10,7 +10,7 @@ import { PRINCIPAL, MINIS } from './games/index.js'
 import { Input } from './input.js'
 import { C } from './palette.js'
 import { son } from './son.js'
-import { texte, rect, cadre, scanlines, PX } from './dessin.js'
+import { texte, rect, cadre, scanlines, largeurTexte, PX } from './dessin.js'
 
 export const W = 360
 export const H = 640
@@ -21,9 +21,10 @@ export const HUD = 56
 // Zones cliquables de l'accueil.
 const BTN_SON = { x: 302, y: 16, w: 40, h: 30 }
 const VEDETTE = { x: 20, y: 74, w: 320, h: 104 }
-const LISTE_Y = 226
-const LIGNE_H = 46
-const LIGNE_PAS = 54
+
+// Les mini-jeux sont en grille : au-delà de six ou sept, une liste ne tient
+// plus dans l'écran, et une liste qui défile se prête mal à une borne.
+const GRILLE = { x: 20, y: 214, cols: 3, w: 101, h: 80, ecart: 8 }
 
 // Zones des menus.
 const B_PAUSE = [
@@ -101,6 +102,10 @@ export class Moteur {
 
   lance(def) {
     this.def = def
+    // On recentre le pointeur : sinon un jeu qui suit le doigt démarre là où
+    // on a appuyé sur sa tuile, ce qui peut le tuer avant la première image.
+    this.input.pointer.x = W / 2
+    this.input.pointer.y = H / 2
     const j = {
       W,
       H,
@@ -171,8 +176,8 @@ export class Moteur {
         son.clic()
         return this.lance(PRINCIPAL)
       }
-      const i = Math.floor((p.y - LISTE_Y) / LIGNE_PAS)
-      if (i >= 0 && i < MINIS.length && p.y >= LISTE_Y && p.y <= LISTE_Y + i * LIGNE_PAS + LIGNE_H) {
+      const i = indexTuile(p)
+      if (i !== null && i < MINIS.length) {
         son.clic()
         this.lance(MINIS[i])
       }
@@ -234,9 +239,13 @@ export class Moteur {
     const ctx = this.ctx
 
     ctx.textAlign = 'left'
-    texte(ctx, '> ARCADE', 20, 30, 26, C.accent, 700)
-    // Curseur clignotant : deux lignes de code, et l'écran a l'air vivant.
-    if (Math.floor(this.phaseT * 2) % 2 === 0) rect(ctx, 152, 22, 12, 18, C.accent)
+    const titre = '> ARCADE'
+    texte(ctx, titre, 20, 30, 26, C.accent, 700)
+    // Curseur clignotant, calé après le titre : deux lignes de code, et
+    // l'écran a l'air vivant.
+    if (Math.floor(this.phaseT * 2) % 2 === 0) {
+      rect(ctx, 20 + largeurTexte(titre, 26) + 8, 22, 12, 18, C.accent)
+    }
     ctx.textAlign = 'center'
 
     this._boutonSon()
@@ -245,11 +254,11 @@ export class Moteur {
     this._vedette()
 
     ctx.textAlign = 'left'
-    texte(ctx, 'MINI-JEUX', 20, 204, 14, C.faible, 700)
+    texte(ctx, 'MINI-JEUX', 20, 196, 14, C.faible, 700)
     ctx.textAlign = 'center'
-    rect(ctx, 104, 204, 236, PX, C.bord)
+    rect(ctx, 104, 196, 236, PX, C.bord)
 
-    MINIS.forEach((def, i) => this._ligne(def, i))
+    MINIS.forEach((def, i) => this._tuile(def, i))
 
     ctx.textAlign = 'left'
     texte(ctx, `${MINIS.length + 1} jeux`, 20, 612, 11, C.faible, 700)
@@ -283,22 +292,17 @@ export class Moteur {
     ctx.textAlign = 'center'
   }
 
-  /** Une ligne de mini-jeu, façon liste de fichiers. */
-  _ligne(def, i) {
+  /** Une tuile de mini-jeu : nom, record, et sa couleur en bandeau. */
+  _tuile(def, i) {
     const ctx = this.ctx
-    const y = LISTE_Y + i * LIGNE_PAS
-    rect(ctx, 20, y, 320, LIGNE_H, C.panneau)
-    rect(ctx, 20, y, 4, LIGNE_H, def.couleur)
+    const { x, y, w, h } = tuile(i)
+    rect(ctx, x, y, w, h, C.panneau)
+    rect(ctx, x, y, w, 4, def.couleur)
 
-    ctx.textAlign = 'left'
-    texte(ctx, `[${String(i + 1).padStart(2, '0')}]`, 34, y + 16, 12, C.faible, 700)
-    texte(ctx, def.nom, 74, y + 16, 16, C.texte, 700, 180)
-    texte(ctx, def.pitch, 34, y + 34, 11, C.faible, 700, 290)
-
+    texte(ctx, def.nom, x + w / 2, y + 26, 12, C.texte, 700, w - 10)
     const best = this.meilleur(def.id)
-    ctx.textAlign = 'right'
-    texte(ctx, best ? `${best} ${def.unite}` : '--', 326, y + 16, 13, best ? C.accent : C.faible, 700)
-    ctx.textAlign = 'center'
+    texte(ctx, best ? String(best) : '--', x + w / 2, y + 52, 16, best ? C.accent : C.bord, 700, w - 12)
+    if (best) texte(ctx, def.unite, x + w / 2, y + 68, 10, C.faible, 700)
   }
 
   _boutonSon() {
@@ -373,6 +377,26 @@ function bouton(ctx, y, h, libelle, primaire) {
   rect(ctx, MENU_X, y, MENU_W, h, C.panneau)
   cadre(ctx, MENU_X, y, MENU_W, h, couleur)
   texte(ctx, libelle, MENU_X + MENU_W / 2, y + h / 2, 18, primaire ? C.accent : C.texte, 700, MENU_W - 24)
+}
+
+function tuile(i) {
+  const c = i % GRILLE.cols
+  const r = Math.floor(i / GRILLE.cols)
+  return {
+    x: GRILLE.x + c * (GRILLE.w + GRILLE.ecart),
+    y: GRILLE.y + r * (GRILLE.h + GRILLE.ecart),
+    w: GRILLE.w,
+    h: GRILLE.h,
+  }
+}
+
+function indexTuile(p) {
+  const c = Math.floor((p.x - GRILLE.x) / (GRILLE.w + GRILLE.ecart))
+  const r = Math.floor((p.y - GRILLE.y) / (GRILLE.h + GRILLE.ecart))
+  if (c < 0 || c >= GRILLE.cols || r < 0 || p.x < GRILLE.x || p.y < GRILLE.y) return null
+  const i = r * GRILLE.cols + c
+  const t = tuile(i)
+  return dans(p, t.x, t.y, t.w, t.h) ? i : null
 }
 
 function index(p, boutons) {

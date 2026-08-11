@@ -41,6 +41,20 @@ Sur un ordinateur, si tu en as un sous la main :
 npm run dev      # assemble www/ et sert sur http://localhost:8000
 ```
 
+## Les jeux
+
+**AVENTURE** est le jeu central, en vedette sur l'accueil. Les douze autres
+sont des mini-jeux, en grille dessous :
+
+| | | |
+|---|---|---|
+| **ESQUIVE** survivre sous les blocs | **VOLTIGE** maintenir pour monter dans un tunnel | **GRIMPE** rebondir de plateforme en plateforme |
+| **BRIQUES** casse-brique | **SERPENT** appui gauche/droite pour tourner | **ORBITE** inverser son sens de rotation |
+| **PILE** empiler sans dépasser | **CIBLES** toucher avant que le chrono se vide | **RYTHME** taper quand la note passe la ligne |
+| **TRI** envoyer chaque bloc dans son bac | **MÉMOIRE** refaire la séquence | **CALCUL** vrai ou faux, vite |
+
+Tous se jouent d'une seule main, avec un seul geste.
+
 ## Ajouter un mini-jeu
 
 Crée `src/games/monJeu.js` :

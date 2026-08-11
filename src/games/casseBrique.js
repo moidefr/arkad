@@ -13,7 +13,7 @@ const TEINTES = [C.rouge, C.accent, C.violet, C.cyan, C.vert]
 
 export default {
   id: 'casse-brique',
-  nom: 'CASSE-BRIQUE',
+  nom: 'BRIQUES',
   pitch: 'Le doigt déplace la raquette. Trois balles',
   couleur: C.violet,
   unite: 'pts',
