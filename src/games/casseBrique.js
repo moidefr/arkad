@@ -1,5 +1,5 @@
 import { C } from '../palette.js'
-import { texte, rect, cercle, borne } from '../dessin.js'
+import { texte, rect, pastille, trame, borne } from '../dessin.js'
 
 const COLS = 6
 const RANGS = 5
@@ -7,15 +7,15 @@ const MARGE = 22
 const BRIQUE_H = 20
 const RAQUETTE_W = 76
 const RAQUETTE_Y = 92 // au-dessus du bas de l'écran
-const BALLE_R = 7
+const BALLE_R = 6
 
-const TEINTES = [C.danger, C.or, C.violet, C.bleu, C.joueur]
+const TEINTES = [C.rouge, C.accent, C.violet, C.cyan, C.vert]
 
 export default {
   id: 'casse-brique',
   nom: 'CASSE-BRIQUE',
   pitch: 'Le doigt déplace la raquette. Trois balles',
-  couleur: C.bleu,
+  couleur: C.violet,
   unite: 'pts',
 
   init(j) {
@@ -57,7 +57,7 @@ export default {
         // c'est ce qui rend le jeu pilotable plutôt que subi.
         const ecart = (b.x - j.e.raquette) / (RAQUETTE_W / 2)
         const v = Math.hypot(b.vx, b.vy)
-        const angle = (-Math.PI / 2) + ecart * 1.05
+        const angle = -Math.PI / 2 + ecart * 1.05
         b.vx = Math.cos(angle) * v
         b.vy = Math.sin(angle) * v
         b.y = ry - BALLE_R
@@ -98,18 +98,25 @@ export default {
   },
 
   dessine(j, ctx) {
-    for (const q of j.e.briques) {
-      if (!q.morte) rect(ctx, q.x, q.y, q.w, BRIQUE_H, q.couleur, 5)
-    }
-    rect(ctx, j.e.raquette - RAQUETTE_W / 2, j.H - RAQUETTE_Y, RAQUETTE_W, 12, C.texte, 6)
-    cercle(ctx, j.e.balle.x, j.e.balle.y, BALLE_R, C.joueur)
+    trame(ctx, 0, j.HUD, j.W, j.H - j.HUD, 20, C.panneau)
 
-    for (let i = 0; i < j.e.vies; i++) cercle(ctx, 18 + i * 16, j.H - 24, 5, C.joueur)
+    for (const q of j.e.briques) {
+      if (q.morte) continue
+      rect(ctx, q.x, q.y, q.w, BRIQUE_H, q.couleur)
+      rect(ctx, q.x, q.y, q.w, 4, C.fond)
+      rect(ctx, q.x, q.y + BRIQUE_H - 4, q.w, 4, C.fond)
+    }
+
+    rect(ctx, j.e.raquette - RAQUETTE_W / 2, j.H - RAQUETTE_Y, RAQUETTE_W, 10, C.texte)
+    rect(ctx, j.e.raquette - 8, j.H - RAQUETTE_Y, 16, 10, C.violet)
+    pastille(ctx, j.e.balle.x, j.e.balle.y, BALLE_R, C.cyan)
+
+    for (let i = 0; i < j.e.vies; i++) rect(ctx, 16 + i * 14, j.H - 24, 8, 8, C.cyan)
     ctx.textAlign = 'right'
-    texte(ctx, `niveau ${j.e.niveau}`, j.W - 16, j.H - 24, 12, C.faible, 700)
+    texte(ctx, `NIV ${j.e.niveau}`, j.W - 14, j.H - 20, 11, C.faible, 700)
     ctx.textAlign = 'center'
 
-    if (j.e.balle.collee) texte(ctx, 'appuie pour lancer', j.W / 2, j.H - 150, 14, C.faible, 600)
+    if (j.e.balle.collee) texte(ctx, 'appuie pour lancer', j.W / 2, j.H - 150, 12, C.faible, 700)
   },
 
   appui(j) {
@@ -124,7 +131,7 @@ function poseBriques(j) {
     for (let c = 0; c < COLS; c++) {
       j.e.briques.push({
         x: MARGE + c * (w + 6),
-        y: j.HUD + 30 + r * (BRIQUE_H + 6),
+        y: j.HUD + 34 + r * (BRIQUE_H + 6),
         w,
         rang: r,
         couleur: TEINTES[r % TEINTES.length],

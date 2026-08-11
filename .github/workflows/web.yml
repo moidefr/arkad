@@ -1,13 +1,8 @@
 name: Web (iPhone + tests)
 
-# Automatique : c'est la seule façon de tester quand on n'a qu'un téléphone.
-# Chaque push met le jeu à jour à l'adresse GitHub Pages, jouable dans le
-# navigateur et installable sur l'écran d'accueil (y compris sur iPhone).
+# Manuel, comme l'APK : le site ne change que quand on le décide.
+# Actions -> Web (iPhone + tests) -> Run workflow.
 on:
-  push:
-    branches:
-      - main
-      - claude/android-surcouche-custom-klcq7l
   workflow_dispatch:
 
 permissions:

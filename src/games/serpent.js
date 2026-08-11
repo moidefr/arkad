@@ -1,10 +1,11 @@
 import { C } from '../palette.js'
-import { texte, rect } from '../dessin.js'
+import { texte, rect, cadre, trame } from '../dessin.js'
 
 const CASE = 24
 const COLS = 15
 const RANGS = 21
 const TOP = 88
+const BANDE = 20 // hauteur des repères gauche/droite en bas
 
 // Sens rangés dans l'ordre horaire : tourner revient à ±1 sur l'index.
 const SENS = [
@@ -18,7 +19,7 @@ export default {
   id: 'serpent',
   nom: 'SERPENT',
   pitch: 'Appuie à gauche ou à droite pour tourner',
-  couleur: C.violet,
+  couleur: C.vert,
   unite: 'pts',
 
   init(j) {
@@ -44,27 +45,36 @@ export default {
   },
 
   dessine(j, ctx) {
-    // Le plateau, pour qu'on voie où sont les murs.
-    rect(ctx, 0, TOP, COLS * CASE, RANGS * CASE, C.fondClair, 8)
+    const L = COLS * CASE
+    const H = RANGS * CASE
+    trame(ctx, 0, TOP, L, H, CASE, C.panneau)
+    cadre(ctx, 0, TOP, L, H, C.bord)
 
-    rect(ctx, j.e.fruit.x * CASE + 4, TOP + j.e.fruit.y * CASE + 4, CASE - 8, CASE - 8, C.or, 5)
+    const f = j.e.fruit
+    rect(ctx, f.x * CASE + 6, TOP + f.y * CASE + 6, 12, 12, C.accent)
 
     j.e.corps.forEach((c, i) => {
-      const teinte = i === 0 ? C.joueur : C.violet
-      rect(ctx, c.x * CASE + 2, TOP + c.y * CASE + 2, CASE - 4, CASE - 4, teinte, 6)
+      const x = c.x * CASE + 2
+      const y = TOP + c.y * CASE + 2
+      rect(ctx, x, y, CASE - 4, CASE - 4, i === 0 ? C.vert : C.bord)
+      if (i > 0) rect(ctx, x + 4, y + 4, CASE - 12, CASE - 12, C.vert)
     })
 
-    texte(ctx, '← tourner à gauche', j.W / 4, j.H - 22, 11, C.faible, 600)
-    texte(ctx, 'tourner à droite →', (j.W * 3) / 4, j.H - 22, 11, C.faible, 600)
+    // La zone d'appui est indiquée en permanence : le jeu n'a pas de tutoriel.
+    rect(ctx, 0, j.H - 34, j.W / 2 - 2, BANDE, C.panneau)
+    rect(ctx, j.W / 2 + 2, j.H - 34, j.W / 2 - 2, BANDE, C.panneau)
+    texte(ctx, '< GAUCHE', j.W / 4, j.H - 24, 11, C.faible, 700)
+    texte(ctx, 'DROITE >', (j.W * 3) / 4, j.H - 24, 11, C.faible, 700)
   },
 
   appui(j, p) {
-    // Un seul virage est mémorisé : sans ça, deux appuis rapides font
-    // faire demi-tour au serpent, donc mourir sur soi-même.
+    // Un seul virage est mémorisé : sans ça, deux appuis rapides font faire
+    // demi-tour au serpent, donc mourir sur soi-même.
     if (j.e.enAttente !== null) return
     j.e.enAttente = p.x < j.W / 2 ? -1 : 1
   },
 }
+
 
 function avance(j) {
   if (j.e.enAttente !== null) {

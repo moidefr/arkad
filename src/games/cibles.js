@@ -1,15 +1,16 @@
 import { C } from '../palette.js'
-import { texte, rect, cercle, dist } from '../dessin.js'
+import { texte, rect, cadre, trame } from '../dessin.js'
 
-const HAUT = 110 // zone de jeu, sous la jauge
+const HAUT = 116 // zone de jeu, sous la jauge
 const BAS = 60
 const R_MAX = 34
+const SEGMENTS = 24
 
 export default {
   id: 'cibles',
   nom: 'CIBLES',
   pitch: 'Touche tout. Chaque touche rallonge le chrono',
-  couleur: C.or,
+  couleur: C.accent,
   unite: 'pts',
 
   init(j) {
@@ -51,27 +52,44 @@ export default {
   },
 
   dessine(j, ctx) {
+    trame(ctx, 0, HAUT, j.W, j.H - HAUT, 16, C.panneau)
+
+    // Chrono en segments : plus lisible qu'une barre continue, et plus dans
+    // le ton de la borne.
     const part = Math.max(0, Math.min(j.e.jauge / 12, 1))
-    rect(ctx, 24, HAUT - 26, j.W - 48, 12, C.fondClair, 6)
-    rect(ctx, 24, HAUT - 26, (j.W - 48) * part, 12, part > 0.25 ? C.joueur : C.danger, 6)
+    const pleins = Math.round(part * SEGMENTS)
+    for (let i = 0; i < SEGMENTS; i++) {
+      const couleur = i < pleins ? (part > 0.25 ? C.accent : C.rouge) : C.bord
+      rect(ctx, 22 + i * 13, HAUT - 30, 9, 12, couleur)
+    }
+    ctx.textAlign = 'left'
+    texte(ctx, 'CHRONO', 22, HAUT - 46, 10, C.faible, 700)
+    ctx.textAlign = 'right'
+    if (j.e.combo > 1) texte(ctx, `COMBO x${j.e.combo}`, j.W - 22, HAUT - 46, 12, C.accent, 700)
+    ctx.textAlign = 'center'
 
-    if (j.e.combo > 1) texte(ctx, `x${j.e.combo}`, j.W / 2, HAUT - 48, 20, C.or, 900)
-
+    // Cible : des carrés concentriques, pas des cercles — même grammaire que
+    // le reste de l'écran.
     for (const c of j.e.cibles) {
       const reste = 1 - c.age / c.duree
       const r = 12 + R_MAX * reste
-      cercle(ctx, c.x, c.y, r, C.fondClair)
-      cercle(ctx, c.x, c.y, r * 0.62, reste < 0.3 ? C.danger : C.or)
+      const chaud = reste < 0.3
+      cadre(ctx, c.x - r, c.y - r, r * 2, r * 2, chaud ? C.rouge : C.faible)
+      rect(ctx, c.x - r * 0.6, c.y - r * 0.6, r * 1.2, r * 1.2, chaud ? C.rouge : C.accent)
+      rect(ctx, c.x - 4, c.y - 4, 8, 8, C.fond)
     }
 
     if (j.e.flash > 0) {
-      ctx.fillStyle = `rgba(255, 61, 110, ${j.e.flash * 0.25})`
+      ctx.fillStyle = `rgba(255, 95, 86, ${j.e.flash * 0.22})`
       ctx.fillRect(0, 0, j.W, j.H)
     }
   },
 
   appui(j, p) {
-    const i = j.e.cibles.findIndex((c) => dist(p.x, p.y, c.x, c.y) < 12 + R_MAX * (1 - c.age / c.duree))
+    const i = j.e.cibles.findIndex((c) => {
+      const r = 12 + R_MAX * (1 - c.age / c.duree)
+      return Math.abs(p.x - c.x) <= r && Math.abs(p.y - c.y) <= r
+    })
     if (i === -1) {
       j.e.combo = 1
       j.e.jauge = Math.max(0, j.e.jauge - 0.8)

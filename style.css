@@ -1,5 +1,5 @@
 :root {
-  --fond: #0d0b1a;
+  --fond: #0b0e0d;
 }
 
 * {
@@ -26,11 +26,13 @@ body {
 }
 
 #scene {
-  /* Le jeu vit dans une zone 360x640 : portrait, donc naturel sur téléphone
-     et lisible sur PC. Le CSS se contente de la mettre à l'échelle. */
+  /* La toile fait exactement 360 x 640 pixels ; c'est le navigateur qui
+     l'agrandit, au plus proche voisin. D'où le grain. */
   aspect-ratio: 360 / 640;
   max-width: 100vw;
   max-height: 100dvh;
   display: block;
   cursor: crosshair;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
 }

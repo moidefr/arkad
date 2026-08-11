@@ -1,21 +1,43 @@
 /**
- * Le moteur de l'arcade.
+ * Le moteur de la borne.
  *
- * Une borne : un accueil qui liste les jeux, un jeu à la fois, une pause,
- * un écran de fin. Le moteur ne connaît rien des jeux — il leur prête un
- * écran, les entrées, un score et une sauvegarde, et c'est tout.
+ * Il tient l'accueil, la pause, l'écran de fin et les records — et rien
+ * d'autre : il ne sait pas ce que font les jeux. Un jeu lui prête juste une
+ * fonction de mise à jour, une fonction de dessin, et lui dit quand c'est
+ * perdu.
  */
-import { GAMES } from './games/index.js'
+import { PRINCIPAL, MINIS } from './games/index.js'
 import { Input } from './input.js'
 import { C } from './palette.js'
 import { son } from './son.js'
-import { texte, rect } from './dessin.js'
+import { texte, rect, cadre, scanlines, PX } from './dessin.js'
 
 export const W = 360
 export const H = 640
 
 /** Hauteur du bandeau du haut pendant une partie. */
-export const HUD = 64
+export const HUD = 56
+
+// Zones cliquables de l'accueil.
+const BTN_SON = { x: 302, y: 16, w: 40, h: 30 }
+const VEDETTE = { x: 20, y: 74, w: 320, h: 104 }
+const LISTE_Y = 226
+const LIGNE_H = 46
+const LIGNE_PAS = 54
+
+// Zones des menus.
+const B_PAUSE = [
+  { y: 250, h: 56, libelle: 'REPRENDRE' },
+  { y: 318, h: 56, libelle: 'RECOMMENCER' },
+  { y: 386, h: 56, libelle: 'QUITTER' },
+  { y: 454, h: 56, libelle: 'SON' },
+]
+const B_FIN = [
+  { y: 404, h: 62, libelle: 'REJOUER' },
+  { y: 480, h: 54, libelle: 'QUITTER' },
+]
+const MENU_X = 50
+const MENU_W = 260
 
 export class Moteur {
   constructor(canvas) {
@@ -28,9 +50,9 @@ export class Moteur {
 
     this.phase = 'accueil' // accueil | jeu | pause | fin
     this.phaseT = 0
-    this.def = null // le jeu chargé
-    this.j = null // son contexte
-    this.record = false // vrai si la partie qui vient de finir bat le record
+    this.def = null
+    this.j = null
+    this.record = false
 
     addEventListener('keydown', (e) => {
       if (e.code === 'Escape') this._bascullePause()
@@ -53,10 +75,12 @@ export class Moteur {
   }
 
   _redim() {
-    const dpr = Math.min(devicePixelRatio || 1, 3)
-    this.canvas.width = Math.round(W * dpr)
-    this.canvas.height = Math.round(H * dpr)
-    this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+    // Volontairement sans densité d'écran : la toile fait exactement
+    // 360 x 640 pixels et c'est le CSS qui l'agrandit sans lissage. C'est de
+    // là que vient le grain.
+    this.canvas.width = W
+    this.canvas.height = H
+    this.ctx.imageSmoothingEnabled = false
     this.ctx.textAlign = 'center'
     this.ctx.textBaseline = 'middle'
   }
@@ -105,11 +129,10 @@ export class Moteur {
   }
 
   _termine() {
-    this.record = this._enregistre(this.def.id, this.j.score)
+    this.record = this.def.sansScore ? false : this._enregistre(this.def.id, this.j.score)
     this.phase = 'fin'
     this.phaseT = 0
     son.mort()
-    // La fanfare passe après le son de mort, pas par-dessus.
     if (this.record) setTimeout(() => son.record(), 450)
   }
 
@@ -129,7 +152,6 @@ export class Moteur {
   _maj(dt) {
     this.phaseT += dt
     if (this.phase !== 'jeu') return
-
     const j = this.j
     j.t += dt
     this.def.maj?.(j, dt)
@@ -139,22 +161,26 @@ export class Moteur {
   // --- Entrées --------------------------------------------------------------
 
   _appui(p) {
-    // On est ici dans le geste de l'utilisateur : c'est le seul moment où
-    // iOS accepte de démarrer le son.
+    // On est dans le geste de l'utilisateur : seul moment où iOS accepte de
+    // démarrer le son.
     son.reveille()
 
     if (this.phase === 'accueil') {
-      if (dansRect(p, BTN_SON.x, BTN_SON.y, BTN_SON.w, BTN_SON.h)) return son.bascule()
-      const i = indexCarte(p)
-      if (i !== null && i < GAMES.length) {
+      if (dans(p, BTN_SON.x, BTN_SON.y, BTN_SON.w, BTN_SON.h)) return son.bascule()
+      if (dans(p, VEDETTE.x, VEDETTE.y, VEDETTE.w, VEDETTE.h)) {
         son.clic()
-        this.lance(GAMES[i])
+        return this.lance(PRINCIPAL)
+      }
+      const i = Math.floor((p.y - LISTE_Y) / LIGNE_PAS)
+      if (i >= 0 && i < MINIS.length && p.y >= LISTE_Y && p.y <= LISTE_Y + i * LIGNE_PAS + LIGNE_H) {
+        son.clic()
+        this.lance(MINIS[i])
       }
       return
     }
 
     if (this.phase === 'jeu') {
-      if (dansRect(p, 0, 0, 56, HUD)) {
+      if (dans(p, 0, 0, 52, HUD)) {
         son.clic()
         return this._bascullePause()
       }
@@ -163,31 +189,18 @@ export class Moteur {
     }
 
     if (this.phase === 'pause') {
-      if (dansRect(p, 50, 250, 260, 60)) {
-        son.clic()
-        return this._bascullePause()
-      }
-      if (dansRect(p, 50, 326, 260, 60)) {
-        son.clic()
-        return this.lance(this.def)
-      }
-      if (dansRect(p, 50, 402, 260, 60)) {
-        son.clic()
-        return this._quitte()
-      }
-      if (dansRect(p, 50, 478, 260, 60)) return son.bascule()
+      const i = index(p, B_PAUSE)
+      if (i === 0) return son.clic(), this._bascullePause()
+      if (i === 1) return son.clic(), this.lance(this.def)
+      if (i === 2) return son.clic(), this._quitte()
+      if (i === 3) return son.bascule()
       return
     }
 
     if (this.phase === 'fin' && this.phaseT > 0.4) {
-      if (dansRect(p, 50, 400, 260, 66)) {
-        son.clic()
-        return this.lance(this.def)
-      }
-      if (dansRect(p, 50, 482, 260, 56)) {
-        son.clic()
-        return this._quitte()
-      }
+      const i = index(p, B_FIN)
+      if (i === 0) return son.clic(), this.lance(this.def)
+      if (i === 1) return son.clic(), this._quitte()
     }
   }
 
@@ -202,126 +215,170 @@ export class Moteur {
     ctx.fillStyle = C.fond
     ctx.fillRect(0, 0, W, H)
 
-    if (this.phase === 'accueil') return this._accueil()
+    if (this.phase === 'accueil') this._accueil()
+    else {
+      // La dernière image du jeu reste visible sous la pause et sous l'écran
+      // de fin : on ne perd jamais de vue ce qui vient de se passer.
+      this.def.dessine?.(this.j, ctx)
+      this._bandeau()
+      if (this.phase === 'pause') this._pause()
+      if (this.phase === 'fin') this._fin()
+    }
 
-    // La dernière image du jeu reste visible sous la pause et sous l'écran
-    // de fin : on ne perd jamais le contexte de ce qui vient de se passer.
-    this.def.dessine?.(this.j, ctx)
-    this._bandeau()
-    if (this.phase === 'pause') this._pause()
-    if (this.phase === 'fin') this._fin()
+    scanlines(ctx, W, H)
   }
+
+  // --- Accueil --------------------------------------------------------------
 
   _accueil() {
     const ctx = this.ctx
-    texte(ctx, 'ARCADE', W / 2, 66, 44, C.joueur, 900)
+
+    ctx.textAlign = 'left'
+    texte(ctx, '> ARCADE', 20, 30, 26, C.accent, 700)
+    // Curseur clignotant : deux lignes de code, et l'écran a l'air vivant.
+    if (Math.floor(this.phaseT * 2) % 2 === 0) rect(ctx, 152, 22, 12, 18, C.accent)
+    ctx.textAlign = 'center'
+
     this._boutonSon()
+    rect(ctx, 20, 56, 320, PX, C.bord)
 
-    GAMES.forEach((def, i) => {
-      const { x, y, w, h } = carte(i)
-      rect(ctx, x, y, w, h, C.fondClair, 16)
-      rect(ctx, x, y, 5, h, def.couleur || C.joueur, 3)
+    this._vedette()
 
-      ctx.textAlign = 'left'
-      const large = w - 40
-      texte(ctx, def.nom, x + 20, y + 30, 22, C.texte, 800, large)
-      texte(ctx, def.pitch, x + 20, y + 56, 12, C.faible, 600, large)
-      const best = this.meilleur(def.id)
-      texte(ctx, best ? `record ${best} ${def.unite || ''}`.trim() : 'jamais joué', x + 20, y + 78, 12, best ? C.or : C.faible, 700)
-      ctx.textAlign = 'center'
-    })
+    ctx.textAlign = 'left'
+    texte(ctx, 'MINI-JEUX', 20, 204, 14, C.faible, 700)
+    ctx.textAlign = 'center'
+    rect(ctx, 104, 204, 236, PX, C.bord)
 
-    texte(ctx, `${GAMES.length} jeux · une seule touche`, W / 2, H - 26, 13, C.faible, 600)
+    MINIS.forEach((def, i) => this._ligne(def, i))
+
+    ctx.textAlign = 'left'
+    texte(ctx, `${MINIS.length + 1} jeux`, 20, 612, 11, C.faible, 700)
+    ctx.textAlign = 'right'
+    texte(ctx, 'une seule touche', 340, 612, 11, C.faible, 700)
+    ctx.textAlign = 'center'
   }
+
+  /** La grosse carte du jeu principal, en haut : c'est le cœur de la borne. */
+  _vedette() {
+    const ctx = this.ctx
+    const { x, y, w, h } = VEDETTE
+    rect(ctx, x, y, w, h, C.panneau)
+    cadre(ctx, x, y, w, h, C.accent)
+
+    ctx.textAlign = 'left'
+    texte(ctx, PRINCIPAL.nom, x + 14, y + 26, 26, C.accent, 700)
+    texte(ctx, PRINCIPAL.pitch, x + 14, y + 50, 11, C.faible, 700, w - 28)
+
+    // Barre de progression en gros blocs, comme un chargement de terminal.
+    const { faits, total } = PRINCIPAL.progression?.() ?? { faits: 0, total: 0 }
+    const cases = 20
+    const pleines = total ? Math.round((faits / total) * cases) : 0
+    for (let i = 0; i < cases; i++) {
+      rect(ctx, x + 14 + i * 12, y + 68, 10, 10, i < pleines ? C.accent : C.bord)
+    }
+    ctx.textAlign = 'right'
+    texte(ctx, `${faits}/${total}`, x + w - 14, y + 88, 12, C.faible, 700)
+    ctx.textAlign = 'left'
+    texte(ctx, 'NIVEAUX', x + 14, y + 88, 12, C.faible, 700)
+    ctx.textAlign = 'center'
+  }
+
+  /** Une ligne de mini-jeu, façon liste de fichiers. */
+  _ligne(def, i) {
+    const ctx = this.ctx
+    const y = LISTE_Y + i * LIGNE_PAS
+    rect(ctx, 20, y, 320, LIGNE_H, C.panneau)
+    rect(ctx, 20, y, 4, LIGNE_H, def.couleur)
+
+    ctx.textAlign = 'left'
+    texte(ctx, `[${String(i + 1).padStart(2, '0')}]`, 34, y + 16, 12, C.faible, 700)
+    texte(ctx, def.nom, 74, y + 16, 16, C.texte, 700, 180)
+    texte(ctx, def.pitch, 34, y + 34, 11, C.faible, 700, 290)
+
+    const best = this.meilleur(def.id)
+    ctx.textAlign = 'right'
+    texte(ctx, best ? `${best} ${def.unite}` : '--', 326, y + 16, 13, best ? C.accent : C.faible, 700)
+    ctx.textAlign = 'center'
+  }
+
+  _boutonSon() {
+    const ctx = this.ctx
+    const { x, y, w, h } = BTN_SON
+    cadre(ctx, x, y, w, h, son.muet ? C.bord : C.faible)
+    texte(ctx, son.muet ? 'x' : '♪', x + w / 2, y + h / 2, 15, son.muet ? C.faible : C.accent, 700)
+  }
+
+  // --- En jeu ---------------------------------------------------------------
 
   _bandeau() {
     const ctx = this.ctx
     rect(ctx, 0, 0, W, HUD, C.fond)
+    rect(ctx, 0, HUD - PX, W, PX, C.bord)
 
     // Bouton pause, toujours au même endroit quel que soit le jeu.
-    rect(ctx, 14, 18, 30, 28, C.fondClair, 8)
-    rect(ctx, 23, 25, 4, 14, C.texte, 2)
-    rect(ctx, 31, 25, 4, 14, C.texte, 2)
+    cadre(ctx, 12, 14, 28, 26, C.faible)
+    rect(ctx, 21, 20, 4, 14, C.texte)
+    rect(ctx, 29, 20, 4, 14, C.texte)
 
-    const u = this.def.unite ? ' ' + this.def.unite : ''
-    texte(ctx, `${Math.floor(this.j.score)}${u}`, W / 2, 32, 26, C.texte, 900)
+    const titre = this.def.sansScore
+      ? this.def.titreHud?.(this.j) ?? this.def.nom
+      : `${Math.floor(this.j.score)} ${this.def.unite}`
+    texte(ctx, titre, W / 2, 26, 20, C.texte, 700, 200)
 
-    ctx.textAlign = 'right'
-    const best = Math.max(this.j.meilleur, Math.floor(this.j.score))
-    texte(ctx, `record ${best}`, W - 14, 32, 12, C.faible, 700)
-    ctx.textAlign = 'center'
+    if (!this.def.sansScore) {
+      ctx.textAlign = 'right'
+      const best = Math.max(this.j.meilleur, Math.floor(this.j.score))
+      texte(ctx, `REC ${best}`, W - 12, 26, 11, C.faible, 700)
+      ctx.textAlign = 'center'
+    }
   }
 
-  _voile(alpha = 0.82) {
+  _voile(alpha = 0.86) {
     const ctx = this.ctx
-    ctx.fillStyle = `rgba(13, 11, 26, ${alpha})`
+    ctx.fillStyle = `rgba(11, 14, 13, ${alpha})`
     ctx.fillRect(0, 0, W, H)
   }
 
   _pause() {
     const ctx = this.ctx
     this._voile()
-    texte(ctx, 'PAUSE', W / 2, 170, 40, C.texte, 900)
-    bouton(ctx, 50, 250, 260, 60, 'REPRENDRE', C.joueur, C.fond)
-    bouton(ctx, 50, 326, 260, 60, 'RECOMMENCER', C.fondClair, C.texte)
-    bouton(ctx, 50, 402, 260, 60, 'QUITTER', C.fondClair, C.texte)
-    bouton(ctx, 50, 478, 260, 60, son.muet ? 'SON : NON' : 'SON : OUI', C.fondClair, son.muet ? C.faible : C.texte)
-  }
-
-  /** Petit bouton de sourdine, en haut à droite de l'accueil. */
-  _boutonSon() {
-    const ctx = this.ctx
-    const { x, y, w, h } = BTN_SON
-    rect(ctx, x, y, w, h, C.fondClair, 10)
-    texte(ctx, '♪', x + w / 2, y + h / 2 + 1, 19, son.muet ? C.faible : C.or, 900)
-    if (son.muet) {
-      ctx.strokeStyle = C.danger
-      ctx.lineWidth = 2.5
-      ctx.beginPath()
-      ctx.moveTo(x + 12, y + h - 9)
-      ctx.lineTo(x + w - 12, y + 9)
-      ctx.stroke()
-    }
+    texte(ctx, '-- PAUSE --', W / 2, 174, 26, C.accent, 700)
+    B_PAUSE.forEach((b, i) => {
+      const libelle = i === 3 ? (son.muet ? 'SON : NON' : 'SON : OUI') : b.libelle
+      bouton(ctx, b.y, b.h, libelle, i === 0)
+    })
   }
 
   _fin() {
     const ctx = this.ctx
-    this._voile(0.88)
-    texte(ctx, 'PERDU', W / 2, 160, 40, C.danger, 900)
-    texte(ctx, `${Math.floor(this.j.score)}`, W / 2, 246, 76, C.texte, 900)
-    texte(ctx, this.def.unite || 'points', W / 2, 296, 15, C.faible, 600)
-    if (this.record) texte(ctx, 'NOUVEAU RECORD !', W / 2, 340, 18, C.or, 900)
-    else texte(ctx, `record : ${this.meilleur(this.def.id)}`, W / 2, 340, 14, C.faible, 700)
+    this._voile(0.9)
+    const perdu = !this.def.sansScore
+    texte(ctx, perdu ? 'GAME OVER' : 'FIN', W / 2, 168, 30, C.rouge, 700)
 
-    bouton(ctx, 50, 400, 260, 66, 'REJOUER', C.joueur, C.fond)
-    bouton(ctx, 50, 482, 260, 56, 'QUITTER', C.fondClair, C.texte)
+    if (!this.def.sansScore) {
+      texte(ctx, `${Math.floor(this.j.score)}`, W / 2, 252, 60, C.texte, 700)
+      texte(ctx, this.def.unite, W / 2, 296, 13, C.faible, 700)
+      if (this.record) texte(ctx, '* NOUVEAU RECORD *', W / 2, 342, 15, C.accent, 700)
+      else texte(ctx, `record ${this.meilleur(this.def.id)}`, W / 2, 342, 12, C.faible, 700)
+    }
+
+    B_FIN.forEach((b, i) => bouton(ctx, b.y, b.h, b.libelle, i === 0))
   }
 }
 
-// --- Disposition de l'accueil ------------------------------------------------
+// --- Petits blocs partagés ---------------------------------------------------
 
-const CARTE_H = 96
-const CARTE_Y0 = 110
-const CARTE_ECART = 12
-
-const BTN_SON = { x: W - 64, y: 44, w: 46, h: 36 }
-
-function carte(i) {
-  return { x: 24, y: CARTE_Y0 + i * (CARTE_H + CARTE_ECART), w: W - 48, h: CARTE_H }
+function bouton(ctx, y, h, libelle, primaire) {
+  const couleur = primaire ? C.accent : C.faible
+  rect(ctx, MENU_X, y, MENU_W, h, C.panneau)
+  cadre(ctx, MENU_X, y, MENU_W, h, couleur)
+  texte(ctx, libelle, MENU_X + MENU_W / 2, y + h / 2, 18, primaire ? C.accent : C.texte, 700, MENU_W - 24)
 }
 
-function indexCarte(p) {
-  const i = Math.floor((p.y - CARTE_Y0) / (CARTE_H + CARTE_ECART))
-  if (i < 0 || p.y < CARTE_Y0) return null
-  const c = carte(i)
-  return p.y <= c.y + c.h && p.x >= c.x && p.x <= c.x + c.w ? i : null
+function index(p, boutons) {
+  return boutons.findIndex((b) => dans(p, MENU_X, b.y, MENU_W, b.h))
 }
 
-function bouton(ctx, x, y, w, h, libelle, fond, encre) {
-  rect(ctx, x, y, w, h, fond, 16)
-  texte(ctx, libelle, x + w / 2, y + h / 2, 21, encre, 800)
-}
-
-function dansRect(p, x, y, w, h) {
+function dans(p, x, y, w, h) {
   return p.x >= x && p.x <= x + w && p.y >= y && p.y <= y + h
 }

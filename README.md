@@ -1,58 +1,56 @@
 # ARCADE
 
-Une borne d'arcade : plusieurs petits jeux, une partie de deux à trois minutes,
-une seule action pour jouer. Un seul code pour le web et pour Android.
+Une borne d'arcade : un jeu d'aventure au centre, des mini-jeux autour. Une
+partie dure deux à trois minutes, une seule action pour jouer, et un seul code
+pour le web et pour Android.
+
+## L'identité
+
+Un terminal à phosphore ambré. Trois règles, tenues partout :
+
+1. **Tout est en gros pixels.** La toile fait exactement 360 × 640 pixels et
+   c'est le navigateur qui l'agrandit sans lissage. Aucun coin arrondi, aucun
+   dégradé, tout est aligné sur une grille de 2 px.
+2. **Une seule couleur d'accent**, l'ambre, pour ce qui compte. Trois teintes
+   secondaires servent uniquement à distinguer les jeux entre eux.
+3. **Du monospace partout**, rastérisé petit puis agrandi — c'est de là que
+   vient le grain du texte, sans embarquer de police bitmap.
+
+Si tu ajoutes quelque chose et que ça jure, c'est presque toujours qu'une de
+ces trois règles a sauté.
 
 ## Où ça tourne
 
 | | comment | mise à jour |
 |---|---|---|
-| **Android** | vraie app, APK installable | on relance le workflow quand on veut une nouvelle version |
-| **iPhone / iPad** | web, « Ajouter à l'écran d'accueil » | automatique à chaque push |
-| **PC** | navigateur | automatique à chaque push |
+| **Android** | vraie app, APK installable | Actions → *APK Android* → Run workflow |
+| **iPhone / iPad** | web, « Ajouter à l'écran d'accueil » | Actions → *Web* → Run workflow |
+| **PC** | navigateur | idem |
+
+Les deux déploiements sont **manuels** : rien ne part en ligne sans qu'on le
+demande. L'APK arrive dans les **Releases** du dépôt, en lien direct
+téléchargeable depuis le téléphone.
 
 Le natif iOS demanderait un Mac et l'Apple Developer Program à 99 $/an, donc
-sur Apple c'est la version web — en plein écran, hors-ligne, avec son icône.
-Pour un jeu en Canvas, la différence ne se voit pas.
+sur Apple c'est la version web — plein écran, hors-ligne, avec son icône. Pour
+un jeu en Canvas, la différence ne se voit pas.
 
-## Jouer / tester
-
-**Depuis le téléphone**, il n'y a rien à installer : chaque push met à jour la
-page GitHub Pages du dépôt. C'est la boucle de test du quotidien.
-
-**Sur un ordinateur**, si tu en as un sous la main :
+Sur un ordinateur, si tu en as un sous la main :
 
 ```bash
-npm run dev      # assemble www/ et sert le tout sur http://localhost:8000
+npm run dev      # assemble www/ et sert sur http://localhost:8000
 ```
 
-## Construire l'APK
-
-Onglet **Actions** → **APK Android** → *Run workflow*. Ça se fait très bien
-depuis un téléphone.
-
-Au bout de quelques minutes, l'APK apparaît dans les **Releases** du dépôt :
-un lien direct, téléchargeable et installable en un appui (il faut autoriser
-l'installation depuis des sources inconnues la première fois).
-
-C'est un APK de debug, non signé pour le Play Store — parfait pour installer
-soi-même et faire tourner autour de soi.
-
-### À faire une fois dans les réglages du dépôt
-
-*Settings → Pages → Source : **GitHub Actions***, sinon la version web ne se
-déploie pas.
-
-## Ajouter un jeu
+## Ajouter un mini-jeu
 
 Crée `src/games/monJeu.js` :
 
 ```js
 import { C } from '../palette.js'
-import { texte, rect, cercle, dist, borne, vers } from '../dessin.js'
+import { texte, rect, cadre, pastille, trame, dist, borne, vers } from '../dessin.js'
 
 export default {
-  id: 'mon-jeu',              // sert de clé pour le record, ne le change plus
+  id: 'mon-jeu',              // clé du record, ne le change plus après coup
   nom: 'MON JEU',
   pitch: 'Une ligne pour dire comment on joue',
   couleur: C.violet,          // la barre de couleur sur l'accueil
@@ -60,13 +58,13 @@ export default {
 
   init(j) { j.e.x = j.W / 2 },
   maj(j, dt) { j.score += dt },
-  dessine(j, ctx) { rect(ctx, j.e.x, 300, 40, 40, C.joueur, 8) },
+  dessine(j, ctx) { rect(ctx, j.e.x, 300, 40, 40, C.cyan) },
   appui(j, p) {},
   relache(j, p) {},
 }
 ```
 
-Puis ajoute-le dans `src/games/index.js`. C'est tout.
+Puis ajoute-le à `MINIS` dans `src/games/index.js`. C'est tout.
 
 ### Ce que contient `j`
 
@@ -81,19 +79,55 @@ Puis ajoute-le dans `src/games/index.js`. C'est tout.
 | `j.perdu()` | termine la partie |
 | `j.pointer` | position du dernier appui (suit la souris sur PC) |
 | `j.maintenu` | vrai tant que c'est appuyé |
+| `j.son` | les bruitages |
 | `j.hasard()`, `j.entier(a, b)` | aléatoire |
-| `j.son` | les bruitages (voir plus bas) |
 
-Le moteur s'occupe du reste : accueil, pause, écran de fin, records.
+### La boîte à dessin
+
+`rect`, `cadre` (une boîte creuse), `pastille` (un disque en gros pixels),
+`trame` (une grille de points), `texte`, plus `dist`, `borne`, `vers`. Aucune
+ne prend de rayon d'arrondi : c'est volontaire.
+
+## L'aventure
+
+C'est le jeu central, et pour l'instant un squelette qui tourne : le
+personnage court tout seul, l'appui le fait sauter, et les niveaux sont
+écrits en texte.
+
+Un niveau, dans `src/aventure/niveaux.js` :
+
+```js
+{
+  nom: 'PREMIERS PAS',
+  indice: 'appuie pour sauter',
+  carte: [
+    '....o..................o.................X..',
+    '...####...............####..............####',
+    '@...........................................',
+    '#########...#########...##########..########',
+  ],
+}
+```
+
+`#` bloc · `^` pic · `o` pièce · `X` sortie · `@` départ · `.` vide
+
+Les lignes n'ont pas besoin d'être de la même longueur ni de remplir la
+hauteur : le chargeur complète à droite et ajoute le ciel au-dessus. On
+n'écrit que ce qui compte.
+
+**Repères pour concevoir :** le personnage saute environ 3 cases de long et
+2 cases de haut. Un trou de 3 cases se franchit, un trou de 4 non.
+
+La progression est retenue, et un niveau ne s'ouvre que si le précédent est
+fait. Ce qu'il reste à faire : de vrais niveaux, un décor, et une raison
+d'avancer.
 
 ## Le son
 
-Tout est synthétisé à la volée dans `src/son.js` : aucun fichier audio, donc
-rien à télécharger, et surtout la hauteur des notes se calcule. Le
-casse-brique monte d'un demi-ton par rangée — vider une colonne fait une
-gamme — et les cibles montent avec le combo, donc on *entend* qu'on enchaîne.
-
-Depuis un jeu :
+Tout est synthétisé dans `src/son.js` : aucun fichier audio, donc rien à
+télécharger, et surtout la hauteur des notes se calcule. Le casse-brique monte
+d'un demi-ton par rangée — vider une colonne fait une gamme — et les cibles
+montent avec le combo, donc on *entend* qu'on enchaîne.
 
 ```js
 j.son.rebond()        // impact court
@@ -104,17 +138,14 @@ j.son.rate()          // raté
 j.son.niveau()        // petite fanfare
 ```
 
-Le moteur joue tout seul le clic des boutons, la mort et le record.
+Le moteur joue tout seul le clic des boutons, la mort et le record. Pour
+inventer un bruitage : `_note({type, de, a, duree, volume})` pour une note
+avec glissando, `_bruit({duree, coupe, type})` pour les impacts. Depuis la
+console du navigateur, `son.casse(3)` les essaie un par un.
 
-Pour inventer un bruitage, tu as deux briques : `_note({type, de, a, duree,
-volume})` pour une note (avec glissando de `de` vers `a`), et `_bruit({duree,
-coupe, type})` pour les impacts. Depuis la console du navigateur, `son` est
-accessible : tape `son.casse(3)` pour essayer.
-
-Le bouton ♪ en haut à droite de l'accueil coupe le son, et le choix est
-retenu. À savoir : sur iPhone, le son ne peut démarrer qu'après un vrai appui
-(le moteur s'en charge), et l'interrupteur latéral de silence coupe tout,
-comme pour n'importe quelle page web.
+Le bouton ♪ de l'accueil coupe le son, et le choix est retenu. À savoir : sur
+iPhone le son ne démarre qu'après un vrai appui (le moteur s'en charge), et
+l'interrupteur latéral de silence coupe tout.
 
 ## Les règles qui font que ça marche
 
@@ -134,23 +165,25 @@ capacitor.config.json
 src/
   engine.js         accueil, pause, fin, records — ne connaît aucun jeu
   input.js          souris / doigt / espace -> appui + relâche
-  son.js            les bruitages, synthétisés (aucun fichier audio)
-  dessin.js         texte, rect, cercle, dist, borne, vers
-  palette.js        les couleurs communes
-  games/            les jeux + le catalogue
+  dessin.js         la boîte à dessin, et le style pixel
+  palette.js        les couleurs
+  son.js            les bruitages, synthétisés
+  games/            les mini-jeux + le catalogue
+  aventure/         le jeu principal et ses niveaux
 .github/workflows/
-  web.yml           déploie la version web à chaque push
-  apk.yml           construit l'APK, uniquement à la demande
+  web.yml           déploie la version web, à la demande
+  apk.yml           construit l'APK, à la demande
 ```
 
 ## Astuces
 
-- `moteur` est accessible depuis la console du navigateur : `moteur.j` donne
-  l'état du jeu en cours, en direct.
+- `moteur` et `son` sont accessibles depuis la console du navigateur :
+  `moteur.j` donne l'état du jeu en cours, en direct.
 - La touche Échap met en pause.
 
 ## La suite
 
+- de vrais niveaux d'aventure
 - une interface pour publier des jeux sans passer par git
 - des scores en ligne
 
