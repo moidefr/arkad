@@ -704,6 +704,73 @@ test('les fardeaux mordent vraiment', () => {
   assert.ok(dur.proc[0].blindage > nu.proc[0].blindage, 'DURCISSEMENT ne durcit rien')
 })
 
+test('aucun fardeau n’est inerte, et deux ne font jamais la même chose', () => {
+  // LATENCE SYSTÈME l'était : sa ligne recopiait le tableau des recharges sur
+  // lui-même. Un fardeau qui ne fait rien est pire qu'un fardeau facile, parce
+  // qu'il occupe une des trois places d'une offre.
+  const effets = new Set()
+  for (const f of SF.FARDEAUX) {
+    assert.ok(f.effet && typeof f.valeur === 'number', `${f.id} : pas d’effet chiffré`)
+    assert.ok(f.valeur !== 0, `${f.id} : effet de valeur nulle`)
+    assert.equal(effets.has(f.effet), false, `${f.id} refait ce que fait déjà un autre fardeau (${f.effet})`)
+    effets.add(f.effet)
+  }
+
+  const eq = equipe('analyste', 'briseur', 'tisseur')
+  const nu = K.commence(eq, ['tampon', 'veille', 'boucle'])
+  for (const f of SF.FARDEAUX) {
+    const dur = K.commence(eq, ['tampon', 'veille', 'boucle'])
+    SF.applique(dur, [f.id])
+    const change =
+      dur.cyclesMax !== nu.cyclesMax ||
+      dur.parTour !== nu.parTour ||
+      dur.tracage !== nu.tracage ||
+      (dur.tracageMult ?? 1) !== 1 ||
+      (dur.rechargePlus ?? 0) !== 0 ||
+      dur.proc.some(
+        (p, i) =>
+          p.blindage !== nu.proc[i].blindage ||
+          p.puiss !== nu.proc[i].puiss ||
+          p.pvMax !== nu.proc[i].pvMax ||
+          (p.etats.pare ?? 0) > 0 ||
+          p.att !== nu.proc[i].att,
+      )
+    // Deux fardeaux agissent hors combat : ils sont vérifiés à part.
+    if (['soinReduit', 'nombrePlus'].includes(f.effet)) continue
+    assert.ok(change, `${f.nom} ne change rien au combat`)
+  }
+})
+
+test('les fardeaux hors combat agissent aussi', () => {
+  const e = E.nouvelle(4, ['briseur', 'tisseur', 'analyste'], 'infini')
+  E.descend(e, 0, 0)
+  for (const o of e.equipe) o.pv = 1
+  E.souffle(e)
+  const plein = e.equipe[0].pv
+
+  const rogne = E.nouvelle(4, ['briseur', 'tisseur', 'analyste'], 'infini')
+  E.descend(rogne, 0, 0)
+  rogne.fardeaux = [SF.FARDEAUX.find((f) => f.effet === 'soinReduit').id]
+  for (const o of rogne.equipe) o.pv = 1
+  E.souffle(rogne)
+  assert.ok(rogne.equipe[0].pv < plein, 'PLAIES OUVERTES ne rogne rien')
+
+  const nuee = E.nouvelle(4, ['briseur', 'tisseur', 'analyste'], 'infini')
+  E.descend(nuee, 0, 0)
+  const avant = E.rencontre(nuee).length
+  nuee.fardeaux = [SF.FARDEAUX.find((f) => f.effet === 'nombrePlus').id]
+  assert.ok(E.rencontre(nuee).length > avant, 'NUÉE n’ajoute aucun processus')
+})
+
+test('tout processus écrit finit par apparaître quelque part', () => {
+  // Le tirage lit le bassin de l'acte, pas le champ `acte` : un processus
+  // oublié dans les bassins n'existe qu'en mode infini.
+  const dansUnBassin = new Set(Carte.ACTES.flatMap((a) => a.bassin))
+  for (const p of PROCESSUS) {
+    assert.ok(dansUnBassin.has(p.id), `${p.nom} n’est dans le bassin d’aucun acte`)
+  }
+})
+
 test('un acte du mode infini est jouable et se durcit avec la profondeur', () => {
   for (const acte of [1, 4, 9, 16]) {
     const carte = Carte.engendre(999, acte, 'infini')

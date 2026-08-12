@@ -29,15 +29,78 @@ export function durcis(modele, p) {
  * on en choisit un parmi trois : la difficulté est un choix, pas une courbe
  * qu'on subit.
  */
+/**
+ * Les fardeaux, décrits par un **effet** et une valeur plutôt qu'en dur.
+ *
+ * Écrits comme des identifiants testés un par un dans `applique()`, ils
+ * étaient inertes dès qu'on en ajoutait un — et l'un des huit premiers, LATENCE
+ * SYSTÈME, ne faisait rien du tout : sa ligne recopiait le tableau des
+ * recharges sur lui-même.
+ *
+ * **Un seul fardeau par effet.** Deux fardeaux qui font la même chose avec un
+ * chiffre différent ne sont pas un choix, et rien n'empêcherait d'en proposer
+ * les deux moitiés dans la même offre de trois.
+ */
 export const FARDEAUX = [
-  { id: 'f_pare', nom: 'PARE-FEU NATIF', dit: 'les processus commencent avec 12 de pare-feu' },
-  { id: 'f_trace', nom: 'SURVEILLANCE', dit: 'le traçage démarre à 40 à chaque combat' },
-  { id: 'f_cycles', nom: 'RATIONNEMENT', dit: 'un cycle maximum de moins' },
-  { id: 'f_soin', nom: 'PLAIES OUVERTES', dit: 'les ateliers ne rendent plus que 15 %' },
-  { id: 'f_nombre', nom: 'NUÉE', dit: 'un processus de plus par rencontre' },
-  { id: 'f_vitesse', nom: 'HORLOGE FOLLE', dit: 'les processus ouvrent toujours le combat' },
-  { id: 'f_recharge', nom: 'LATENCE SYSTÈME', dit: 'toutes les recharges durent un tour de plus' },
-  { id: 'f_blindage', nom: 'DURCISSEMENT', dit: '+3 de blindage à tous les processus' },
+  {
+    id: 'f_pare',
+    nom: 'PARE-FEU NATIF',
+    dit: 'les processus commencent avec 12 de pare-feu',
+    effet: 'pareProc',
+    valeur: 12,
+  },
+  {
+    id: 'f_trace',
+    nom: 'SURVEILLANCE',
+    dit: 'le traçage démarre à 40 à chaque combat',
+    effet: 'tracageDepart',
+    valeur: 40,
+  },
+  { id: 'f_cycles', nom: 'RATIONNEMENT', dit: 'un cycle maximum de moins', effet: 'cyclesMax', valeur: 1 },
+  {
+    id: 'f_soin',
+    nom: 'PLAIES OUVERTES',
+    dit: 'les ateliers ne rendent plus que 15 %',
+    effet: 'soinReduit',
+    valeur: 0.15,
+  },
+  { id: 'f_nombre', nom: 'NUÉE', dit: 'un processus de plus par rencontre', effet: 'nombrePlus', valeur: 1 },
+  {
+    id: 'f_vitesse',
+    nom: 'HORLOGE FOLLE',
+    dit: 'les processus ouvrent toujours le combat',
+    effet: 'vitesseProc',
+    valeur: 1,
+  },
+  {
+    id: 'f_recharge',
+    nom: 'LATENCE SYSTÈME',
+    dit: 'toutes les recharges durent un tour de plus',
+    effet: 'rechargePlus',
+    valeur: 1,
+  },
+  {
+    id: 'f_blindage',
+    nom: 'DURCISSEMENT',
+    dit: '+3 de blindage à tous les processus',
+    effet: 'blindageProc',
+    valeur: 3,
+  },
+  { id: 'f_debit', nom: 'DÉBIT RÉDUIT', dit: '+1 cycle par tour au lieu de +2', effet: 'cyclesTour', valeur: -1 },
+  {
+    id: 'f_sonde',
+    nom: 'SONDE ACTIVE',
+    dit: 'le traçage monte une fois et demie plus vite',
+    effet: 'tracageVite',
+    valeur: 1.5,
+  },
+  {
+    id: 'f_charge',
+    nom: 'MONTÉE EN CHARGE',
+    dit: '+2 de puissance à tous les processus',
+    effet: 'puissProc',
+    valeur: 2,
+  },
 ]
 
 export const FARDEAU = Object.fromEntries(FARDEAUX.map((f) => [f.id, f]))
@@ -66,18 +129,38 @@ export function acteInfini(acte) {
   }
 }
 
+/** La valeur d'un effet parmi les fardeaux portés, ou 0. */
+export const valeurDe = (fardeaux, effet) =>
+  fardeaux.reduce((v, id) => (FARDEAU[id]?.effet === effet ? v + FARDEAU[id].valeur : v), 0)
+
 /** Applique les fardeaux à un combat qui commence. */
 export function applique(c, fardeaux) {
-  if (fardeaux.includes('f_cycles')) c.cyclesMax = Math.max(4, c.cyclesMax - 1)
-  if (fardeaux.includes('f_trace')) c.tracage = Math.max(c.tracage, 40)
+  if (!fardeaux?.length) return
+  const v = (effet) => valeurDe(fardeaux, effet)
+
+  if (v('cyclesMax')) c.cyclesMax = Math.max(4, c.cyclesMax - v('cyclesMax'))
+  if (v('cyclesTour')) c.parTour = Math.max(1, Math.round(c.parTour * (1 - v('cyclesTour'))))
+  if (v('tracageDepart')) c.tracage = Math.max(c.tracage, v('tracageDepart'))
+  if (v('tracageVite')) c.tracageMult = 1 + v('tracageVite')
+
+  const pare = v('pareProc')
+  const blindage = v('blindageProc')
+  const puiss = v('puissProc')
+  const pv = v('pvProc')
   for (const p of c.proc) {
-    if (fardeaux.includes('f_pare')) p.etats.pare = 12
-    if (fardeaux.includes('f_blindage')) p.blindage += 3
-    if (fardeaux.includes('f_vitesse')) p.att = 0
+    if (pare) p.etats.pare = pare
+    if (blindage) p.blindage += blindage
+    if (puiss) p.puiss += puiss
+    if (pv) {
+      p.pvMax = Math.round(p.pvMax * (1 + pv))
+      p.pv = p.pvMax
+    }
+    if (v('vitesseProc')) p.att = 0
   }
-  if (fardeaux.includes('f_recharge')) {
-    for (const u of [...c.ops, ...c.proc]) u.rech = u.rech.map((r) => r)
-  }
+  // Les recharges : un tour de plus pour tout le monde, ce que l'ancienne
+  // version prétendait faire en recopiant le tableau sur lui-même.
+  const plus = v('rechargePlus')
+  if (plus) c.rechargePlus = plus
 }
 
 export const nomDe = (id) => PROC[id]?.nom ?? id

@@ -337,7 +337,7 @@ export function joue(c, acteur, k, cible) {
   const rapport = { acteur: acteur.nom, comp: comp.nom, coups: [], prime: prime > 1 }
 
   if (joueur) c.cycles -= cout(acteur, comp)
-  acteur.rech[k] = rechargeDe(acteur, comp)
+  acteur.rech[k] = rechargeDe(acteur, comp) + (c.rechargePlus ?? 0)
 
   for (const but of buts) {
     // Un CACHE consomme l'attaque entière, pas une pile de dégâts.
@@ -456,7 +456,7 @@ function bus(c, acteur, comp, buts) {
 function monteTracage(c, acteur, comp) {
   const regle = c.regles.includes('tracage') ? 2 : 1
   const mods = (acteur.mod ?? []).reduce((k, m) => k * (m.tracageMult ?? 1), 1)
-  c.tracage = Math.min(TRACAGE_MAX, c.tracage + (comp.cout * 3 + 2) * regle * mods)
+  c.tracage = Math.min(TRACAGE_MAX, c.tracage + (comp.cout * 3 + 2) * regle * mods * (c.tracageMult ?? 1))
 }
 
 /** Le tempo. Une PRIORITÉ le rend gratuit une fois. */

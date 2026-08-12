@@ -4,6 +4,7 @@ import { COMP } from './donnees/competences.js'
 import { MODULE, MODULES, oppose, EMPLACEMENTS_MODULE } from './donnees/modules.js'
 import * as Carte from './carte.js'
 import { SOLO } from './combat.js'
+import { valeurDe } from './sansfin.js'
 
 /**
  * L'état d'une partie, sa sérialisation et sa migration.
@@ -101,7 +102,15 @@ export const noeudCourant = (e) => {
 
 export const rencontre = (e) => {
   const n = noeudCourant(e)
-  return n ? Carte.rencontre(e.graine, e.acte, e.position.couche, e.position.k, n.type, e.mode, e.equipe.length) : []
+  if (!n) return []
+  const r = Carte.rencontre(e.graine, e.acte, e.position.couche, e.position.k, n.type, e.mode, e.equipe.length)
+  // NUÉE et consorts ajoutent des processus à la rencontre déjà tirée : on ne
+  // retire pas la carte, on l'alourdit.
+  const plus = Math.round(valeurDe(e.fardeaux ?? [], 'nombrePlus'))
+  if (!plus || n.type === 'noyau') return r
+  const bassin = Carte.acteDe(e.acte, e.mode).bassin
+  const sup = Array.from({ length: plus }, (_, k) => bassin[(e.position.couche + e.position.k + k) % bassin.length])
+  return [...r, ...sup].slice(0, e.equipe.length === 1 ? 3 : 5)
 }
 
 /** Avance sur la carte. Rend `'acte'` quand l'acte est fini, `'carte'` sinon. */
@@ -199,7 +208,10 @@ export const ATELIER = [
 ]
 
 export function souffle(e) {
-  for (const o of e.equipe) o.pv = Math.min(o.pvMax, o.pv + Math.round(o.pvMax * 0.35))
+  // Un fardeau peut rogner ce que rend un atelier : c'est le seul effet du
+  // mode infini qui agisse hors combat.
+  const part = valeurDe(e.fardeaux ?? [], 'soinReduit') || 0.35
+  for (const o of e.equipe) o.pv = Math.min(o.pvMax, o.pv + Math.round(o.pvMax * part))
 }
 
 /** Les compétences qu'un atelier peut encore affûter, tous opérateurs confondus. */

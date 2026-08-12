@@ -148,6 +148,17 @@ plus. Le purger ouvre le mode **INFINI**, où la pression monte sans fin et où
 l'on choisit tous les trois actes *comment* ça devient dur, un fardeau parmi
 trois.
 
+On peut aussi **plonger seul**. Ce n'est pas une difficulté de plus mais un
+autre jeu : la classe prise décide de toute la partie, personne ne couvre ni ne
+répare, et huit emplacements se remplissent d'une seule main. La correction qui
+compte est structurelle — face à deux processus, un opérateur seul joue une
+action quand l'adversaire en joue deux, alors il agit presque deux fois plus
+vite et reçoit trois fois plus de cycles par tour. Aucune quantité d'intégrité
+ne rattrape un rapport d'actions.
+
+Huit classes, cinquante-quatre compétences, vingt-sept processus, cinq noyaux,
+trente-neuf modules, onze fardeaux.
+
 Ce qui empêche une combinaison de tout casser, et qui manquait au jeu
 précédent : six emplacements de compétence dont deux verrouillés avec **rejet
 forcé** au-delà, trois emplacements de module, quatre **paires antagonistes**
