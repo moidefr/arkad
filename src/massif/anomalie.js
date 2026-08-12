@@ -33,7 +33,7 @@ import * as SF from './anomalie/sansfin.js'
  * fait pour ça — c'est le même chemin que les records.
  */
 const CLE_META = 'anomalie.meta'
-const metaVide = { victoires: 0, plongees: 0, profondeur: 0 }
+const metaVide = { victoires: 0, plongees: 0, profondeur: 0, profondeurSeul: 0, victoiresSeul: 0 }
 
 const litMeta = () => {
   try {
@@ -66,6 +66,7 @@ export default {
     j.e.prises = []
     j.e.gagne = false
     j.e.attente = 0
+    j.e.equipage = 3
     j.e.sel = 0
     j.e.detail = null
     j.e.choisi = null
@@ -109,8 +110,8 @@ export default {
 
   dessine(j, ctx) {
     const e = j.e
-    if (e.vue === 'titre') e.zones = VM.titre(ctx, e.meta)
-    else if (e.vue === 'recrutement') e.zones = VM.recrutement(ctx, e.offertes, e.prises)
+    if (e.vue === 'titre') e.zones = VM.titre(ctx, e.meta, e.equipage)
+    else if (e.vue === 'recrutement') e.zones = VM.recrutement(ctx, e.offertes, e.prises, e.equipage)
     else if (e.vue === 'carte') e.zones = ecranCarte(ctx, e)
     else if (e.vue === 'equipe') e.zones = VE.dessine(ctx, e.p, e.sel, e.detail)
     else if (e.vue === 'noeud') e.zones = VM.noeud(ctx, e.p, E.rencontre(e.p), E.noeudCourant(e.p))
@@ -129,6 +130,7 @@ export default {
     const z = e.zones.find((x) => p.x >= x.x && p.x <= x.x + x.w && p.y >= x.y && p.y <= x.y + x.h)
     if (!z) return
     const suites = {
+      equipage: () => ((e.equipage = z.n), j.son.clic()),
       plonger: () => commencePartie(j, 'campagne'),
       infini: () => commencePartie(j, 'infini'),
       fardeau: () => prendFardeau(j, z.id),
@@ -168,10 +170,15 @@ function commencePartie(j, mode = 'campagne') {
 
 function choisitClasse(j, id) {
   const pris = j.e.prises
+  const combien = j.e.equipage ?? 3
   const k = pris.indexOf(id)
   if (k >= 0) pris.splice(k, 1)
-  else if (pris.length < 3) pris.push(id)
-  else return j.son.rate()
+  else if (pris.length < combien) pris.push(id)
+  else if (combien === 1) {
+    // Seul, un deuxième appui remplace le choix au lieu de le refuser : on
+    // n'oblige pas à désélectionner avant de changer d'avis.
+    pris[0] = id
+  } else return j.son.rate()
   j.son.clic()
 }
 
@@ -257,6 +264,7 @@ function avance(j) {
       e.gagne = true
       e.p.fini = true
       e.meta.victoires++
+      if (E.estSeul(e.p)) e.meta.victoiresSeul = (e.meta.victoiresSeul ?? 0) + 1
       ecritMeta(e.meta)
       j.efface()
       return j.perdu()
@@ -397,9 +405,12 @@ function termine(j) {
     // aucun — c'est exactement ce qui rendait ASCENSION creux.
     e.gagne = false
     e.vue = 'bilan'
-    if (e.p.mode === 'infini' && e.p.acte > e.meta.profondeur) {
-      e.meta.profondeur = e.p.acte
-      ecritMeta(e.meta)
+    if (e.p.mode === 'infini') {
+      const cle = E.estSeul(e.p) ? 'profondeurSeul' : 'profondeur'
+      if (e.p.acte > (e.meta[cle] ?? 0)) {
+        e.meta[cle] = e.p.acte
+        ecritMeta(e.meta)
+      }
     }
     j.efface()
     j.son.mort()

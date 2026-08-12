@@ -28,9 +28,11 @@ const PAR_CAS = Number(process.argv[2] ?? 40)
  */
 const equipe = (cl, extra = 0, decalage = 0) =>
   cl.map((c, i) => {
-    const op = E.nouvelOperateur(c, 'OP' + i)
+    const op = E.nouvelOperateur(c, 'OP' + i, cl.length === 1)
     const reserve = CLASSES.find((x) => x.id === c).reserve
-    for (let k = 0; k < extra; k++) {
+    // Jamais plus que la réserve : garnir en boucle donne des compétences en
+    // double, ce qu'aucun joueur ne fait et ce que le surcoût d'axe punit.
+    for (let k = 0; k < Math.min(extra, reserve.length); k++) {
       const libre = op.comp.indexOf(null)
       if (libre < 0) break
       op.comp[libre] = reserve[(k + decalage + i) % reserve.length]
@@ -151,6 +153,41 @@ for (const politique of ['gourmand', 'prudent', 'hasard']) {
       `${(tours / total).toFixed(0).padStart(3)} tours · ` +
       `${((sante / Math.max(1, gagnes)) * 100).toFixed(0).padStart(3)} % d'intégrité restante` +
       (sansFin ? `  ⚠ ${sansFin} combats sans fin` : ''),
+  )
+}
+
+// --- Le mode solo -------------------------------------------------------------------------
+//
+// Un opérateur seul est un autre jeu, pas une difficulté de plus : il a le
+// triple de cycles par tour, presque le double d'intégrité, deux emplacements
+// de compétence et un module de plus, et il ne croise jamais plus de deux
+// processus. Ces chiffres n'ont de sens que mesurés.
+
+// On mesure contre le bassin des deux premiers actes : y jeter les processus
+// du cinquième ne dirait rien d'utile, pas plus que pour une équipe de trois.
+const bassinTot = PROCESSUS.filter((p) => p.acte <= 2)
+const rngSolo = melange32(31337)
+const duosSolo = Array.from({ length: 24 }, () =>
+  Array.from({ length: 1 + Math.floor(rngSolo() * 2) }, () => bassinTot[Math.floor(rngSolo() * bassinTot.length)].id),
+)
+
+console.log('\n  SEUL, par classe, contre les actes I-II :')
+for (const cl of CLASSES) {
+  let g = 0
+  let t = 0
+  let s = 0
+  for (let n = 0; n < duosSolo.length; n++) {
+    const rencontre = duosSolo[n]
+    const r = combat([cl.id], rencontre, 'gourmand', 1000 + n, 400, 6)
+    t += r.tours
+    if (r.issue === 'gagne') {
+      g++
+      s += r.sante
+    }
+  }
+  console.log(
+    `    ${cl.nom.padEnd(11)} ${((g / duosSolo.length) * 100).toFixed(0).padStart(3)} % · ` +
+      `${(t / duosSolo.length).toFixed(0).padStart(3)} tours · ${((s / Math.max(1, g)) * 100).toFixed(0)} % d'intégrité`,
   )
 }
 

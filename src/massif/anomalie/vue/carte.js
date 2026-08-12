@@ -74,7 +74,7 @@ export function dessine(ctx, carte, position, visites, choisi) {
                 ? C.cyan
                 : n.type === 'marche'
                   ? C.accent
-                  : C.faible
+                  : C.texte // un combat ordinaire, mais pas pour autant illisible
 
       const vise = choisi && choisi.couche === i && choisi.k === k
       if (ouvert) lueur(ctx, b.x, b.y, b.w, b.h, vise ? C.accent : teinte, vise ? 3 : 2, vise ? 0.9 : 0.6)

@@ -3,6 +3,7 @@ import { CLASSES, CLASSE, NOMS } from './donnees/classes.js'
 import { COMP } from './donnees/competences.js'
 import { MODULE, MODULES, oppose, EMPLACEMENTS_MODULE } from './donnees/modules.js'
 import * as Carte from './carte.js'
+import { SOLO } from './combat.js'
 
 /**
  * L'état d'une partie, sa sérialisation et sa migration.
@@ -24,6 +25,19 @@ export const VERSION = 3
 export const EMPLACEMENTS = 6
 export const VERROUS = 2
 
+/**
+ * Un opérateur seul porte tout le rôle d'une équipe de trois : il lui faut de
+ * quoi le ranger. Huit compétences et quatre modules au lieu de six et trois —
+ * sans ça, le butin cesse d'offrir quoi que ce soit à mi-partie et les nœuds
+ * ARCHIVE deviennent des couloirs vides.
+ */
+export const EMPLACEMENTS_SOLO = 8
+export const MODULES_SOLO = 4
+
+export const emplacementsDe = (e) => (e.equipe.length === 1 ? EMPLACEMENTS_SOLO : EMPLACEMENTS)
+export const modulesDe = (e) => (e.equipe.length === 1 ? MODULES_SOLO : EMPLACEMENTS_MODULE)
+export const estSeul = (e) => e.equipe.length === 1
+
 // --- Une partie neuve -------------------------------------------------------------
 
 export function nouvelle(graine, classes, mode = 'campagne') {
@@ -38,18 +52,31 @@ export function nouvelle(graine, classes, mode = 'campagne') {
     visites: [],
     fardeaux: [],
     verrous: [], // les modules verrouillés par leur antagoniste, pour la partie
-    equipe: classes.map((cl, i) => nouvelOperateur(cl, noms[i])),
+    equipe: classes.map((cl, i) => nouvelOperateur(cl, noms[i], classes.length === 1)),
     combat: null,
     offre: null,
     fini: false,
   }
 }
 
-export function nouvelOperateur(cl, nom) {
+export function nouvelOperateur(cl, nom, seul = false) {
   const c = CLASSE[cl]
   const comp = c.depart.slice()
-  while (comp.length < EMPLACEMENTS) comp.push(null)
-  return { cl, nom, pv: c.pv, pvMax: c.pv, rang: c.rang, comp, mod: Array(EMPLACEMENTS_MODULE).fill(null) }
+  while (comp.length < (seul ? EMPLACEMENTS_SOLO : EMPLACEMENTS)) comp.push(null)
+  // L'intégrité renforcée du mode solo appartient à la **fiche**, pas au
+  // combat : calculée à l'engagement, elle laissait l'opérateur commencer sa
+  // partie à moitié blessé, son `pv` de départ ayant été fixé sur la valeur
+  // non renforcée de la classe.
+  const pvMax = Math.round(c.pv * (seul ? SOLO.pv : 1))
+  return {
+    cl,
+    nom,
+    pv: pvMax,
+    pvMax,
+    rang: c.rang,
+    comp,
+    mod: Array(seul ? MODULES_SOLO : EMPLACEMENTS_MODULE).fill(null),
+  }
 }
 
 /** Quatre classes proposées, trois à prendre : le recrutement est déjà un choix. */
@@ -73,7 +100,7 @@ export const noeudCourant = (e) => {
 
 export const rencontre = (e) => {
   const n = noeudCourant(e)
-  return n ? Carte.rencontre(e.graine, e.acte, e.position.couche, e.position.k, n.type, e.mode) : []
+  return n ? Carte.rencontre(e.graine, e.acte, e.position.couche, e.position.k, n.type, e.mode, e.equipe.length) : []
 }
 
 /** Avance sur la carte. Rend `'acte'` quand l'acte est fini, `'carte'` sinon. */
@@ -135,7 +162,7 @@ export function prendModule(e, offreCourante, id, jette = -1) {
   if (!offreCourante.choix.includes(id) || !MODULE[id]) return false
   const libre = op.mod.indexOf(null)
   const place = libre >= 0 ? libre : jette
-  if (place < 0 || place >= EMPLACEMENTS_MODULE) return false
+  if (place < 0 || place >= modulesDe(e)) return false
   op.mod[place] = id
   const adverse = oppose(id)
   if (adverse && !e.verrous.includes(adverse)) e.verrous.push(adverse)
@@ -153,7 +180,7 @@ export function prend(e, offreCourante, idComp, jette = -1) {
     op.comp[libre] = idComp
     return true
   }
-  if (jette < VERROUS || jette >= EMPLACEMENTS) return false
+  if (jette < VERROUS || jette >= emplacementsDe(e)) return false
   op.comp[jette] = idComp
   return true
 }
@@ -196,7 +223,7 @@ const compacte = (c) => ({
 export function migre(s) {
   if (!s || typeof s !== 'object') return null
   if (s.v !== VERSION) return null // aucune version antérieure n'existe encore
-  if (!Array.isArray(s.equipe) || s.equipe.length !== 3) return null
+  if (!Array.isArray(s.equipe) || (s.equipe.length !== 3 && s.equipe.length !== 1)) return null
   for (const o of s.equipe) {
     if (!CLASSE[o.cl]) return null
     if (!Array.isArray(o.comp) || o.comp.some((id) => id !== null && !COMP[id])) return null
@@ -216,8 +243,10 @@ export function migre(s) {
       pv: Math.max(0, o.pv | 0),
       pvMax: Math.max(1, o.pvMax | 0),
       rang: o.rang === 1 ? 1 : 0,
-      comp: o.comp.slice(0, EMPLACEMENTS),
-      mod: (Array.isArray(o.mod) ? o.mod : []).slice(0, EMPLACEMENTS_MODULE).map((id) => (MODULE[id] ? id : null)),
+      comp: o.comp.slice(0, s.equipe.length === 1 ? EMPLACEMENTS_SOLO : EMPLACEMENTS),
+      mod: (Array.isArray(o.mod) ? o.mod : [])
+        .slice(0, s.equipe.length === 1 ? MODULES_SOLO : EMPLACEMENTS_MODULE)
+        .map((id) => (MODULE[id] ? id : null)),
     })),
     combat: s.combat ?? null,
     offre: s.offre ?? null,

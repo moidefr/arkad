@@ -715,3 +715,111 @@ test('un acte du mode infini est jouable et se durcit avec la profondeur', () =>
   }
   assert.ok(Carte.acteDe(9, 'infini').force > Carte.acteDe(2, 'infini').force, 'la descente ne durcit pas')
 })
+
+// --- Le mode solo -------------------------------------------------------------------------
+
+test('un opérateur seul reçoit ce qu’il faut pour tenir la place de trois', () => {
+  const trio = K.commence(equipe('briseur', 'tisseur', 'analyste'), ['veille'])
+  const seul = K.commence([E.nouvelOperateur('briseur', 'A', true)], ['veille'])
+  assert.equal(seul.seul, true)
+  assert.equal(trio.seul, false)
+  assert.ok(seul.ops[0].pvMax > trio.ops[0].pvMax * 1.4, 'un opérateur seul n’a pas assez d’intégrité')
+  assert.ok(seul.ops[0].blindage > trio.ops[0].blindage, 'ni assez de blindage')
+  // Et il commence sa partie **entier**, pas à moitié blessé : le renfort
+  // appartient à la fiche, pas au combat.
+  assert.equal(seul.ops[0].pv, seul.ops[0].pvMax, 'un opérateur seul démarre entamé')
+  // Et surtout, il joue plus souvent : c'est le rapport d'actions qui décide,
+  // pas les points de vie.
+  const pasTrio = K.tempoDe(trio.ops[0], { temps: 1 })
+  const pasSeul = K.tempoDe(seul.ops[0], { temps: 1 })
+  assert.ok(pasSeul < pasTrio * 0.7, `seul, le coût de tempo est ${(pasSeul / pasTrio).toFixed(2)} de celui d’un trio`)
+})
+
+test('les cycles rendus par tour compensent l’équipage', () => {
+  // Ressource partagée : trois opérateurs en regagnent trois fois plus par
+  // tour de camp qu'un seul. Sans rattrapage, jouer seul serait jouer avec le
+  // tiers de son économie.
+  assert.equal(K.cyclesTour(3), 2)
+  assert.equal(K.cyclesTour(1), 6)
+  assert.equal(K.cyclesTour(3) * 3, K.cyclesTour(1))
+})
+
+test('seul, on affronte au plus deux processus et jamais une escorte', () => {
+  for (let acte = 1; acte <= Carte.DERNIER_ACTE; acte++) {
+    for (let g = 0; g < 40; g++) {
+      const carte = Carte.engendre(g * 313 + 7, acte)
+      carte.couches.forEach((ligne, i) => {
+        ligne.forEach((n, k) => {
+          const seul = Carte.rencontre(g * 313 + 7, acte, i, k, n.type, 'campagne', 1)
+          const trio = Carte.rencontre(g * 313 + 7, acte, i, k, n.type, 'campagne', 3)
+          assert.ok(seul.length >= 1, 'rencontre vide')
+          assert.ok(seul.length <= 2, `${seul.length} processus contre un opérateur seul`)
+          assert.ok(seul.length <= trio.length, 'seul, on en affronte plus qu’à trois')
+        })
+      })
+    }
+  }
+})
+
+test('un opérateur seul a plus de place à remplir', () => {
+  const solo = E.nouvelle(5, ['briseur'])
+  const trio = E.nouvelle(5, ['briseur', 'tisseur', 'analyste'])
+  assert.equal(E.estSeul(solo), true)
+  assert.equal(E.estSeul(trio), false)
+  assert.equal(E.emplacementsDe(solo), E.EMPLACEMENTS_SOLO)
+  assert.equal(E.modulesDe(solo), E.MODULES_SOLO)
+  assert.ok(E.emplacementsDe(solo) > E.emplacementsDe(trio))
+  assert.equal(solo.equipe[0].comp.length, E.EMPLACEMENTS_SOLO)
+  assert.equal(solo.equipe[0].mod.length, E.MODULES_SOLO)
+})
+
+test('une partie solo se sauve et se relit', () => {
+  const e = E.nouvelle(88, ['vecteur'])
+  E.descend(e, 0, 0)
+  e.equipe[0].comp[2] = 'ver'
+  e.equipe[0].mod[3] = 'md_plaque'
+  const relu = E.migre(JSON.parse(JSON.stringify(E.sauvegarde(e))))
+  assert.ok(relu, 'la sauvegarde solo ne se relit pas')
+  assert.equal(relu.equipe.length, 1)
+  assert.equal(relu.equipe[0].comp[2], 'ver')
+  assert.equal(relu.equipe[0].mod[3], 'md_plaque')
+})
+
+test('aucune classe n’est morte en solo', () => {
+  // Le banc mesure les taux exacts ; ici on vérifie seulement qu'aucune classe
+  // ne se retrouve incapable de finir un combat d'ouverture toute seule.
+  for (const cl of CLASSES) {
+    const op = E.nouvelOperateur(cl.id, 'SEUL', true)
+    cl.reserve.forEach((id, k) => (op.comp[2 + k] = id))
+    let gagnes = 0
+    for (let n = 0; n < 8; n++) {
+      const rencontre = n % 2 ? ['veille'] : ['veille', 'balise']
+      const c = K.commence([op], rencontre)
+      IA.annonce(c)
+      let t = 0
+      while (!K.fini(c) && t < 300) {
+        const u = K.actif(c)
+        K.ouvreTour(c, u)
+        K.recharge(u)
+        if (!K.estOperateur(c, u)) IA.tourProcessus(c, u)
+        else {
+          let m = null
+          for (let k = 0; k < u.comp.length; k++) {
+            const comp = COMP[u.comp[k]]
+            if (!comp || !K.jouable(c, u, comp, k)) continue
+            for (const cible of K.cibles(c, u, comp)) {
+              const v = comp.base ? K.degats(c, u, comp, cible).final : comp.soin ? comp.soin * 0.5 : 3
+              if (!m || v > m.v) m = { k, cible, v }
+            }
+          }
+          if (m) K.joue(c, u, m.k, m.cible)
+          else K.passe(c, u)
+        }
+        IA.annonce(c)
+        t++
+      }
+      if (K.fini(c) === 'gagne') gagnes++
+    }
+    assert.ok(gagnes >= 4, `${cl.nom} seul ne gagne que ${gagnes}/8 combats d’ouverture`)
+  }
+})

@@ -68,37 +68,39 @@ const TEINTE_TYPE = { brut: C.rouge, logique: C.cyan, corruption: C.violet, aucu
  * Une carte ne montre que des nombres : coût, dégâts, recharge. La prose vit
  * sur l'écran ÉQUIPE, hors combat. En combat, on n'enseigne pas — on montre.
  */
-export function carteComp(ctx, x, y, id, { cout, dispo, choisie, recharge = 0 }) {
+export function carteComp(ctx, x, y, id, { cout, dispo, choisie, recharge = 0, compacte = false }) {
   const comp = COMP[id]
+  const h = compacte ? 60 : CARTE.h
   if (!comp) {
-    rect(ctx, x, y, CARTE.w, CARTE.h, ton(C.panneau, -0.55))
-    cadre(ctx, x, y, CARTE.w, CARTE.h, ton(C.bord, -0.3))
-    texte(ctx, '—', x + CARTE.w / 2, y + CARTE.h / 2, 16, ton(C.bord, 0.1), 700)
+    rect(ctx, x, y, CARTE.w, h, ton(C.panneau, -0.55))
+    cadre(ctx, x, y, CARTE.w, h, ton(C.bord, -0.3))
+    texte(ctx, '—', x + CARTE.w / 2, y + h / 2, 16, ton(C.bord, 0.1), 700)
     return
   }
   const teinte = TEINTE_TYPE[comp.type] ?? C.faible
   const alpha = ctx.globalAlpha
   if (!dispo) ctx.globalAlpha = alpha * 0.35
 
-  if (choisie) lueur(ctx, x, y, CARTE.w, CARTE.h, C.accent, 3, 0.8)
-  rect(ctx, x, y, CARTE.w, CARTE.h, C.panneau)
-  rect(ctx, x, y, 4, CARTE.h, teinte)
-  cadre(ctx, x, y, CARTE.w, CARTE.h, choisie ? C.accent : ton(C.bord, -0.1))
+  if (choisie) lueur(ctx, x, y, CARTE.w, h, C.accent, 3, 0.8)
+  rect(ctx, x, y, CARTE.w, h, C.panneau)
+  rect(ctx, x, y, 4, h, teinte)
+  cadre(ctx, x, y, CARTE.w, h, choisie ? C.accent : ton(C.bord, -0.1))
 
   ctx.textAlign = 'left'
   texte(ctx, comp.nom, x + 12, y + 16, 13, dispo ? C.texte : C.faible, 700, 106)
-  if (comp.base) texte(ctx, `${comp.base}`, x + 12, y + 52, 15, teinte, 700, 40)
-  else if (comp.soin) texte(ctx, `+${comp.soin}`, x + 12, y + 52, 15, C.vert, 700, 40)
-  else texte(ctx, comp.forme === 'soi' ? 'SOI' : '···', x + 12, y + 52, 12, C.faible, 700, 40)
-  texte(ctx, etiquette(comp), x + 12, y + 34, 10, ton(C.faible, 0.1), 700, 120)
+  const yBas = compacte ? y + 46 : y + 52
+  if (comp.base) texte(ctx, `${comp.base}`, x + 12, yBas, 15, teinte, 700, 40)
+  else if (comp.soin) texte(ctx, `+${comp.soin}`, x + 12, yBas, 15, C.vert, 700, 40)
+  else texte(ctx, comp.forme === 'soi' ? 'SOI' : '···', x + 12, yBas, 12, C.faible, 700, 40)
+  texte(ctx, etiquette(comp), x + 12, compacte ? y + 32 : y + 34, 10, ton(C.faible, 0.1), 700, 120)
   ctx.textAlign = 'right'
   texte(ctx, `${cout}`, x + CARTE.w - 12, y + 16, 14, cout > 0 ? C.accent : C.faible, 700, 24)
   ctx.textAlign = 'center'
 
   if (recharge > 0) {
     ctx.globalAlpha = alpha * 0.75
-    rect(ctx, x, y, CARTE.w, CARTE.h, ton(C.fond, 0.05))
-    texte(ctx, `${recharge}`, x + CARTE.w / 2, y + CARTE.h / 2, 24, C.bord, 700)
+    rect(ctx, x, y, CARTE.w, h, ton(C.fond, 0.05))
+    texte(ctx, `${recharge}`, x + CARTE.w / 2, y + h / 2, 24, C.bord, 700)
     ctx.globalAlpha = alpha
   }
   ctx.globalAlpha = alpha

@@ -185,7 +185,7 @@ export const termine = (carte, position) => position && position.couche >= carte
  * La rencontre d'un nœud, tirée d'une sous-graine stable : revenir sur la même
  * partie retrouve exactement les mêmes processus.
  */
-export function rencontre(graine, acteN, couche, k, type, mode = 'campagne') {
+export function rencontre(graine, acteN, couche, k, type, mode = 'campagne', equipage = 3) {
   const acte = acteDe(acteN, mode)
   const rng = melange32(sousGraine(graine, acteN, couche, k, 11))
   if (type === 'noyau') {
@@ -194,10 +194,17 @@ export function rencontre(graine, acteN, couche, k, type, mode = 'campagne') {
     // trouvait souvent aucun des deux noyaux de l'acte.
     const id = parmi(rng, acte.noyaux)
     const noyau = NOYAUX.find((n) => n.id === id)
-    return noyau.escorte ? [noyau.id, ...noyau.escorte] : [noyau.id]
+    // Seul, on affronte le noyau sans son escorte : trois contre un se
+    // renverse mal quand on est un.
+    if (!noyau.escorte || equipage === 1) return [noyau.id]
+    return [noyau.id, ...noyau.escorte]
   }
   const bassin = PROCESSUS.filter((p) => acte.bassin.includes(p.id))
   const dur = type === 'elite'
-  const combien = Math.min(4, (dur ? 3 : 1) + Math.floor(acte.force / 2) + entier(rng, 2))
-  return pioche(rng, bassin, Math.min(combien, bassin.length)).map((p) => p.id)
+  // Le nombre de processus suit la taille de l'équipage : un opérateur seul
+  // face à quatre processus ne fait pas un combat difficile, il fait un combat
+  // qu'il regarde se dérouler sans lui.
+  const plafond = equipage === 1 ? 2 : 4
+  const combien = Math.min(plafond, (dur ? 3 : 1) + Math.floor(acte.force / 2) + entier(rng, 2))
+  return pioche(rng, bassin, Math.max(1, Math.min(combien, bassin.length))).map((p) => p.id)
 }

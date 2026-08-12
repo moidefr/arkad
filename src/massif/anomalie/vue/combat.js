@@ -26,10 +26,18 @@ const TRACAGE = { x: 16, y: 86, w: 328, h: 8 }
  */
 const PROCS = { y: { 0: 170, 1: 102 }, h: 62, x: [20, 184], w: 156 }
 const OPS = { y: 246, h: 112, w: 104, pas: 108, x0: 20 }
+/**
+ * Seul, l'opérateur prend toute la largeur mais moins de hauteur : la place
+ * gagnée va à sa main, qui compte huit cartes au lieu de six. Un écran conçu
+ * pour trois et rempli par un est un écran à moitié vide.
+ */
+const OPS_SEUL = { y: 246, h: 76, w: 320, x0: 20 }
 const CYCLES = { x: 20, y: 366, w: 256, h: 18 }
+const CYCLES_SEUL = { x: 20, y: 330, w: 256, h: 18 }
 const CHAINE = { x: 288, y: 366, pas: 20, taille: 14 }
 const MAIN = { x: [20, 184], y: [392, 466, 540] }
-const AIDE = { y: 628 }
+const MAIN_SEUL = { x: [20, 184], y: [356, 422, 488, 554] }
+const AIDE = { y: 628, seul: 636 }
 
 /** Où se dessine un processus : deux rangs de deux, ou une carte centrée s'il est seul. */
 export function placeProc(c, p) {
@@ -43,8 +51,17 @@ export function placeProc(c, p) {
   return { x: PROCS.x[Math.min(1, k)], y, w: PROCS.w, h: PROCS.h }
 }
 
-export const placeOp = (i) => ({ x: OPS.x0 + i * OPS.pas, y: OPS.y, w: OPS.w, h: OPS.h })
-export const placeCarte = (k) => ({ x: MAIN.x[k % 2], y: MAIN.y[Math.floor(k / 2)], w: P.CARTE.w, h: P.CARTE.h })
+export const placeOp = (i, seul = false) =>
+  seul
+    ? { x: OPS_SEUL.x0, y: OPS_SEUL.y, w: OPS_SEUL.w, h: OPS_SEUL.h }
+    : { x: OPS.x0 + i * OPS.pas, y: OPS.y, w: OPS.w, h: OPS.h }
+
+export const placeCarte = (k, seul = false) => {
+  const m = seul ? MAIN_SEUL : MAIN
+  const rangee = Math.floor(k / 2)
+  if (rangee >= m.y.length) return { x: -999, y: -999, w: 0, h: 0 }
+  return { x: m.x[k % 2], y: m.y[rangee], w: P.CARTE.w, h: seul ? 60 : P.CARTE.h }
+}
 
 /**
  * Les zones touchables de l'écran, dans l'ordre où elles sont testées.
@@ -58,13 +75,13 @@ export function zones(c, choisie) {
   if (joueur) {
     for (let k = 0; k < u.comp.length; k++) {
       if (!u.comp[k]) continue
-      out.push({ quoi: 'comp', k, ...placeCarte(k) })
+      out.push({ quoi: 'comp', k, ...placeCarte(k, c.seul) })
     }
     if (choisie != null) {
       const comp = COMP[u.comp[choisie]]
       for (const cible of K.cibles(c, u, comp)) {
         const camp = K.estOperateur(c, cible) ? 'op' : 'proc'
-        const boite = camp === 'op' ? placeOp(c.ops.indexOf(cible)) : placeProc(c, cible)
+        const boite = camp === 'op' ? placeOp(c.ops.indexOf(cible), c.seul) : placeProc(c, cible)
         out.push({ quoi: 'cible', cible, ...boite })
       }
     }
@@ -94,21 +111,24 @@ export function dessine(j, ctx, c, choisie) {
   rect(ctx, 16, 238, 328, 2, ton(C.bord, -0.2))
 
   c.ops.forEach((o, i) => {
-    const b = placeOp(i)
+    const b = placeOp(i, c.seul)
     P.fiche(ctx, b.x, b.y, b.w, b.h, o, {
       teinte: CLASSE[o.cl].couleur,
       actif: o === u,
       visable: legales ? legales.has(o) : undefined,
     })
     // Le rang, en un caractère : c'est une information tactique, pas un décor.
-    texte(ctx, o.rang === 0 ? '▲' : '▼', b.x + b.w - 12, b.y + 52, 11, ton(CLASSE[o.cl].couleur, 0.2), 700, 12)
+    // Seul, il n'y a qu'un rang occupé, donc rien à dire.
+    if (!c.seul) {
+      texte(ctx, o.rang === 0 ? '▲' : '▼', b.x + b.w - 12, b.y + 52, 11, ton(CLASSE[o.cl].couleur, 0.2), 700, 12)
+    }
   })
 
   cycles(ctx, c)
   chaine(ctx, c)
 
   if (joueur) main(ctx, c, u, choisie)
-  else texte(ctx, `${u ? u.nom : '—'} joue…`, 180, 470, 18, C.rouge, 700, 320)
+  else texte(ctx, `${u ? u.nom : '—'} joue…`, 180, c.seul ? 450 : 470, 18, C.rouge, 700, 320)
 
   aide(ctx, c, u, comp, joueur)
 }
@@ -129,31 +149,34 @@ function tracage(ctx, c) {
 }
 
 function cycles(ctx, c) {
+  const boite = c.seul ? CYCLES_SEUL : CYCLES
   const n = c.cyclesMax
-  const large = (CYCLES.w - (n - 1) * 2) / n
+  const large = (boite.w - (n - 1) * 2) / n
   for (let k = 0; k < n; k++) {
-    const x = CYCLES.x + k * (large + 2)
+    const x = boite.x + k * (large + 2)
     const plein = k < c.cycles
-    if (plein) lueur(ctx, x, CYCLES.y, large, CYCLES.h, C.accent, 2, 0.5)
-    rect(ctx, x, CYCLES.y, large, CYCLES.h, plein ? C.accent : ton(C.panneau, -0.3))
+    if (plein) lueur(ctx, x, boite.y, large, boite.h, C.accent, 2, 0.5)
+    rect(ctx, x, boite.y, large, boite.h, plein ? C.accent : ton(C.panneau, -0.3))
   }
 }
 
 function chaine(ctx, c) {
+  const y0 = c.seul ? CYCLES_SEUL.y : CHAINE.y
   K.CHAINE_TAGS.forEach((tag, k) => {
     const allume = c.chaine.includes(tag)
     const x = CHAINE.x + k * CHAINE.pas
-    if (allume) lueur(ctx, x, CHAINE.y + 2, CHAINE.taille, CHAINE.taille, C.vert, 2, 0.8)
-    rect(ctx, x, CHAINE.y + 2, CHAINE.taille, CHAINE.taille, allume ? C.vert : ton(C.panneau, -0.2))
-    cadre(ctx, x, CHAINE.y + 2, CHAINE.taille, CHAINE.taille, allume ? C.vert : ton(C.bord, -0.2))
+    if (allume) lueur(ctx, x, y0 + 2, CHAINE.taille, CHAINE.taille, C.vert, 2, 0.8)
+    rect(ctx, x, y0 + 2, CHAINE.taille, CHAINE.taille, allume ? C.vert : ton(C.panneau, -0.2))
+    cadre(ctx, x, y0 + 2, CHAINE.taille, CHAINE.taille, allume ? C.vert : ton(C.bord, -0.2))
   })
 }
 
 // --- La main ----------------------------------------------------------------------------
 
 function main(ctx, c, u, choisie) {
-  for (let k = 0; k < 6; k++) {
-    const b = placeCarte(k)
+  for (let k = 0; k < u.comp.length; k++) {
+    const b = placeCarte(k, c.seul)
+    if (b.w <= 0) continue
     const id = u.comp[k]
     const comp = COMP[id]
     const prix = comp ? K.cout(u, comp) : 0
@@ -162,6 +185,7 @@ function main(ctx, c, u, choisie) {
       dispo: comp ? K.jouable(c, u, comp, k) : false,
       choisie: k === choisie,
       recharge: u.rech[k] ?? 0,
+      compacte: c.seul,
     })
   }
 }
@@ -174,7 +198,7 @@ function aide(ctx, c, u, comp, joueur) {
     const rien = u.comp.every((id, k) => !id || !K.jouable(c, u, COMP[id], k))
     ligne = rien ? 'plus rien de jouable — appuie deux fois pour passer' : `${u.nom} · ${c.cycles} cycles`
   }
-  texte(ctx, ligne, 180, AIDE.y, 11, C.faible, 700, 336)
+  texte(ctx, ligne, 180, c.seul ? AIDE.seul : AIDE.y, 11, C.faible, 700, 336)
 }
 
 // --- Le journal, en surimpression -----------------------------------------------------------
@@ -192,7 +216,7 @@ export function journal(ctx, c) {
   const bout = l.coups.some((x) => x.esquive) ? 'esquivé' : somme ? `−${somme}` : '·'
   const teinte = l.repere ? C.rouge : l.prime ? C.vert : ton(C.faible, -0.15)
   const suffixe = l.repere ? '  ·  REPÉRÉ' : l.prime ? '  ·  CHAÎNE' : ''
-  texte(ctx, `${l.acteur} ${l.comp} ${bout}${suffixe}`, 180, 614, 11, teinte, 700, 336)
+  texte(ctx, `${l.acteur} ${l.comp} ${bout}${suffixe}`, 180, c.seul ? 623 : 614, 11, teinte, 700, 336)
 }
 
 export { borne }

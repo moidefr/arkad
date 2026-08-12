@@ -30,35 +30,53 @@ function bandeau(ctx, titre, sous, teinte = C.accent, teinteSous = C.faible) {
 
 // --- Titre ------------------------------------------------------------------------
 
-export function titre(ctx, meta) {
+export function titre(ctx, meta, equipage = 3) {
   rect(ctx, 0, 58, 360, 140, C.fond)
   lueur(ctx, 40, 120, 280, 44, C.accent, 3, 0.8)
   texte(ctx, 'ANOMALIE', 180, 142, 34, C.accent, 700, 300, 4)
-  texte(ctx, 'trois opérateurs, un système corrompu', 180, 176, 13, C.faible, 700, 320)
+  texte(ctx, 'un système corrompu, et personne pour t’aider', 180, 176, 12, C.faible, 700, 320)
 
   P.texteLong(
     ctx,
     'Le système est corrompu jusqu’au noyau. Descends-y. Les processus ne dorment pas, et plus tu restes, plus on te voit.',
     180,
-    228,
+    216,
     300,
     13,
     ton(C.texte, -0.25),
     18,
   )
 
-  const out = [{ quoi: 'plonger', ...P.bouton(ctx, 50, 330, 260, 58, 'PLONGER', { vif: true, taille: 20 }) }]
+  // Le choix d'équipage se fait ici, avant tout : il change le jeu, pas
+  // seulement sa difficulté.
+  const out = []
+  texte(ctx, 'ÉQUIPAGE', 180, 274, 11, C.bord, 700, 300)
+  ;[
+    { n: 3, nom: 'À TROIS', dit: 'trois classes, cycles partagés' },
+    { n: 1, nom: 'SEUL', dit: 'une classe, huit exploits, tout sur soi' },
+  ].forEach((choix, k) => {
+    const x = 20 + k * 164
+    const actif = equipage === choix.n
+    if (actif) lueur(ctx, x, 286, 156, 46, C.accent, 2, 0.7)
+    rect(ctx, x, 286, 156, 46, C.panneau)
+    cadre(ctx, x, 286, 156, 46, actif ? C.accent : ton(C.bord, -0.1))
+    texte(ctx, choix.nom, x + 78, 302, 15, actif ? C.accent : C.faible, 700, 146)
+    texte(ctx, choix.dit, x + 78, 320, 9, actif ? ton(C.faible, 0.1) : C.bord, 700, 148)
+    out.push({ quoi: 'equipage', n: choix.n, x, y: 286, w: 156, h: 46 })
+  })
+
+  out.push({ quoi: 'plonger', ...P.bouton(ctx, 50, 344, 260, 54, 'PLONGER', { vif: true, taille: 20 }) })
 
   // Le mode INFINI ne s'ouvre qu'une fois le système purgé : c'est la
   // récompense d'une campagne finie, et la seule progression entre parties.
   if (meta?.victoires) {
-    texte(ctx, `${meta.victoires} système(s) purgé(s)`, 180, 412, 12, C.vert, 700, 300)
-    out.push({ quoi: 'infini', ...P.bouton(ctx, 50, 432, 260, 50, 'DESCENDRE SANS FIN', { taille: 16 }) })
-    if (meta.profondeur > 1) {
-      texte(ctx, `profondeur atteinte : ${meta.profondeur}`, 180, 500, 12, C.accent, 700, 300)
-    }
+    texte(ctx, `${meta.victoires} système(s) purgé(s)`, 180, 418, 12, C.vert, 700, 300)
+    out.push({ quoi: 'infini', ...P.bouton(ctx, 50, 432, 260, 48, 'DESCENDRE SANS FIN', { taille: 16 }) })
+    if (meta.profondeur > 1) texte(ctx, `profondeur atteinte : ${meta.profondeur}`, 180, 498, 12, C.accent, 700, 300)
+    if (meta.profondeurSeul > 1)
+      texte(ctx, `seul : ${meta.profondeurSeul}`, 180, 516, 12, ton(C.accent, -0.2), 700, 300)
   } else {
-    texte(ctx, 'purge le système pour ouvrir la descente sans fin', 180, 432, 11, C.bord, 700, 300)
+    texte(ctx, 'purge le système pour ouvrir la descente sans fin', 180, 424, 11, C.bord, 700, 300)
   }
   return out
 }
@@ -74,8 +92,14 @@ export function titre(ctx, meta) {
 const REC = { y: 144, h: 94, pas: 100 }
 
 /** Trois opérateurs à composer. Le choix d'équipe est la première vraie décision. */
-export function recrutement(ctx, offertes, prises) {
-  bandeau(ctx, 'ÉQUIPE DE PLONGÉE', `${prises.length} / 3 · il en est proposé une de plus qu’il n’en faut`)
+export function recrutement(ctx, offertes, prises, combien = 3) {
+  bandeau(
+    ctx,
+    combien === 1 ? 'OPÉRATEUR' : 'ÉQUIPE DE PLONGÉE',
+    combien === 1
+      ? `${prises.length} / 1 · seul, la classe décide de toute la partie`
+      : `${prises.length} / 3 · il en est proposé une de plus qu’il n’en faut`,
+  )
 
   const out = []
   offertes.forEach((id, k) => {
@@ -99,7 +123,7 @@ export function recrutement(ctx, offertes, prises) {
     out.push({ quoi: 'classe', id, x: 20, y, w: 320, h: REC.h })
   })
 
-  if (prises.length === 3)
+  if (prises.length === combien)
     out.push({ quoi: 'partir', ...P.bouton(ctx, 50, 556, 260, 52, 'ENTRER', { vif: true, taille: 19 }) })
   return out
 }
@@ -231,7 +255,7 @@ export function butin(ctx, e, offre, jette) {
         ? 'plus de place : il faudra en jeter un'
         : module
           ? `${op.mod.filter((x) => !x).length} emplacement(s) de module libre(s)`
-          : `${6 - op.comp.filter(Boolean).length} emplacement(s) libre(s)`,
+          : `${op.comp.length - op.comp.filter(Boolean).length} emplacement(s) libre(s)`,
       180,
       170,
       12,
@@ -245,21 +269,23 @@ export function butin(ctx, e, offre, jette) {
 
   // Deuxième temps : choisir ce qu'on sacrifie. On ne finit jamais avec tout.
   texte(ctx, 'QUE JETTE-T-IL ?', 180, 168, 15, C.rouge, 700, 320)
-  const liste = module ? op.mod.slice(0, EMPLACEMENTS_MODULE) : op.comp
+  const liste = module ? op.mod : op.comp
+  const pas = liste.length > 6 ? 48 : 62
   liste.forEach((id, k) => {
-    const y = 196 + k * 62
+    const y = 196 + k * pas
     const verrou = !module && k < E.VERROUS
     const comp = module ? MODULE[id] : COMP[id]
-    rect(ctx, 24, y, 312, 54, C.panneau)
-    rect(ctx, 24, y, 4, 54, verrou ? C.bord : C.rouge)
-    cadre(ctx, 24, y, 312, 54, verrou ? ton(C.bord, -0.3) : ton(C.rouge, -0.2))
+    const h = pas - 8
+    rect(ctx, 24, y, 312, h, C.panneau)
+    rect(ctx, 24, y, 4, h, verrou ? C.bord : C.rouge)
+    cadre(ctx, 24, y, 312, h, verrou ? ton(C.bord, -0.3) : ton(C.rouge, -0.2))
     ctx.textAlign = 'left'
-    texte(ctx, comp?.nom ?? '—', 42, y + 20, 14, verrou ? C.bord : C.texte, 700, 200)
-    texte(ctx, verrou ? 'verrouillée' : (comp?.dit ?? ''), 42, y + 38, 10, C.faible, 700, 250)
+    texte(ctx, comp?.nom ?? '—', 42, y + 18, 14, verrou ? C.bord : C.texte, 700, 200)
+    if (h > 44) texte(ctx, verrou ? 'verrouillée' : (comp?.dit ?? ''), 42, y + 36, 10, C.faible, 700, 250)
     ctx.textAlign = 'center'
-    if (!verrou) out.push({ quoi: 'jette', k, x: 24, y, w: 312, h: 54 })
+    if (!verrou) out.push({ quoi: 'jette', k, x: 24, y, w: 312, h })
   })
-  out.push({ quoi: 'annule', ...P.bouton(ctx, 110, 588, 140, 38, 'ANNULER', { taille: 13 }) })
+  out.push({ quoi: 'annule', ...P.bouton(ctx, 110, 596, 140, 34, 'ANNULER', { taille: 13 }) })
   return out
 }
 

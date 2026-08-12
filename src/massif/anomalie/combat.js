@@ -21,6 +21,27 @@ import { MODULE } from './donnees/modules.js'
 
 export const CYCLES_MAX = 10
 export const CYCLES_TOUR = 2
+
+/**
+ * Les cycles rendus au début du tour d'un opérateur, selon la taille de
+ * l'équipage.
+ *
+ * Les cycles sont une ressource **partagée**, donc une équipe de trois en
+ * regagne trois fois plus par tour de camp qu'un opérateur seul. Sans ce
+ * rattrapage, jouer seul revient à jouer avec le tiers de son économie contre
+ * les mêmes processus : ce n'est pas plus dur, c'est un autre jeu, et un moins
+ * bon. Trois opérateurs : 2. Deux : 4. Un seul : 6.
+ */
+export const cyclesTour = (n) => 2 + (3 - Math.max(1, Math.min(3, n))) * 2
+
+/**
+ * Ce qu'on donne à un opérateur qui plonge seul.
+ *
+ * Il affronte les mêmes processus sans personne pour le couvrir, le réparer ni
+ * finir ce qu'il a entamé. La compensation est franche et lisible plutôt que
+ * distribuée en petits ajustements partout.
+ */
+export const SOLO = { pv: 1.55, blindage: 1, puiss: 0, degats: 0.1, tempo: 0.6 }
 export const TRACAGE_MAX = 100
 export const TRACAGE_RETOMBE = 40
 export const TRACAGE_DECRUE = 6
@@ -39,6 +60,7 @@ export const FILE_VUE = 7
  * @param rencontre  la liste d'identifiants de processus
  */
 export function commence(equipe, rencontre, { tracage = 0, cyclesMax = CYCLES_MAX } = {}) {
+  const seul = equipe.length === 1
   const ops = equipe.map((o, i) => {
     const cl = CLASSE[o.cl]
     const mods = (o.mod ?? [])
@@ -46,6 +68,8 @@ export function commence(equipe, rencontre, { tracage = 0, cyclesMax = CYCLES_MA
       .map((id) => MODULE[id])
       .filter(Boolean)
     const somme = (cle) => mods.reduce((s, m) => s + (m[cle] ?? 0), 0)
+    // `pvMax` vient de la fiche, déjà renforcé si l'opérateur plonge seul :
+    // le multiplier ici aussi le doublerait à chaque combat.
     const pvMax = Math.max(10, (o.pvMax ?? cl.pv) + somme('pvMax'))
     const vit = Math.max(3, cl.vit + somme('vit'))
     return {
@@ -54,10 +78,11 @@ export function commence(equipe, rencontre, { tracage = 0, cyclesMax = CYCLES_MA
       cl: o.cl,
       pv: Math.min(o.pv ?? pvMax, pvMax),
       pvMax,
-      puiss: cl.puiss + somme('puiss'),
+      puiss: cl.puiss + somme('puiss') + (seul ? SOLO.puiss : 0),
       vit,
-      blindage: Math.max(0, cl.blindage + somme('blindage')),
+      blindage: Math.max(0, cl.blindage + somme('blindage') + (seul ? SOLO.blindage : 0)),
       rang: o.rang ?? cl.rang,
+      seul,
       comp: o.comp.slice(),
       mod: mods,
       rech: o.comp.map(() => 0),
@@ -94,7 +119,9 @@ export function commence(equipe, rencontre, { tracage = 0, cyclesMax = CYCLES_MA
   const c = {
     ops,
     proc,
+    seul,
     cycles: 4,
+    parTour: cyclesTour(ops.length),
     cyclesMax: cyclesMax + bonusCycles,
     tracage,
     chaine: [],
@@ -139,7 +166,7 @@ export function file(c, n = FILE_VUE) {
   const copie = [...vivants(c.ops), ...vivants(c.proc)].map((u) => ({
     u,
     att: u.att,
-    pas: (100 * 1.0 * (1 + retard(u))) / u.vit,
+    pas: (100 * tempoDe(u, { temps: 1 })) / u.vit,
   }))
   const out = []
   for (let k = 0; k < n && copie.length; k++) {
@@ -152,6 +179,18 @@ export function file(c, n = FILE_VUE) {
 }
 
 const retard = (u) => (u.etats.latence > 0 ? 0.4 : 0) - (u.etats.surcadence > 0 ? 0.35 : 0)
+
+/**
+ * Le coût de tempo d'une action, équipage compris.
+ *
+ * C'est **la** correction du mode solo, et elle est structurelle : face à deux
+ * processus, un opérateur seul joue une action quand l'adversaire en joue deux.
+ * Aucune quantité d'intégrité ni de dégâts ne rattrape un rapport d'actions —
+ * on tient seulement plus longtemps en faisant toujours aussi peu. Seul, on
+ * agit donc presque deux fois plus vite, ce qui rétablit le rythme au lieu de
+ * le compenser.
+ */
+export const tempoDe = (u, comp) => comp.temps * (1 + retard(u)) * (u.seul ? SOLO.tempo : 1)
 
 export function fini(c) {
   if (!vivants(c.ops).length) return 'perdu'
@@ -242,7 +281,12 @@ function reducRang(c, comp, cible, acteur) {
 
 /** Les bonus multiplicatifs de l'acteur, avant rendement décroissant. */
 const bonusDe = (u, comp) => {
-  const out = [u.etats.surcadence > 0 ? 0.2 : 0]
+  // Une équipe de trois joue trois actions là où un opérateur seul n'en joue
+  // qu'une. Lui donner de l'intégrité ne suffit donc pas : il tiendrait plus
+  // longtemps en faisant toujours aussi peu, ce qui allonge le combat sans le
+  // rendre gagnable. C'est la puissance de frappe par action qu'il faut
+  // rattraper, et elle passe par le même rendement décroissant que le reste.
+  const out = [u.seul ? SOLO.degats : 0, u.etats.surcadence > 0 ? 0.2 : 0]
   for (const m of u.mod ?? []) {
     if (m.greffe?.mult && comp?.tags?.includes(m.greffe.tag)) out.push(m.greffe.mult)
   }
@@ -416,7 +460,7 @@ function finTour(c, acteur, comp) {
     acteur.etats.priorite--
     if (!acteur.etats.priorite) delete acteur.etats.priorite
   } else {
-    acteur.att += (100 * comp.temps * (1 + retard(acteur))) / acteur.vit
+    acteur.att += (100 * tempoDe(acteur, comp)) / acteur.vit
   }
   decompte(acteur)
   if (acteur.etats.regenere > 0) soigne(acteur, 5)
@@ -460,7 +504,7 @@ export function ouvreTour(c, acteur) {
   }
 
   if (estOperateur(c, acteur)) {
-    c.cycles = Math.min(c.cyclesMax, c.cycles + CYCLES_TOUR)
+    c.cycles = Math.min(c.cyclesMax, c.cycles + (c.parTour ?? CYCLES_TOUR))
     return
   }
   // Après le tour d'un processus, la chaîne du joueur est rompue.
@@ -511,7 +555,7 @@ export function repere(c) {
   // des deux côtés. Une purge qui ignore blindage, pare-feu et résistances
   // rend toute impasse mortelle pour l'intrus, ce qui est le bon sens de la
   // fiction autant que la garantie qu'un combat se termine.
-  const purge = 3 + Math.floor(c.tour / 30)
+  const purge = Math.max(2, Math.round((3 + Math.floor(c.tour / 30)) / (c.seul ? 2 : 1)))
   for (const o of vivants(c.ops)) o.pv = Math.max(0, o.pv - purge)
   return true
 }
