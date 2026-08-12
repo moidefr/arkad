@@ -1,5 +1,5 @@
 import { C } from '../palette.js'
-import { texte, rect } from '../dessin.js'
+import { texte, rect, bloc, lueur } from '../dessin.js'
 
 const BLOC_H = 22
 const BASE_Y = 520 // hauteur du sommet de la pile à l'écran, fixe
@@ -39,14 +39,14 @@ export default {
       const b = j.e.pile[i]
       const y = BASE_Y + (j.e.pile.length - 1 - i) * BLOC_H
       if (y > j.H) break
-      rect(ctx, b.x, y, b.w, BLOC_H, TEINTES[i % TEINTES.length])
-      rect(ctx, b.x, y, b.w, 3, C.fond)
+      bloc(ctx, b.x, y, b.w, BLOC_H, TEINTES[i % TEINTES.length], 3)
     }
 
     for (const d of j.e.chutes) rect(ctx, d.x, d.y, d.w, BLOC_H, C.bord)
 
     const c = j.e.courant
-    rect(ctx, c.x, BASE_Y - BLOC_H, c.w, BLOC_H, C.texte)
+    lueur(ctx, c.x, BASE_Y - BLOC_H, c.w, BLOC_H, C.texte, 2, 0.6)
+    bloc(ctx, c.x, BASE_Y - BLOC_H, c.w, BLOC_H, C.texte, 3)
 
     ctx.textAlign = 'left'
     texte(ctx, `largeur ${Math.round(j.e.pile[j.e.pile.length - 1].w)}`, 16, j.H - 20, 13, C.faible, 700)

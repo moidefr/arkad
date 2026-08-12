@@ -1,5 +1,5 @@
 import { C } from '../palette.js'
-import { texte, rect, borne } from '../dessin.js'
+import { texte, rect, borne, bloc, lueur } from '../dessin.js'
 
 const LARGEUR_J = 22
 const HAUTEUR_J = 22
@@ -72,13 +72,13 @@ export default {
     for (const p of j.e.plats) {
       const y = p.y + dy
       if (y < j.HUD - 20 || y > j.H + 20) continue
-      rect(ctx, p.x, y, PLAT_W, PLAT_H, C.vert)
-      rect(ctx, p.x, y + PLAT_H - 3, PLAT_W, 3, C.bord)
+      bloc(ctx, p.x, y, PLAT_W, PLAT_H, C.vert, 3)
     }
 
     const x = j.e.x - LARGEUR_J / 2
     const y = j.e.y - HAUTEUR_J / 2 + dy
-    rect(ctx, x, y, LARGEUR_J, HAUTEUR_J, C.accent)
+    lueur(ctx, x, y, LARGEUR_J, HAUTEUR_J, C.accent, 3)
+    bloc(ctx, x, y, LARGEUR_J, HAUTEUR_J, C.accent, 3)
     rect(ctx, x + 5, y + 6, 4, 5, C.fond)
     rect(ctx, x + 13, y + 6, 4, 5, C.fond)
 

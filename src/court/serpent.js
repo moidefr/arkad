@@ -1,5 +1,5 @@
-import { C } from '../palette.js'
-import { texte, rect, cadre, trame } from '../dessin.js'
+import { C, ton } from '../palette.js'
+import { texte, rect, cadre, trame, bloc, lueur } from '../dessin.js'
 
 const CASE = 24
 const COLS = 15
@@ -52,13 +52,14 @@ export default {
     cadre(ctx, 0, TOP, L, H, C.bord)
 
     const f = j.e.fruit
-    rect(ctx, f.x * CASE + 6, TOP + f.y * CASE + 6, 12, 12, C.accent)
+    lueur(ctx, f.x * CASE + 6, TOP + f.y * CASE + 6, 12, 12, C.accent, 3)
+    bloc(ctx, f.x * CASE + 6, TOP + f.y * CASE + 6, 12, 12, C.accent, 2)
 
     j.e.corps.forEach((c, i) => {
       const x = c.x * CASE + 2
       const y = TOP + c.y * CASE + 2
-      rect(ctx, x, y, CASE - 4, CASE - 4, i === 0 ? C.vert : C.bord)
-      if (i > 0) rect(ctx, x + 4, y + 4, CASE - 12, CASE - 12, C.vert)
+      if (i === 0) lueur(ctx, x, y, CASE - 4, CASE - 4, C.vert, 2)
+      bloc(ctx, x, y, CASE - 4, CASE - 4, i === 0 ? C.vert : ton(C.vert, -0.45), 3)
     })
 
     // La zone d'appui est indiquée en permanence : le jeu n'a pas de tutoriel.

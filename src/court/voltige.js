@@ -1,5 +1,5 @@
-import { C } from '../palette.js'
-import { texte, rect } from '../dessin.js'
+import { C, ton } from '../palette.js'
+import { texte, rect, bloc, lueur } from '../dessin.js'
 
 const LARGEUR_COL = 20
 const X_JOUEUR = 84
@@ -61,12 +61,15 @@ export default {
     j.e.cols.forEach((col, i) => {
       const x = i * LARGEUR_COL - j.e.decalage
       rect(ctx, x, j.HUD, LARGEUR_COL, col.haut - j.HUD, C.bord)
-      rect(ctx, x, col.haut - 4, LARGEUR_COL, 4, C.cyan)
+      rect(ctx, x, col.haut - 5, LARGEUR_COL, 5, C.cyan)
+      rect(ctx, x, col.haut - 5, LARGEUR_COL, 2, ton(C.cyan, 0.5))
       rect(ctx, x, col.bas, LARGEUR_COL, j.H - col.bas, C.bord)
-      rect(ctx, x, col.bas, LARGEUR_COL, 4, C.cyan)
+      rect(ctx, x, col.bas, LARGEUR_COL, 5, C.cyan)
+      rect(ctx, x, col.bas + 3, LARGEUR_COL, 2, ton(C.cyan, -0.4))
     })
 
-    rect(ctx, X_JOUEUR - TAILLE / 2, j.e.y - TAILLE / 2, TAILLE, TAILLE, C.accent)
+    lueur(ctx, X_JOUEUR - TAILLE / 2, j.e.y - TAILLE / 2, TAILLE, TAILLE, C.accent, 3)
+    bloc(ctx, X_JOUEUR - TAILLE / 2, j.e.y - TAILLE / 2, TAILLE, TAILLE, C.accent, 3)
 
     if (j.t < 3) texte(ctx, 'maintiens appuyé', j.W / 2, j.H - 40, 13, C.faible, 700)
   },

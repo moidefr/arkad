@@ -1,5 +1,5 @@
-import { C } from '../palette.js'
-import { texte, rect, pastille, trame, borne } from '../dessin.js'
+import { C, ton } from '../palette.js'
+import { texte, rect, pastille, trame, borne, bloc, lueur } from '../dessin.js'
 
 const COLS = 6
 const RANGS = 5
@@ -105,14 +105,14 @@ export default {
 
     for (const q of j.e.briques) {
       if (q.morte) continue
-      rect(ctx, q.x, q.y, q.w, BRIQUE_H, q.couleur)
-      rect(ctx, q.x, q.y, q.w, 4, C.fond)
-      rect(ctx, q.x, q.y + BRIQUE_H - 4, q.w, 4, C.fond)
+      bloc(ctx, q.x, q.y, q.w, BRIQUE_H, q.couleur, 3)
     }
 
-    rect(ctx, j.e.raquette - RAQUETTE_W / 2, j.H - RAQUETTE_Y, RAQUETTE_W, 10, C.texte)
-    rect(ctx, j.e.raquette - 8, j.H - RAQUETTE_Y, 16, 10, C.violet)
+    bloc(ctx, j.e.raquette - RAQUETTE_W / 2, j.H - RAQUETTE_Y, RAQUETTE_W, 10, C.texte, 2)
+    bloc(ctx, j.e.raquette - 8, j.H - RAQUETTE_Y, 16, 10, C.violet, 2)
+    lueur(ctx, j.e.balle.x - BALLE_R, j.e.balle.y - BALLE_R, BALLE_R * 2, BALLE_R * 2, C.cyan, 3)
     pastille(ctx, j.e.balle.x, j.e.balle.y, BALLE_R, C.cyan)
+    pastille(ctx, j.e.balle.x - 2, j.e.balle.y - 2, BALLE_R / 2, ton(C.cyan, 0.5))
 
     for (let i = 0; i < j.e.vies; i++) rect(ctx, 16 + i * 14, j.H - 24, 8, 8, C.cyan)
     ctx.textAlign = 'right'

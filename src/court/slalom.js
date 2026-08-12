@@ -1,5 +1,5 @@
 import { C } from '../palette.js'
-import { texte, rect } from '../dessin.js'
+import { texte, rect, bloc, lueur } from '../dessin.js'
 
 const TAILLE = 18
 const Y_JOUEUR = 520
@@ -63,10 +63,12 @@ export default {
 
   dessine(j, ctx) {
     for (const m of j.e.murs) {
-      rect(ctx, 0, m.y, m.trou, MUR_H, C.bord)
-      rect(ctx, m.trou + m.largeur, m.y, j.W - m.trou - m.largeur, MUR_H, C.bord)
-      rect(ctx, m.trou - 4, m.y, 4, MUR_H, C.cyan)
-      rect(ctx, m.trou + m.largeur, m.y, 4, MUR_H, C.cyan)
+      bloc(ctx, 0, m.y, m.trou, MUR_H, C.bord, 2)
+      bloc(ctx, m.trou + m.largeur, m.y, j.W - m.trou - m.largeur, MUR_H, C.bord, 2)
+      lueur(ctx, m.trou - 5, m.y, 5, MUR_H, C.cyan, 2, 0.8)
+      bloc(ctx, m.trou - 5, m.y, 5, MUR_H, C.cyan, 2)
+      lueur(ctx, m.trou + m.largeur, m.y, 5, MUR_H, C.cyan, 2, 0.8)
+      bloc(ctx, m.trou + m.largeur, m.y, 5, MUR_H, C.cyan, 2)
     }
 
     j.e.trace.forEach((x, i) => {
@@ -74,7 +76,8 @@ export default {
       rect(ctx, x - 2, Y_JOUEUR + i * 4, 4, 4, i < 12 ? C.bord : C.panneau)
     })
 
-    rect(ctx, j.e.x - TAILLE / 2, Y_JOUEUR - TAILLE / 2, TAILLE, TAILLE, C.accent)
+    lueur(ctx, j.e.x - TAILLE / 2, Y_JOUEUR - TAILLE / 2, TAILLE, TAILLE, C.accent, 3)
+    bloc(ctx, j.e.x - TAILLE / 2, Y_JOUEUR - TAILLE / 2, TAILLE, TAILLE, C.accent, 3)
     rect(ctx, j.e.x - 2 + j.e.dir * 6, Y_JOUEUR - 2, 4, 4, C.fond)
 
     if (j.t < 3) texte(ctx, 'appuie pour zigzaguer', j.W / 2, j.H - 40, 13, C.faible, 700)

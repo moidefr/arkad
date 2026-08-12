@@ -1,5 +1,5 @@
 import { C } from '../palette.js'
-import { texte, rect } from '../dessin.js'
+import { texte, rect, bloc, lueur } from '../dessin.js'
 
 const N = 4
 const CASE = 76
@@ -47,8 +47,13 @@ export default {
       const v = j.e.g[i]
       const x = X0 + (i % N) * (CASE + ECART)
       const y = Y0 + Math.floor(i / N) * (CASE + ECART)
-      rect(ctx, x, y, CASE, CASE, v ? TEINTES[v] ?? C.accent : C.fond)
-      if (!v) continue
+      if (!v) {
+        rect(ctx, x, y, CASE, CASE, C.fond)
+        continue
+      }
+      const teinte = TEINTES[v] ?? C.accent
+      if (v >= 64) lueur(ctx, x, y, CASE, CASE, teinte, 2, 0.7)
+      bloc(ctx, x, y, CASE, CASE, teinte, 4)
       const petit = v >= 1024
       texte(ctx, v, x + CASE / 2, y + CASE / 2, petit ? 22 : 28, v >= 8 ? C.fond : C.texte, 700, CASE - 8)
     }

@@ -12,11 +12,11 @@
  */
 import { CATEGORIES } from './catalogue.js'
 import { Input } from './input.js'
-import { C } from './palette.js'
+import { C, ton } from './palette.js'
 import { son } from './son.js'
 import { Effets } from './effets.js'
 import { lis, ecris } from './stockage.js'
-import { texte, rect, cadre, scanlines, largeurTexte, PX } from './dessin.js'
+import { texte, rect, cadre, bloc, lueur, ombre, vignette, scanlines, largeurTexte, PX } from './dessin.js'
 
 export const W = 360
 export const H = 640
@@ -290,6 +290,7 @@ export class Moteur {
         son.clic()
         this.cat = null
         this.phase = 'accueil'
+        this.phaseT = 0
         return
       }
       const i = this._indexJeu(p)
@@ -359,20 +360,33 @@ export class Moteur {
       if (this.phase === 'fin') this._fin()
     }
 
+    vignette(ctx, W, H)
     scanlines(ctx, W, H)
+  }
+
+  /**
+   * Entrée en fondu, décalée d'un élément à l'autre. Trois lignes, et une
+   * liste cesse d'apparaître d'un bloc comme une capture d'écran.
+   */
+  _entree(i) {
+    const k = Math.min(1, Math.max(0, (this.phaseT - i * 0.045) / 0.2))
+    return { k: k * (2 - k), dy: (1 - k) * 16 }
   }
 
   _entete(titre, sousTitre, retour) {
     const ctx = this.ctx
     ctx.textAlign = 'left'
     if (retour) {
+      rect(ctx, BTN_RETOUR.x, BTN_RETOUR.y, BTN_RETOUR.w, BTN_RETOUR.h, C.panneau)
       cadre(ctx, BTN_RETOUR.x, BTN_RETOUR.y, BTN_RETOUR.w, BTN_RETOUR.h, C.faible)
       texte(ctx, '< RET', BTN_RETOUR.x + 12, BTN_RETOUR.y + 17, 14, C.texte, 700)
-      texte(ctx, titre, 104, 31, 24, C.accent, 700, 190)
+      texte(ctx, titre, 104, 31, 24, C.accent, 700, 190, 2)
     } else {
-      texte(ctx, titre, 20, 30, 26, C.accent, 700)
+      const l = largeurTexte(ctx, titre, 26)
+      lueur(ctx, 20, 18, l, 24, C.accent, 3, 0.8)
+      texte(ctx, titre, 20, 30, 26, C.accent, 700, undefined, 2)
       if (Math.floor(this.phaseT * 2) % 2 === 0) {
-        rect(ctx, 20 + largeurTexte(ctx, titre, 26) + 8, 22, 12, 18, C.accent)
+        rect(ctx, 20 + l + 10, 22, 12, 18, C.accent)
       }
     }
     ctx.textAlign = 'center'
@@ -390,18 +404,28 @@ export class Moteur {
     this._boutonSon()
 
     CATEGORIES.forEach((cat, i) => {
-      const y = CAT_Y + i * CAT_PAS
+      const { k, dy } = this._entree(i)
+      if (k <= 0) return
+      const y = CAT_Y + i * CAT_PAS + dy
+      ctx.globalAlpha = k
+
+      ombre(ctx, 20, y, 320, CAT_H, 5)
       rect(ctx, 20, y, 320, CAT_H, C.panneau)
-      cadre(ctx, 20, y, 320, CAT_H, cat.couleur)
+      rect(ctx, 20, y, 320, 3, ton(C.panneau, 0.5))
+      cadre(ctx, 20, y, 320, CAT_H, ton(cat.couleur, -0.3))
+      // Le bandeau de couleur, allumé : c'est le seul repère de catégorie.
+      lueur(ctx, 20, y + 10, 7, CAT_H - 20, cat.couleur, 2, 0.9)
+      bloc(ctx, 20, y + 10, 7, CAT_H - 20, cat.couleur, 2)
 
       ctx.textAlign = 'left'
-      texte(ctx, cat.nom, 36, y + 26, 24, cat.couleur, 700)
-      texte(ctx, cat.duree, 36, y + 52, 14, C.texte, 700, 240)
-      texte(ctx, cat.detail, 36, y + 72, 12, C.faible, 700, 268)
+      texte(ctx, cat.nom, 40, y + 26, 24, cat.couleur, 700, 200, 2)
+      texte(ctx, cat.duree, 40, y + 52, 14, C.texte, 700, 240)
+      texte(ctx, cat.detail, 40, y + 72, 12, C.faible, 700, 268)
       ctx.textAlign = 'right'
       const n = cat.jeux.length
       texte(ctx, `${n} ${n > 1 ? 'jeux' : 'jeu'}`, 324, y + 26, 14, C.faible, 700)
       ctx.textAlign = 'center'
+      ctx.globalAlpha = 1
     })
 
     texte(ctx, `${CATEGORIES.reduce((n, c) => n + c.jeux.length, 0)} jeux · une seule touche`, W / 2, 612, 12, C.faible, 700)
@@ -419,21 +443,39 @@ export class Moteur {
   /** Tuile compacte, pour les catégories qui ont beaucoup de jeux. */
   _tuile(def, i) {
     const ctx = this.ctx
-    const { x, y, w, h } = tuile(i)
-    rect(ctx, x, y, w, h, C.panneau)
-    rect(ctx, x, y, w, 4, def.couleur)
+    const t = tuile(i)
+    const { k, dy } = this._entree(i)
+    if (k <= 0) return
+    const { x, w, h } = t
+    const y = t.y + dy
+    ctx.globalAlpha = k
 
-    texte(ctx, def.nom, x + w / 2, y + 24, 13, C.texte, 700, w - 8)
+    ombre(ctx, x, y, w, h, 4)
+    rect(ctx, x, y, w, h, C.panneau)
+    rect(ctx, x, y + h - 3, w, 3, ton(C.panneau, -0.5))
+    lueur(ctx, x, y, w, 4, def.couleur, 2, 0.7)
+    bloc(ctx, x, y, w, 5, def.couleur, 2)
+
+    texte(ctx, def.nom, x + w / 2, y + 26, 13, C.texte, 700, w - 8)
     const best = this.meilleur(def.id)
-    texte(ctx, best ? String(best) : '--', x + w / 2, y + 48, 17, best ? C.accent : C.bord, 700, w - 10)
+    texte(ctx, best ? String(best) : '--', x + w / 2, y + 50, 17, best ? C.accent : C.bord, 700, w - 10)
+    ctx.globalAlpha = 1
   }
 
   /** Rangée détaillée, pour les catégories qui n'ont que deux ou trois jeux. */
   _rangee(def, i) {
     const ctx = this.ctx
-    const y = RANGEE.y + i * (RANGEE.h + RANGEE.ecart)
+    const { k, dy } = this._entree(i)
+    if (k <= 0) return
+    const y = RANGEE.y + i * (RANGEE.h + RANGEE.ecart) + dy
+    ctx.globalAlpha = k
+
+    ombre(ctx, RANGEE.x, y, RANGEE.w, RANGEE.h, 5)
     rect(ctx, RANGEE.x, y, RANGEE.w, RANGEE.h, C.panneau)
-    rect(ctx, RANGEE.x, y, 5, RANGEE.h, def.couleur)
+    rect(ctx, RANGEE.x, y, RANGEE.w, 3, ton(C.panneau, 0.5))
+    rect(ctx, RANGEE.x, y + RANGEE.h - 3, RANGEE.w, 3, ton(C.panneau, -0.5))
+    lueur(ctx, RANGEE.x, y + 8, 6, RANGEE.h - 16, def.couleur, 2, 0.9)
+    bloc(ctx, RANGEE.x, y + 8, 6, RANGEE.h - 16, def.couleur, 2)
 
     ctx.textAlign = 'left'
     texte(ctx, def.nom, RANGEE.x + 18, y + 26, 21, C.texte, 700, 230)
@@ -444,6 +486,7 @@ export class Moteur {
     const bas = enCours ? 'PARTIE EN COURS' : best ? `record ${best} ${def.unite}`.trim() : 'jamais joué'
     texte(ctx, bas, RANGEE.x + 18, y + 74, 13, enCours ? C.accent : best ? C.faible : C.bord, 700, 284)
     ctx.textAlign = 'center'
+    ctx.globalAlpha = 1
   }
 
   _indexJeu(p) {
@@ -465,6 +508,7 @@ export class Moteur {
   _boutonSon() {
     const ctx = this.ctx
     const { x, y, w, h } = BTN_SON
+    rect(ctx, x, y, w, h, C.panneau)
     cadre(ctx, x, y, w, h, son.muet ? C.bord : C.faible)
     texte(ctx, son.muet ? 'x' : '♪', x + w / 2, y + h / 2, 15, son.muet ? C.faible : C.accent, 700)
   }
@@ -475,7 +519,9 @@ export class Moteur {
     const ctx = this.ctx
     rect(ctx, 0, 0, W, HUD, C.fond)
     rect(ctx, 0, HUD - PX, W, PX, C.bord)
+    rect(ctx, 0, HUD, W, 3, 'rgba(0, 0, 0, 0.45)')
 
+    rect(ctx, 12, 14, 28, 26, C.panneau)
     cadre(ctx, 12, 14, 28, 26, C.faible)
     rect(ctx, 21, 20, 4, 14, C.texte)
     rect(ctx, 29, 20, 4, 14, C.texte)
@@ -494,7 +540,7 @@ export class Moteur {
 
     // Les vies restantes, à gauche sous le bouton pause.
     if ((this.def.vies ?? 1) > 1) {
-      for (let i = 0; i < this.j.vies; i++) rect(ctx, 50 + i * 12, 22, 8, 8, C.rouge)
+      for (let i = 0; i < this.j.vies; i++) bloc(ctx, 50 + i * 12, 22, 8, 8, C.rouge, 2)
     }
   }
 
@@ -508,6 +554,7 @@ export class Moteur {
     ctx.save()
     ctx.translate(W / 2, H / 2)
     ctx.scale(1.6 - dans * 0.6, 1.6 - dans * 0.6)
+    lueur(ctx, -40, -32, 80, 64, n === 1 ? C.accent : C.texte, 3, 0.8)
     texte(ctx, n > 0 ? String(n) : 'GO', 0, 0, 64, n === 1 ? C.accent : C.texte, 700)
     ctx.restore()
     texte(ctx, this.def.pitch, W / 2, H / 2 + 90, 14, C.faible, 700, 320)
@@ -517,9 +564,10 @@ export class Moteur {
   _reprisEcran() {
     const ctx = this.ctx
     this._voile(0.5)
-    texte(ctx, 'ENCORE', W / 2, H / 2 - 20, 34, C.rouge, 700)
+    lueur(ctx, W / 2 - 80, H / 2 - 38, 160, 36, C.rouge, 3, 0.9)
+    texte(ctx, 'ENCORE', W / 2, H / 2 - 20, 34, C.rouge, 700, undefined, 3)
     const reste = this.j.vies
-    for (let i = 0; i < reste; i++) rect(ctx, W / 2 - reste * 11 + i * 22, H / 2 + 20, 14, 14, C.accent)
+    for (let i = 0; i < reste; i++) bloc(ctx, W / 2 - reste * 11 + i * 22, H / 2 + 20, 14, 14, C.accent, 2)
     texte(ctx, reste > 1 ? `${reste} vies` : 'dernière vie', W / 2, H / 2 + 60, 14, C.faible, 700)
   }
 
@@ -532,7 +580,7 @@ export class Moteur {
   _pause() {
     const ctx = this.ctx
     this._voile()
-    texte(ctx, '-- PAUSE --', W / 2, 174, 26, C.accent, 700)
+    texte(ctx, '-- PAUSE --', W / 2, 174, 26, C.accent, 700, undefined, 3)
     B_PAUSE.forEach((b, i) => {
       let libelle = b.libelle
       if (i === 3) libelle = son.muet ? 'SON : NON' : 'SON : OUI'
@@ -551,9 +599,12 @@ export class Moteur {
     const brut = typeof this.def.finTitre === 'function' ? this.def.finTitre(this.j) : this.def.finTitre
     const fin = brut ?? { texte: 'GAME OVER', couleur: C.rouge }
     const titre = typeof fin === 'string' ? { texte: fin, couleur: C.rouge } : fin
-    texte(ctx, titre.texte, W / 2, 168, 30, titre.couleur ?? C.rouge, 700)
+    const teinte = titre.couleur ?? C.rouge
+    lueur(ctx, W / 2 - 110, 150, 220, 36, teinte, 3, 0.9)
+    texte(ctx, titre.texte, W / 2, 168, 30, teinte, 700, 330, 2)
 
     if (!this.def.sansScore) {
+      lueur(ctx, W / 2 - 90, 222, 180, 60, C.texte, 2, 0.5)
       texte(ctx, `${Math.floor(this.j.score)}`, W / 2, 252, 60, C.texte, 700)
       texte(ctx, this.def.unite, W / 2, 296, 14, C.faible, 700)
       if (this.record) texte(ctx, '* NOUVEAU RECORD *', W / 2, 342, 15, C.accent, 700)
@@ -579,9 +630,13 @@ function tuile(i) {
 
 function bouton(ctx, y, h, libelle, primaire) {
   const couleur = primaire ? C.accent : C.faible
+  ombre(ctx, MENU_X, y, MENU_W, h, 5)
+  if (primaire) lueur(ctx, MENU_X, y, MENU_W, h, C.accent, 3, 0.7)
   rect(ctx, MENU_X, y, MENU_W, h, C.panneau)
+  rect(ctx, MENU_X, y, MENU_W, 3, ton(C.panneau, 0.55))
+  rect(ctx, MENU_X, y + h - 3, MENU_W, 3, ton(C.panneau, -0.55))
   cadre(ctx, MENU_X, y, MENU_W, h, couleur)
-  texte(ctx, libelle, MENU_X + MENU_W / 2, y + h / 2, 19, primaire ? C.accent : C.texte, 700, MENU_W - 24)
+  texte(ctx, libelle, MENU_X + MENU_W / 2, y + h / 2, 19, primaire ? C.accent : C.texte, 700, MENU_W - 24, 1)
 }
 
 function index(p, boutons) {

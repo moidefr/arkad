@@ -1,5 +1,5 @@
 import { C } from '../palette.js'
-import { texte, rect, pastille } from '../dessin.js'
+import { texte, rect, pastille, bloc, lueur } from '../dessin.js'
 
 const RAYON = 96
 const TAILLE = 14
@@ -71,12 +71,14 @@ export default {
       const x = cx + Math.cos(o.a) * o.r
       const y = cy + Math.sin(o.a) * o.r
       const proche = Math.abs(o.r - RAYON) < 40
-      rect(ctx, x - 7, y - 7, 14, 14, proche ? C.rouge : C.bord)
+      if (proche) lueur(ctx, x - 7, y - 7, 14, 14, C.rouge, 2)
+      bloc(ctx, x - 7, y - 7, 14, 14, proche ? C.rouge : C.bord, 2)
     }
 
     const px = cx + Math.cos(j.e.ang) * RAYON
     const py = cy + Math.sin(j.e.ang) * RAYON
-    rect(ctx, px - TAILLE / 2, py - TAILLE / 2, TAILLE, TAILLE, C.accent)
+    lueur(ctx, px - TAILLE / 2, py - TAILLE / 2, TAILLE, TAILLE, C.accent, 3)
+    bloc(ctx, px - TAILLE / 2, py - TAILLE / 2, TAILLE, TAILLE, C.accent, 3)
 
     if (j.t < 3) texte(ctx, 'appuie pour inverser', j.W / 2, j.H - 50, 13, C.faible, 700)
   },

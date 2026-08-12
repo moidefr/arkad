@@ -1,5 +1,5 @@
-import { C } from '../palette.js'
-import { texte, rect, cadre } from '../dessin.js'
+import { C, ton } from '../palette.js'
+import { texte, rect, cadre, bloc, lueur } from '../dessin.js'
 
 /**
  * ASCENSION — une échelle sans fin contre une IA qui apprend.
@@ -271,6 +271,9 @@ function duel(j, ctx) {
   ACTIONS.forEach((act, i) => {
     const y = 452 + i * 62
     rect(ctx, 20, y, 320, 54, C.panneau)
+    rect(ctx, 20, y, 320, 3, ton(C.panneau, 0.5))
+    rect(ctx, 20, y + 51, 320, 3, ton(C.panneau, -0.5))
+    lueur(ctx, 20, y, 320, 54, act.couleur, 2, 0.35)
     cadre(ctx, 20, y, 320, 54, act.couleur)
     ctx.textAlign = 'left'
     texte(ctx, act.nom, 38, y + 27, 18, act.couleur, 700)
@@ -287,8 +290,12 @@ function jauge(ctx, nom, e, max, y, couleur) {
   texte(ctx, `${Math.max(0, e.pv)} PV`, 340, y, 14, C.texte, 700)
   ctx.textAlign = 'center'
   rect(ctx, 20, y + 14, 320, 14, C.panneau)
-  rect(ctx, 20, y + 14, 320 * Math.max(0, e.pv / max), 14, couleur)
-  for (let i = 0; i < 6; i++) rect(ctx, 20 + i * 18, y + 36, 12, 8, i < e.charge ? C.accent : C.bord)
+  const l = 320 * Math.max(0, e.pv / max)
+  if (l > 4) {
+    lueur(ctx, 20, y + 14, l, 14, couleur, 2, 0.6)
+    bloc(ctx, 20, y + 14, l, 14, couleur, 3)
+  }
+  for (let i = 0; i < 6; i++) bloc(ctx, 20 + i * 18, y + 36, 12, 8, i < e.charge ? C.accent : C.bord, 2)
 }
 
 const alea = () => Math.floor(Math.random() * 3)

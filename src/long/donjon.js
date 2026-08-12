@@ -1,5 +1,5 @@
-import { C } from '../palette.js'
-import { texte, rect } from '../dessin.js'
+import { C, ton } from '../palette.js'
+import { texte, rect, bloc, lueur } from '../dessin.js'
 
 const COLS = 11
 const RANGS = 13
@@ -77,11 +77,12 @@ export default {
         const x = X0 + c * CASE
         const y = Y0 + r * CASE
         const t = j.e.carte[i]
-        if (t === '#') rect(ctx, x, y, CASE, CASE, eclaire ? C.bord : C.panneau)
+        if (t === '#') bloc(ctx, x, y, CASE, CASE, eclaire ? C.bord : ton(C.panneau, -0.3), 3)
         else {
           rect(ctx, x + 14, y + 14, 3, 3, eclaire ? C.faible : C.panneau)
           if (t === '>') {
-            rect(ctx, x + 6, y + 6, CASE - 12, CASE - 12, eclaire ? C.accent : C.panneau)
+            if (eclaire) lueur(ctx, x + 6, y + 6, CASE - 12, CASE - 12, C.accent, 3)
+            bloc(ctx, x + 6, y + 6, CASE - 12, CASE - 12, eclaire ? C.accent : C.panneau, 2)
             texte(ctx, '>', x + CASE / 2, y + CASE / 2, 18, C.fond, 700)
           }
         }
@@ -106,7 +107,8 @@ export default {
       texte(ctx, t.l, x + CASE / 2, y + CASE / 2 - 2, 22, t.couleur, 700)
     }
 
-    rect(ctx, X0 + h.c * CASE + 7, Y0 + h.r * CASE + 7, CASE - 14, CASE - 14, C.accent)
+    lueur(ctx, X0 + h.c * CASE + 7, Y0 + h.r * CASE + 7, CASE - 14, CASE - 14, C.accent, 3)
+    bloc(ctx, X0 + h.c * CASE + 7, Y0 + h.r * CASE + 7, CASE - 14, CASE - 14, C.accent, 3)
 
     entete(j, ctx)
     ctx.textAlign = 'left'

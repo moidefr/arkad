@@ -1,5 +1,5 @@
 import { C } from '../palette.js'
-import { texte, rect, cadre } from '../dessin.js'
+import { texte, rect, cadre, bloc, lueur } from '../dessin.js'
 
 const BAC_Y = 512
 const BAC_H = 60
@@ -50,12 +50,13 @@ export default {
       const w = j.W / 2 - 24
       rect(ctx, x, BAC_Y, w, BAC_H, C.panneau)
       cadre(ctx, x, BAC_Y, w, BAC_H, couleur)
-      rect(ctx, x + w / 2 - 14, BAC_Y + BAC_H / 2 - 8, 28, 16, couleur)
+      bloc(ctx, x + w / 2 - 14, BAC_Y + BAC_H / 2 - 8, 28, 16, couleur, 2)
     }
 
     for (const o of j.e.objets) {
       const couleur = o.gauche ? GAUCHE : DROITE
-      rect(ctx, o.x - TAILLE / 2, o.y - TAILLE / 2, TAILLE, TAILLE, couleur)
+      lueur(ctx, o.x - TAILLE / 2, o.y - TAILLE / 2, TAILLE, TAILLE, couleur, 2)
+      bloc(ctx, o.x - TAILLE / 2, o.y - TAILLE / 2, TAILLE, TAILLE, couleur, 3)
       rect(ctx, o.x - 6, o.y - 6, 12, 12, C.fond)
     }
 

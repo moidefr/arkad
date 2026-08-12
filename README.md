@@ -8,14 +8,18 @@ et pour Android.
 
 Un terminal à phosphore ambré. Trois règles, tenues partout :
 
-1. **Les formes sont en gros pixels.** Tout est aligné sur une grille de
-   2 px, aucun coin arrondi, aucun dégradé, les disques sont des empilements
-   de rectangles.
+1. **Les formes sont en gros pixels, mais elles ont un corps.** Tout est
+   aligné sur une grille de 2 px, aucun coin arrondi, aucun dégradé — et
+   chaque objet a une arête claire en haut, une arête sombre en bas. C'est la
+   différence entre un carré de couleur et une chose posée quelque part.
 2. **Le texte, lui, est net.** On a essayé de le rastériser petit puis de
    l'agrandir pour lui donner du grain : joli en grand, illisible en petit.
    Le style vient des formes, pas de la typo — mais le monospace reste.
 3. **Une seule couleur d'accent**, l'ambre, pour ce qui compte. Trois teintes
    secondaires servent uniquement à distinguer les jeux entre eux.
+4. **Ce qui est vif est allumé.** Un halo déborde derrière les objets
+   lumineux : sur un tube à phosphore la lumière bave, et c'est ce
+   débordement qui distingue une couleur allumée d'une couleur peinte.
 
 Si tu ajoutes quelque chose et que ça jure, c'est presque toujours qu'une de
 ces trois règles a sauté.
@@ -169,9 +173,15 @@ n'est pas « GAME OVER ».
 
 ### La boîte à dessin
 
-`rect`, `cadre` (une boîte creuse), `pastille` (un disque en gros pixels),
-`trame` (une grille de points), `texte`, plus `dist`, `borne`, `vers`. Aucune
-ne prend de rayon d'arrondi : c'est volontaire.
+`rect`, `bloc` (un rectangle avec son relief), `cadre` (une boîte creuse),
+`pastille` (un disque en gros pixels), `lueur` (un halo), `ombre` (une ombre
+portée), `trame` (une grille de points), `vignette`, `texte`, plus `dist`,
+`borne`, `vers`. Et `ton(couleur, k)` dans la palette, pour éclaircir ou
+assombrir sans inventer de nouvelle teinte.
+
+Aucune ne prend de rayon d'arrondi : c'est volontaire. En règle générale, un
+objet de jeu se dessine avec `bloc`, et ce qui doit attirer l'œil reçoit en
+plus un `lueur` juste avant.
 
 ## Les effets
 

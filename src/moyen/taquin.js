@@ -1,5 +1,5 @@
-import { C } from '../palette.js'
-import { texte, rect, cadre } from '../dessin.js'
+import { C, ton } from '../palette.js'
+import { texte, rect, cadre, bloc, lueur } from '../dessin.js'
 
 const N = 4
 const CASE = 78
@@ -39,7 +39,8 @@ export default {
       const y = Y0 + Math.floor(i / N) * (CASE + ECART)
       // Une tuile bien placée s'éteint : on voit sa progression d'un coup d'œil.
       const place = v === i + 1
-      rect(ctx, x, y, CASE, CASE, place ? C.panneau : C.vert)
+      if (!place) lueur(ctx, x, y, CASE, CASE, C.vert, 2, 0.5)
+      bloc(ctx, x, y, CASE, CASE, place ? ton(C.panneau, 0.2) : C.vert, 4)
       texte(ctx, v, x + CASE / 2, y + CASE / 2, 30, place ? C.faible : C.fond, 700)
     }
 

@@ -1,5 +1,5 @@
-import { C } from '../palette.js'
-import { texte, rect, cadre } from '../dessin.js'
+import { C, ton } from '../palette.js'
+import { texte, rect, cadre, bloc, lueur } from '../dessin.js'
 
 const COLS = 9
 const RANGS = 12
@@ -54,8 +54,7 @@ export default {
       const y = Y0 + Math.floor(i / COLS) * CASE
 
       if (!c.vu) {
-        rect(ctx, x + 1, y + 1, CASE - 2, CASE - 2, C.panneau)
-        rect(ctx, x + 1, y + 1, CASE - 2, 3, C.bord)
+        bloc(ctx, x + 1, y + 1, CASE - 2, CASE - 2, ton(C.panneau, 0.22), 3)
         if (c.drapeau) {
           rect(ctx, x + 12, y + 9, 4, 20, C.faible)
           rect(ctx, x + 16, y + 9, 12, 9, C.rouge)
@@ -65,7 +64,10 @@ export default {
 
       rect(ctx, x + 1, y + 1, CASE - 2, CASE - 2, C.fond)
       cadre(ctx, x + 1, y + 1, CASE - 2, CASE - 2, C.panneau)
-      if (c.mine) rect(ctx, x + 10, y + 10, CASE - 20, CASE - 20, C.rouge)
+      if (c.mine) {
+        lueur(ctx, x + 10, y + 10, CASE - 20, CASE - 20, C.rouge, 2)
+        bloc(ctx, x + 10, y + 10, CASE - 20, CASE - 20, C.rouge, 2)
+      }
       else if (c.voisins) texte(ctx, c.voisins, x + CASE / 2, y + CASE / 2, 20, TEINTE[c.voisins - 1], 700)
     }
 

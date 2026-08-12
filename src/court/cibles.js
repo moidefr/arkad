@@ -1,5 +1,5 @@
 import { C } from '../palette.js'
-import { texte, rect, cadre, trame } from '../dessin.js'
+import { texte, rect, cadre, trame, bloc, lueur } from '../dessin.js'
 
 const HAUT = 116 // zone de jeu, sous la jauge
 const BAS = 60
@@ -78,8 +78,10 @@ export default {
       const reste = 1 - c.age / c.duree
       const r = 12 + R_MAX * reste
       const chaud = reste < 0.3
+      const teinte = chaud ? C.rouge : C.accent
+      lueur(ctx, c.x - r, c.y - r, r * 2, r * 2, teinte, 3, 0.8)
       cadre(ctx, c.x - r, c.y - r, r * 2, r * 2, chaud ? C.rouge : C.faible)
-      rect(ctx, c.x - r * 0.6, c.y - r * 0.6, r * 1.2, r * 1.2, chaud ? C.rouge : C.accent)
+      bloc(ctx, c.x - r * 0.6, c.y - r * 0.6, r * 1.2, r * 1.2, teinte, 3)
       rect(ctx, c.x - 4, c.y - 4, 8, 8, C.fond)
     }
 

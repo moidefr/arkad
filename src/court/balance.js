@@ -1,5 +1,5 @@
 import { C } from '../palette.js'
-import { texte, rect } from '../dessin.js'
+import { texte, rect, bloc, lueur } from '../dessin.js'
 
 const BASE_Y = 500
 const LONGUEUR = 190
@@ -42,7 +42,7 @@ export default {
   dessine(j, ctx) {
     const cx = j.W / 2
     rect(ctx, 0, BASE_Y, j.W, 4, C.bord)
-    rect(ctx, cx - 26, BASE_Y - 12, 52, 12, C.faible)
+    bloc(ctx, cx - 26, BASE_Y - 12, 52, 12, C.faible, 3)
 
     // Le mât, tracé en gros pixels le long de son axe.
     const dx = Math.sin(j.e.angle)
@@ -54,7 +54,9 @@ export default {
     }
     const bx = cx + dx * LONGUEUR
     const by = BASE_Y - 12 + dy * LONGUEUR
-    rect(ctx, bx - 9, by - 9, 18, 18, j.e.eclat > 0 ? C.accent : chaud ? C.rouge : C.cyan)
+    const teinte = j.e.eclat > 0 ? C.accent : chaud ? C.rouge : C.cyan
+    lueur(ctx, bx - 9, by - 9, 18, 18, teinte, 3)
+    bloc(ctx, bx - 9, by - 9, 18, 18, teinte, 3)
 
     // Inclinomètre : on voit venir la chute avant de la sentir.
     const part = j.e.angle / LIMITE

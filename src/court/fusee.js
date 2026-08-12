@@ -1,5 +1,5 @@
 import { C } from '../palette.js'
-import { texte, rect } from '../dessin.js'
+import { texte, rect, bloc, lueur } from '../dessin.js'
 
 const G = 190
 const POUSSEE = 430
@@ -73,15 +73,17 @@ export default {
 
   dessine(j, ctx) {
     const sol = j.H - SOL
-    rect(ctx, 0, sol, j.W, j.H - sol, C.bord)
-    rect(ctx, j.e.piste.x, sol - 4, j.e.piste.w, 6, C.accent)
+    bloc(ctx, 0, sol, j.W, j.H - sol, C.bord, 3)
+    lueur(ctx, j.e.piste.x, sol - 4, j.e.piste.w, 6, C.accent, 3)
+    bloc(ctx, j.e.piste.x, sol - 4, j.e.piste.w, 6, C.accent, 2)
     for (let i = 0; i < j.e.piste.w; i += 12) rect(ctx, j.e.piste.x + i, sol + 6, 6, 3, C.accent)
 
     const x = j.e.x - LARGE / 2
     const y = j.e.y - HAUT / 2
     const vite = j.e.vy >= VITESSE_MAX
-    rect(ctx, x, y, LARGE, HAUT, vite ? C.rouge : C.texte)
-    rect(ctx, x + 4, y + 4, 8, 6, C.fond)
+    if (vite) lueur(ctx, x, y, LARGE, HAUT, C.rouge, 3)
+    bloc(ctx, x, y, LARGE, HAUT, vite ? C.rouge : C.texte, 3)
+    rect(ctx, x + 4, y + 4, 8, 6, C.cyan)
 
     // Jauge de carburant, en segments comme partout ailleurs.
     for (let i = 0; i < 16; i++) {

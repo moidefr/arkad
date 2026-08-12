@@ -1,5 +1,5 @@
-import { C } from '../palette.js'
-import { texte, rect } from '../dessin.js'
+import { C, ton } from '../palette.js'
+import { texte, rect, bloc, lueur } from '../dessin.js'
 
 const TEINTES = [C.rouge, C.accent, C.cyan, C.vert]
 const HAUT = 130
@@ -75,8 +75,8 @@ export default {
     const c = cases(j)
     c.forEach((z, i) => {
       const allume = j.e.actif === i
-      rect(ctx, z.x, z.y, z.w, z.h, allume ? TEINTES[i] : C.panneau)
-      rect(ctx, z.x, z.y, z.w, 4, TEINTES[i])
+      if (allume) lueur(ctx, z.x, z.y, z.w, z.h, TEINTES[i], 3)
+      bloc(ctx, z.x, z.y, z.w, z.h, allume ? TEINTES[i] : ton(TEINTES[i], -0.72), 4)
     })
 
     texte(ctx, `SÉQUENCE ${j.e.suite.length}`, j.W / 2, HAUT - 40, 14, C.faible, 700)

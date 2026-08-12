@@ -1,5 +1,5 @@
 import { C } from '../palette.js'
-import { texte, rect, cadre } from '../dessin.js'
+import { texte, rect, cadre, bloc, lueur } from '../dessin.js'
 
 const ARRIVEE = 900 // kilomètres
 const JAUGES = [
@@ -235,7 +235,11 @@ export default {
 
     // La route, avec les frontières des quatre pays.
     rect(ctx, 20, 110, 320, 10, C.panneau)
-    rect(ctx, 20, 110, 320 * Math.min(1, h.km / ARRIVEE), 10, etape.couleur)
+    const avance = 320 * Math.min(1, h.km / ARRIVEE)
+    if (avance > 4) {
+      lueur(ctx, 20, 110, avance, 10, etape.couleur, 2, 0.7)
+      bloc(ctx, 20, 110, avance, 10, etape.couleur, 2)
+    }
     for (const e of ETAPES) rect(ctx, 20 + (e.jusqu / ARRIVEE) * 320 - 1, 106, 2, 18, C.bord)
 
     JAUGES.forEach((g, i) => {
@@ -244,7 +248,7 @@ export default {
       ctx.textAlign = 'left'
       texte(ctx, g.nom, 20, y + 8, 12, C.faible, 700)
       rect(ctx, 96, y + 2, 244, 12, C.panneau)
-      rect(ctx, 96, y + 2, 244 * (v / 100), 12, v > 25 ? g.couleur : C.rouge)
+      if (v > 0) bloc(ctx, 96, y + 2, 244 * (v / 100), 12, v > 25 ? g.couleur : C.rouge, 2)
       ctx.textAlign = 'center'
     })
 

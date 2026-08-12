@@ -1,5 +1,5 @@
 import { C } from '../palette.js'
-import { texte, rect, cadre } from '../dessin.js'
+import { texte, rect, cadre, bloc, lueur } from '../dessin.js'
 
 const VOIES = 3
 const BUT_Y = 500
@@ -70,11 +70,14 @@ export default {
 
     for (const t of j.e.tirs) {
       const x = t.voie * largeurVoie + largeurVoie / 2
-      rect(ctx, x - BALLE / 2, t.y - BALLE / 2, BALLE, BALLE, C.texte)
+      lueur(ctx, x - BALLE / 2, t.y - BALLE / 2, BALLE, BALLE, C.texte, 2, 0.7)
+      bloc(ctx, x - BALLE / 2, t.y - BALLE / 2, BALLE, BALLE, C.texte, 2)
     }
 
     const gx = j.e.voie * largeurVoie + largeurVoie / 2
-    rect(ctx, gx - GARDIEN_W / 2, BUT_Y + 14, GARDIEN_W, 42, j.e.eclat > 0 ? C.accent : C.vert)
+    const teinteG = j.e.eclat > 0 ? C.accent : C.vert
+    lueur(ctx, gx - GARDIEN_W / 2, BUT_Y + 14, GARDIEN_W, 42, teinteG, 2)
+    bloc(ctx, gx - GARDIEN_W / 2, BUT_Y + 14, GARDIEN_W, 42, teinteG, 3)
     rect(ctx, gx - 22, BUT_Y + 22, 10, 10, C.fond)
     rect(ctx, gx + 12, BUT_Y + 22, 10, 10, C.fond)
 

@@ -1,5 +1,5 @@
-import { C } from '../palette.js'
-import { texte, rect, cadre } from '../dessin.js'
+import { C, ton } from '../palette.js'
+import { texte, rect, cadre, bloc, lueur } from '../dessin.js'
 
 const MACHINES = [
   { nom: 'PIOCHE', cout: 12, taux: 1.15, prod: 0.4, couleur: C.faible },
@@ -125,7 +125,8 @@ function vueUsine(j, ctx) {
   ctx.save()
   ctx.translate(CREUSER.x + CREUSER.w / 2, CREUSER.y + CREUSER.h / 2)
   ctx.scale(k, k)
-  rect(ctx, -CREUSER.w / 2, -CREUSER.h / 2, CREUSER.w, CREUSER.h, C.panneau)
+  lueur(ctx, -CREUSER.w / 2, -CREUSER.h / 2, CREUSER.w, CREUSER.h, C.accent, 3, 0.8)
+  bloc(ctx, -CREUSER.w / 2, -CREUSER.h / 2, CREUSER.w, CREUSER.h, ton(C.panneau, 0.3), 3)
   cadre(ctx, -CREUSER.w / 2, -CREUSER.h / 2, CREUSER.w, CREUSER.h, C.accent)
   texte(ctx, 'CREUSER', 0, 0, 19, C.accent, 700)
   ctx.restore()
@@ -136,7 +137,9 @@ function vueUsine(j, ctx) {
     const possible = j.e.minerai >= prix
     const mult = multiplicateur(j, i)
     rect(ctx, 16, y, 328, RANGEE_H, C.panneau)
-    rect(ctx, 16, y, 4, RANGEE_H, possible ? m.couleur : C.bord)
+    rect(ctx, 16, y + RANGEE_H - 3, 328, 3, ton(C.panneau, -0.5))
+    if (possible) lueur(ctx, 16, y, 5, RANGEE_H, m.couleur, 2)
+    bloc(ctx, 16, y, 5, RANGEE_H, possible ? m.couleur : C.bord, 2)
 
     ctx.textAlign = 'left'
     texte(ctx, m.nom, 32, y + 18, 15, possible ? C.texte : C.faible, 700)

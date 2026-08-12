@@ -1,5 +1,5 @@
 import { C } from '../palette.js'
-import { texte, rect } from '../dessin.js'
+import { texte, rect, bloc, lueur } from '../dessin.js'
 
 const SOL = 470
 const TAILLE = 26
@@ -56,7 +56,8 @@ export default {
     }
     const rx = cx + Math.sin(a) * 120
     const ry = SOL - 80 - Math.cos(a) * 80
-    rect(ctx, rx - 5, ry - 5, 10, 10, C.accent)
+    lueur(ctx, rx - 5, ry - 5, 10, 10, C.accent, 2)
+    bloc(ctx, rx - 5, ry - 5, 10, 10, C.accent, 2)
     // Le brin, tracé en pointillés entre les mains et la corde.
     for (let k = 1; k < 9; k++) {
       rect(ctx, cx + ((rx - cx) * k) / 9 - 1, SOL - 80 + ((ry - (SOL - 80)) * k) / 9 - 1, 2, 2, C.faible)
@@ -64,7 +65,9 @@ export default {
 
     const monte = j.e.saut > 0 ? Math.sin((1 - j.e.saut / SAUT) * Math.PI) * HAUTEUR : 0
     const y = SOL - TAILLE - monte
-    rect(ctx, cx - TAILLE / 2, y, TAILLE, TAILLE, j.e.eclat > 0 ? C.accent : C.vert)
+    const teinte = j.e.eclat > 0 ? C.accent : C.vert
+    lueur(ctx, cx - TAILLE / 2, y, TAILLE, TAILLE, teinte, 3)
+    bloc(ctx, cx - TAILLE / 2, y, TAILLE, TAILLE, teinte, 3)
     rect(ctx, cx - 7, y + 7, 4, 5, C.fond)
     rect(ctx, cx + 3, y + 7, 4, 5, C.fond)
 

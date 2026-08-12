@@ -1,5 +1,5 @@
 import { C } from '../palette.js'
-import { rect, borne, vers } from '../dessin.js'
+import { rect, borne, vers, bloc, lueur } from '../dessin.js'
 
 const TAILLE = 24
 const SOL = 96 // hauteur du joueur au-dessus du bas de l'écran
@@ -75,18 +75,20 @@ export default {
     for (const f of j.e.filantes) rect(ctx, f.x, f.y, 2, 10, C.panneau)
 
     for (const s of j.e.etoiles) {
-      rect(ctx, s.x, s.y, 12, 12, C.accent)
+      lueur(ctx, s.x, s.y, 12, 12, C.accent, 2)
+      bloc(ctx, s.x, s.y, 12, 12, C.accent, 2)
       rect(ctx, s.x + 4, s.y + 4, 4, 4, C.fond)
     }
 
     for (const b of j.e.blocs) {
-      rect(ctx, b.x, b.y, b.w, b.h, C.rouge)
-      rect(ctx, b.x, b.y, b.w, 4, C.accent)
+      bloc(ctx, b.x, b.y, b.w, b.h, C.rouge, 3)
+      rect(ctx, b.x + 3, b.y + 3, b.w - 6, 2, C.accent)
     }
 
     const px = j.e.x - TAILLE / 2
     const py = j.H - SOL
-    rect(ctx, px, py, TAILLE, TAILLE, C.cyan)
+    lueur(ctx, px, py, TAILLE, TAILLE, C.cyan, 3)
+    bloc(ctx, px, py, TAILLE, TAILLE, C.cyan, 3)
     rect(ctx, px + 6, py + 6, 12, 6, C.fond)
   },
 }
