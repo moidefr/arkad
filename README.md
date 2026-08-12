@@ -65,7 +65,7 @@ tunnel · **GRIMPE** rebondir de plateforme en plateforme · **SLALOM** zigzague
 entre les portes · **FUSÉE** se poser en douceur · **BRIQUES** casse-brique
 
 *Réflexe* — **SERPENT** · **ORBITE** inverser son sens · **BALANCE** redresser
-un mât · **PILE** empiler sans dépasser · **CORDE** sauter au bon moment ·
+un mât · **PILE** empiler sans dépasser · **CORDE** sauter quand le sol s’allume ·
 **CIBLES** · **RYTHME** · **GARDIEN** plonger du bon côté
 
 *Tête* — **TRI** · **MÉMOIRE** · **COULEUR** l'encre, pas le mot · **CALCUL**
@@ -104,10 +104,16 @@ couloirs cessent d'être des refuges ; le spectre traverse les murs ; le golem
 ne bouge qu'un tour sur deux mais encaisse tout. Épées, plaques, fioles,
 parchemins, or, et un gardien tous les cinq étages.
 
-**USINE** — incrémental. Cinq machines, neuf améliorations qui cassent la
-courbe au lieu de l'allonger, production hors ligne créditée jusqu'à huit
-heures, et une **refonte** : on perd tout sauf des lingots, qui donnent +5 %
-définitifs chacun. C'est elle qui fait tenir le jeu au-delà d'une soirée.
+**USINE** — incrémental, et un atelier qui tourne vraiment. La moitié haute de
+l'écran est une scène : un front de taille qu'on frappe pour creuser, deux
+étages de machines qui battent et soufflent à la cadence de leur ligne, des
+ouvriers qui font la navette, un convoyeur qui se remplit à mesure, un ciel
+qui bascule du jour à la nuit. Dix machines, trente améliorations, vingt
+recherches — la seule dépense en temps réel, et la seule chose qui survit à
+une refonte —, des pannes qu'on répare en tapant la machine, des contrats à
+livrer avant l'heure, et des ouvriers à embaucher dont dépend le rendement.
+La courbe se vérifie au banc : `node test/usine-banc.mjs 10` joue dix heures
+en une seconde et imprime quand chaque contenu tombe.
 
 **EXPÉDITION** — 900 km à travers quatre pays, chacun avec ses propres
 journées. Trois objets se trouvent en route et ouvrent des options qui
@@ -119,13 +125,39 @@ milieu d'un couloir, on la rouvre trois jours plus tard au même endroit.
 
 ### MASSIF — sans fin (1 jeu)
 
-**ASCENSION** — une échelle de rangs sans plafond. Chaque rang a son
-caractère : LA BRUTE frappe, LE COMPTEUR retient ce que tu joues le plus, LE
-MIROIR contre ton dernier geste, et L'ANALYSTE retient ce que tu joues *après*
-chaque coup — ce qui casse les alternances, que la simple fréquence ne voit
-pas. Un gardien tous les dix rangs, une relique tous les trois. Les
-améliorations et les reliques sont permanentes, une défaite ne coûte qu'un
-rang. La catégorie n'a pas vocation à se terminer.
+**ANOMALIE** — un RPG tactique au tour par tour. Trois opérateurs plongent
+dans un système corrompu ; les ennemis sont des processus, les boss des
+noyaux, les compétences des exploits.
+
+**Aucun aléatoire dans la résolution** : les dégâts sont exactement
+prévisibles. Le hasard vit dans la génération — quels nœuds, quelles offres,
+quels processus — et dans les choix pondérés de l'adversaire, jamais dans le
+résultat d'un coup. C'est ce qui rend le combat lisible sur 360 px, et
+surtout vérifiable à l'unité près par un test.
+
+La file d'initiative se calcule à l'avance et s'affiche sur sept coups ; les
+processus annoncent leur intention en y entrant. Les **cycles sont partagés
+par l'équipe** — un tour bon marché en finance un cher, trois classes
+gourmandes s'étouffent. Le **traçage** monte quand on joue, son plancher monte
+avec la durée du combat, et à cent le système frappe en ignorant tout : rester
+est impossible, et aucune stratégie ne gagne en durant.
+
+Cinq actes à cartes ramifiées, chacun avec son bassin de processus et son
+noyau. Le dernier change deux fois de peau : ce qui l'a entamé ne l'entame
+plus. Le purger ouvre le mode **INFINI**, où la pression monte sans fin et où
+l'on choisit tous les trois actes *comment* ça devient dur, un fardeau parmi
+trois.
+
+Ce qui empêche une combinaison de tout casser, et qui manquait au jeu
+précédent : six emplacements de compétence dont deux verrouillés avec **rejet
+forcé** au-delà, trois emplacements de module, quatre **paires antagonistes**
+qui s'excluent pour la partie entière, un **surcoût d'axe** écrit en clair sur
+l'écran ÉQUIPE, un plafond sur chaque état, et des multiplicateurs à rendement
+décroissant — trois bonus de +30 % donnent ×1.64, pas ×2.20. Une défaite
+termine la partie : sans prix à l'échec, la progression n'en a aucun.
+
+`node test/anomalie-banc.mjs` joue des milliers de combats sans rendu et
+imprime qui gagne, contre quoi, en combien de tours et à quel prix.
 
 ## Ajouter un mini-jeu
 
@@ -264,10 +296,32 @@ src/
   effets.js         gerbes, bulles de score, secousse d'écran
   catalogue.js      les quatre catégories, et rien d'autre à toucher
   court/  moyen/  long/  massif/     les jeux, rangés par durée
+test/
+  faux.js           un canvas qui enregistre, un moteur qui ne dessine pas
+  *.test.js         `npm test` — aucune dépendance, `node --test` suffit
+  usine-banc.mjs    dix heures d'USINE en une seconde
+  anomalie-banc.mjs des milliers de combats sans rendu
 .github/workflows/
+  test.yml          le banc d'essai, à chaque poussée
   web.yml           déploie la version web, à la demande
   apk.yml           construit l'APK, à la demande
 ```
+
+## Les tests
+
+`npm test` — sans navigateur et sans une seule dépendance. Un faux contexte 2D
+enregistre les rectangles et les textes au lieu de peindre, un faux contexte de
+partie remplace le moteur, et toute la règle des jeux profonds vit dans des
+fichiers qui n'importent ni canvas ni stockage.
+
+Ce ne sont pas des tests de politesse. Ceux de CORDE **ne lisent pas l'état du
+jeu** pour décider quand appuyer : ils lisent ce qui est dessiné, comme le
+ferait un joueur — la seule façon d'attraper un mensonge entre l'image et la
+règle. Ceux d'ANOMALIE vérifient chaque dégât à l'unité près et vérifient sur
+des centaines de graines qu'aucune carte n'enferme le joueur. Ils ont trouvé,
+entre autres, un pare-feu plein qui laissait passer un point, un type de dégât
+entier inoffensif contre le joueur, un tirage au hasard écrit à l'intérieur
+d'un `.find()`, et trois combats qui ne se terminaient jamais.
 
 ## Astuces
 
@@ -278,6 +332,8 @@ src/
 ## La suite
 
 - d'autres jeux massifs — la catégorie n'en a qu'un
+- ANOMALIE : trois classes de plus, et des déblocages entre parties qui
+  ajoutent de la variété sans jamais ajouter de puissance
 - une interface pour publier des jeux sans passer par git
 - des scores en ligne
 
