@@ -84,6 +84,9 @@ export function commence(equipe, rencontre, { tracage = 0, cyclesMax = CYCLES_MA
       etats: {},
       att: 100 / p.vit,
       intent: null,
+      phases: p.phases,
+      phase: p.phases?.[0],
+      resist: p.phases ? p.phases[0].resist : p.resist,
     }
   })
 
@@ -336,7 +339,23 @@ function encaisse(but, d) {
   if (d.absorbe > 0) but.etats.pare = Math.max(0, (but.etats.pare ?? 0) - d.absorbe)
   if (!but.etats.pare) delete but.etats.pare
   but.pv = Math.max(0, but.pv - d.final)
+  changePhase(but)
   return d.final
+}
+
+/**
+ * Un noyau à phases change de profil de résistance à mesure qu'il tombe : ce
+ * qui l'a entamé ne l'entame plus. Une seule façon de frapper ne suffit pas à
+ * le descendre, et c'est ce qui fait qu'une équipe mono-type se heurte
+ * réellement à quelque chose — sans qu'aucune règle ne le lui interdise.
+ */
+function changePhase(u) {
+  if (!u.phases) return
+  const part = u.pv / u.pvMax
+  const phase = u.phases.filter((p) => part <= p.seuil).at(-1) ?? u.phases[0]
+  if (u.phase === phase) return
+  u.phase = phase
+  u.resist = phase.resist
 }
 
 const soigne = (u, n) => (u.pv = Math.min(u.pvMax, u.pv + n))
@@ -484,6 +503,16 @@ export function repere(c) {
   if (c.tracage < TRACAGE_MAX) return false
   c.tracage = TRACAGE_RETOMBE
   for (const p of vivants(c.proc)) p.att = 0
+  // Et le repérage **fait mal**, de plus en plus.
+  //
+  // Rendre la main aux processus ne suffit pas : le banc a trouvé une impasse
+  // où un processus repéré passait son tour à se re-blinder pendant que
+  // l'équipe ne pouvait plus l'entamer — neuf cents tours sans une égratignure
+  // des deux côtés. Une purge qui ignore blindage, pare-feu et résistances
+  // rend toute impasse mortelle pour l'intrus, ce qui est le bon sens de la
+  // fiction autant que la garantie qu'un combat se termine.
+  const purge = 3 + Math.floor(c.tour / 30)
+  for (const o of vivants(c.ops)) o.pv = Math.max(0, o.pv - purge)
   return true
 }
 

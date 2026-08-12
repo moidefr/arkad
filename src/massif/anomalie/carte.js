@@ -1,5 +1,6 @@
 import { melange32, sousGraine, entier, parmi, pioche } from './rng.js'
 import { PROCESSUS, NOYAUX } from './donnees/ennemis.js'
+import { acteInfini, durcis, pressionDe } from './sansfin.js'
 
 /**
  * La carte d'un acte : un graphe en couches, engendré depuis la graine.
@@ -40,13 +41,40 @@ export const ACTES = [
     couches: 7,
     large: [1, 3, 3, 3, 2, 3, 1],
     bassin: ['tampon', 'boucle', 'sentinelle', 'relais', 'salvateur', 'rouille', 'garde'],
-    noyaux: ['n_veilleur', 'n_metier'],
+    noyaux: ['n_pile'],
     force: 4,
     dit: 'Les appels s’empilent et ne redescendent plus. On y résiste, ou on y reste.',
   },
+  {
+    n: 4,
+    nom: 'REGISTRE',
+    couches: 7,
+    large: [1, 3, 3, 3, 3, 2, 1],
+    bassin: ['sentinelle', 'rouille', 'garde', 'faucheur', 'chiffre', 'meute', 'salvateur'],
+    noyaux: ['n_registre'],
+    force: 6,
+    dit: 'Tout y est écrit, y compris ce que tu viens de faire.',
+  },
+  {
+    n: 5,
+    nom: 'NOYAU',
+    couches: 6,
+    large: [1, 2, 3, 2, 2, 1],
+    bassin: ['faucheur', 'chiffre', 'meute', 'archiviste', 'sonde', 'garde'],
+    noyaux: ['n_noyau'],
+    force: 8,
+    dit: 'Le centre. Il sait que tu viens depuis la périphérie.',
+  },
 ]
 
-export const acteDe = (n) => ACTES[Math.min(ACTES.length, Math.max(1, n)) - 1]
+/**
+ * L'acte demandé. Au-delà du cinquième, on est en mode infini et l'acte est
+ * engendré à la volée : la campagne a une fin, la descente n'en a pas.
+ */
+export const acteDe = (n, mode = 'campagne') =>
+  mode === 'infini' ? acteInfini(n) : ACTES[Math.min(ACTES.length, Math.max(1, n)) - 1]
+
+export const DERNIER_ACTE = ACTES.length
 
 /** Les types de nœud et leur glyphe sur la carte. */
 export const TYPES = {
@@ -66,8 +94,8 @@ export const TYPES = {
  * peut s'enfermer dans un cul-de-sac est une carte fausse. Un test le vérifie
  * sur des centaines de graines.
  */
-export function engendre(graine, acteN) {
-  const acte = acteDe(acteN)
+export function engendre(graine, acteN, mode = 'campagne') {
+  const acte = acteDe(acteN, mode)
   const rng = melange32(sousGraine(graine, acteN, 101))
   const couches = acte.large.map((n, i) =>
     Array.from({ length: n }, (_, k) => ({ couche: i, k, type: null, liens: [] })),
@@ -112,7 +140,7 @@ export function engendre(graine, acteN) {
   garantit(couches, rng, 'atelier')
   garantit(couches, rng, 'archive')
 
-  return { acte: acteN, couches }
+  return { acte: acteN, mode, couches }
 }
 
 function tireType(rng, i, total, k) {
@@ -157,8 +185,8 @@ export const termine = (carte, position) => position && position.couche >= carte
  * La rencontre d'un nœud, tirée d'une sous-graine stable : revenir sur la même
  * partie retrouve exactement les mêmes processus.
  */
-export function rencontre(graine, acteN, couche, k, type) {
-  const acte = acteDe(acteN)
+export function rencontre(graine, acteN, couche, k, type, mode = 'campagne') {
+  const acte = acteDe(acteN, mode)
   const rng = melange32(sousGraine(graine, acteN, couche, k, 11))
   if (type === 'noyau') {
     // Le tirage se fait **une fois**, avant la recherche : écrit à l'intérieur

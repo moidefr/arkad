@@ -19,9 +19,25 @@ import { ETATS } from '../src/massif/anomalie/donnees/etats.js'
 import { ROLES, AXES, FORMES, TYPES, TAGS } from '../src/massif/anomalie/donnees/competences.js'
 import * as Carte from '../src/massif/anomalie/carte.js'
 import { ANTAGONISTES } from '../src/massif/anomalie/donnees/modules.js'
+import * as SF from '../src/massif/anomalie/sansfin.js'
+import { PROC } from '../src/massif/anomalie/donnees/ennemis.js'
 import { graine } from './faux.js'
 
 const equipe = (...cl) => cl.map((c, i) => E.nouvelOperateur(c, 'OP' + i))
+
+/**
+ * Une équipe telle qu'elle est *à la fin d'un acte* : deux compétences de plus
+ * par opérateur, ramassées en chemin. Mesurer un noyau contre l'équipement du
+ * tout premier nœud ne dit rien — on n'affronte jamais un noyau dans cet état.
+ */
+const equipeGarnie = (...cl) =>
+  cl.map((c, i) => {
+    const op = E.nouvelOperateur(c, 'OP' + i)
+    const reserve = CLASSES.find((x) => x.id === c).reserve
+    op.comp[2] = reserve[0]
+    op.comp[3] = reserve[1]
+    return op
+  })
 
 // --- Invariants de données ------------------------------------------------------------
 
@@ -350,8 +366,8 @@ function gourmand(c) {
   return true
 }
 
-function duel(equipeIds, rencontre, tours = 400) {
-  const c = K.commence(equipe(...equipeIds), rencontre)
+function duel(equipeIds, rencontre, tours = 400, garnie = false) {
+  const c = K.commence(garnie ? equipeGarnie(...equipeIds) : equipe(...equipeIds), rencontre)
   IA.annonce(c)
   let n = 0
   while (!K.fini(c) && n < tours) {
@@ -392,12 +408,15 @@ test('l’état reste sain au bout de milliers de résolutions', () => {
 })
 
 test('l’équipe de départ gagne souvent contre l’acte I, mais pas toujours', () => {
+  // Contre le bassin de l'acte I seulement : y jeter les processus du
+  // cinquième acte ne mesurerait rien d'utile.
+  const bassin = PROCESSUS.filter((p) => Carte.acteDe(1).bassin.includes(p.id))
   const rng = graine(101)
   let gagnes = 0
   const total = 60
   for (let k = 0; k < total; k++) {
     const combien = 2 + Math.floor(rng() * 3)
-    const rencontre = Array.from({ length: combien }, () => PROCESSUS[Math.floor(rng() * PROCESSUS.length)].id)
+    const rencontre = Array.from({ length: combien }, () => bassin[Math.floor(rng() * bassin.length)].id)
     if (duel(['analyste', 'briseur', 'tisseur'], rencontre).issue === 'gagne') gagnes++
   }
   const taux = gagnes / total
@@ -405,13 +424,41 @@ test('l’équipe de départ gagne souvent contre l’acte I, mais pas toujours'
   assert.ok(taux < 0.98, `l’acte I est gagné ${(taux * 100).toFixed(0)} % du temps, il ne demande rien`)
 })
 
-test('les noyaux sont plus durs que les processus, sans être infaisables', () => {
+test('aucun noyau ne mène à un combat sans fin', () => {
+  // Une équipe de départ n'a rien à faire contre le noyau du cinquième acte,
+  // et c'est très bien : ce qu'on vérifie ici, c'est qu'aucun ne bloque.
   for (const n of NOYAUX) {
     const rencontre = n.escorte ? [n.id, ...n.escorte] : [n.id]
-    const { issue, tours } = duel(['analyste', 'briseur', 'tisseur'], rencontre, 600)
-    assert.ok(issue, `${n.nom} : combat sans fin`)
+    const { issue, tours } = duel(['analyste', 'briseur', 'tisseur'], rencontre, 800)
+    assert.ok(issue, `${n.nom} : combat sans fin après ${tours} tours`)
+  }
+})
+
+test('les noyaux du premier acte sont durs mais franchissables', () => {
+  for (const id of Carte.acteDe(1).noyaux) {
+    const n = NOYAUX.find((x) => x.id === id)
+    const rencontre = n.escorte ? [n.id, ...n.escorte] : [n.id]
+    const { issue, tours } = duel(['analyste', 'briseur', 'tisseur'], rencontre, 600, true)
+    assert.equal(issue, 'gagne', `${n.nom} est infranchissable avec l’équipement de fin d’acte I`)
     assert.ok(tours > 12, `${n.nom} tombe en ${tours} tours`)
   }
+})
+
+test('le noyau final change de peau à mesure qu’il tombe', () => {
+  const final = NOYAUX.find((n) => n.final)
+  assert.ok(final, 'aucun noyau final')
+  const c = K.commence(equipe('briseur', 'briseur', 'briseur'), [final.id])
+  const p = c.proc[0]
+  const profils = new Set()
+  for (let k = 0; k < 40; k++) {
+    profils.add(JSON.stringify(p.resist))
+    p.pv = Math.max(0, p.pv - p.pvMax / 12)
+    K.applique(p, 'marque', 0)
+    // On force la relecture de phase par un coup d'un point.
+    K.joue(c, c.ops[0], 0, p)
+    if (p.pv <= 0) break
+  }
+  assert.ok(profils.size >= 3, `le noyau final n’a montré que ${profils.size} profil(s) de résistance`)
 })
 
 // --- Sauvegarde ----------------------------------------------------------------------------------
@@ -609,4 +656,62 @@ test('le bus de tags rend bien des cycles', () => {
   const avant = c.cycles
   K.joue(c, c.ops[0], 0, c.proc[0]) // SONDE porte le tag MARQUE, coût 1
   assert.equal(c.cycles, avant - 1 + 1, 'MOISSON n’a pas rendu son cycle')
+})
+
+// --- La fin, et le sans-fin -----------------------------------------------------------------
+
+test('la campagne a une fin, la descente n’en a pas', () => {
+  const e = E.nouvelle(1, ['analyste', 'briseur', 'tisseur'])
+  for (let k = 1; k < Carte.DERNIER_ACTE; k++) assert.equal(E.acteSuivant(e), 'suite', `acte ${k} sans suite`)
+  assert.equal(e.acte, Carte.DERNIER_ACTE)
+  assert.equal(E.acteSuivant(e), 'fin', 'la campagne ne se termine jamais')
+
+  const inf = E.nouvelle(1, ['analyste', 'briseur', 'tisseur'], 'infini')
+  for (let k = 0; k < 30; k++) assert.equal(E.acteSuivant(inf), 'suite', 'la descente sans fin s’arrête')
+  assert.ok(inf.acte > 30, 'la profondeur ne monte pas')
+})
+
+test('la pression durcit les processus, sans jamais les adoucir', () => {
+  const base = { pv: 40, blindage: 2, vit: 8, puiss: 6 }
+  let precedent = base
+  for (let p = 1; p <= 20; p++) {
+    const dur = SF.durcis(base, p)
+    assert.ok(dur.pv >= precedent.pv, 'l’intégrité redescend avec la pression')
+    assert.ok(dur.blindage >= precedent.blindage && dur.vit >= precedent.vit && dur.puiss >= precedent.puiss)
+    precedent = dur
+  }
+  assert.ok(SF.durcis(base, 20).pv > base.pv * 4, 'vingt crans de pression ne changent presque rien')
+})
+
+test('un fardeau n’est jamais proposé deux fois', () => {
+  const portes = []
+  for (let acte = 4; acte <= 22; acte += 3) {
+    const offre = SF.offreFardeaux(4242, acte, portes)
+    for (const id of offre) assert.equal(portes.includes(id), false, `${id} reproposé alors qu’il est déjà porté`)
+    if (offre.length) portes.push(offre[0])
+  }
+  assert.ok(portes.length >= 5, 'les fardeaux s’épuisent trop vite')
+})
+
+test('les fardeaux mordent vraiment', () => {
+  const eq = equipe('analyste', 'briseur', 'tisseur')
+  const nu = K.commence(eq, ['tampon', 'veille'])
+  const dur = K.commence(eq, ['tampon', 'veille'])
+  SF.applique(dur, ['f_pare', 'f_cycles', 'f_trace', 'f_blindage'])
+  assert.ok(dur.cyclesMax < nu.cyclesMax, 'RATIONNEMENT ne rationne rien')
+  assert.ok(dur.tracage > nu.tracage, 'SURVEILLANCE ne surveille rien')
+  assert.ok(dur.proc[0].etats.pare > 0, 'PARE-FEU NATIF ne pose aucun pare-feu')
+  assert.ok(dur.proc[0].blindage > nu.proc[0].blindage, 'DURCISSEMENT ne durcit rien')
+})
+
+test('un acte du mode infini est jouable et se durcit avec la profondeur', () => {
+  for (const acte of [1, 4, 9, 16]) {
+    const carte = Carte.engendre(999, acte, 'infini')
+    assert.ok(carte.couches.length >= 5, `profondeur ${acte} : carte trop courte`)
+    assert.equal(carte.couches.at(-1)[0].type, 'noyau')
+    const r = Carte.rencontre(999, acte, 1, 0, 'processus', 'infini')
+    assert.ok(r.length >= 1 && r.length <= 4)
+    for (const id of r) assert.ok(PROC[id], `${id} inconnu`)
+  }
+  assert.ok(Carte.acteDe(9, 'infini').force > Carte.acteDe(2, 'infini').force, 'la descente ne durcit pas')
 })

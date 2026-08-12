@@ -18,7 +18,7 @@ import * as Carte from './carte.js'
  * tenir : renommer un `id` casse le test des données.
  */
 
-export const VERSION = 2
+export const VERSION = 3
 
 /** Six emplacements par opérateur : deux verrouillés, quatre libres. */
 export const EMPLACEMENTS = 6
@@ -26,16 +26,17 @@ export const VERROUS = 2
 
 // --- Une partie neuve -------------------------------------------------------------
 
-export function nouvelle(graine, classes) {
+export function nouvelle(graine, classes, mode = 'campagne') {
   const rng = melange32(graine)
   const noms = pioche(rng, NOMS, 3)
   return {
     v: VERSION,
     graine,
-    mode: 'campagne',
+    mode,
     acte: 1,
     position: null, // null = on n'est pas encore entré dans la première couche
     visites: [],
+    fardeaux: [],
     verrous: [], // les modules verrouillés par leur antagoniste, pour la partie
     equipe: classes.map((cl, i) => nouvelOperateur(cl, noms[i])),
     combat: null,
@@ -62,7 +63,7 @@ export const classesOffertes = (graine) =>
 // --- L'acte ------------------------------------------------------------------------
 
 /** La carte de l'acte courant, reconstruite à la demande depuis la graine. */
-export const carteDe = (e) => Carte.engendre(e.graine, e.acte)
+export const carteDe = (e) => Carte.engendre(e.graine, e.acte, e.mode)
 
 export const noeudCourant = (e) => {
   if (!e.position) return null
@@ -72,7 +73,7 @@ export const noeudCourant = (e) => {
 
 export const rencontre = (e) => {
   const n = noeudCourant(e)
-  return n ? Carte.rencontre(e.graine, e.acte, e.position.couche, e.position.k, n.type) : []
+  return n ? Carte.rencontre(e.graine, e.acte, e.position.couche, e.position.k, n.type, e.mode) : []
 }
 
 /** Avance sur la carte. Rend `'acte'` quand l'acte est fini, `'carte'` sinon. */
@@ -87,12 +88,20 @@ export function finActe(e) {
   return Carte.termine(c, e.position)
 }
 
+/**
+ * Rend `'suite'` si un acte de plus attend, `'fin'` si la campagne est purgée.
+ * En mode infini, il n'y a jamais de `'fin'` : c'est tout le principe.
+ */
 export function acteSuivant(e) {
+  if (e.mode === 'campagne' && e.acte >= Carte.DERNIER_ACTE) return 'fin'
   e.acte++
   e.position = null
   e.visites = []
-  return e.acte <= Carte.ACTES.length
+  return 'suite'
 }
+
+/** Tous les trois actes de descente, un fardeau à choisir parmi trois. */
+export const doitChoisirFardeau = (e) => e.mode === 'infini' && e.acte > 1 && (e.acte - 1) % 3 === 0
 
 // --- Le butin -----------------------------------------------------------------------
 
@@ -159,6 +168,7 @@ export const sauvegarde = (e) => ({
   position: e.position,
   visites: e.visites,
   verrous: e.verrous,
+  fardeaux: e.fardeaux ?? [],
   equipe: e.equipe.map((o) => ({
     cl: o.cl,
     nom: o.nom,
@@ -195,9 +205,10 @@ export function migre(s) {
     v: VERSION,
     graine: s.graine >>> 0,
     mode: s.mode === 'infini' ? 'infini' : 'campagne',
-    acte: Math.max(1, Math.min(Carte.ACTES.length, s.acte | 0)),
+    acte: Math.max(1, s.mode === 'infini' ? s.acte | 0 : Math.min(Carte.DERNIER_ACTE, s.acte | 0)),
     position: s.position?.couche >= 0 ? { couche: s.position.couche | 0, k: s.position.k | 0 } : null,
     visites: Array.isArray(s.visites) ? s.visites : [],
+    fardeaux: Array.isArray(s.fardeaux) ? s.fardeaux : [],
     verrous: Array.isArray(s.verrous) ? s.verrous.filter((id) => MODULE[id]) : [],
     equipe: s.equipe.map((o) => ({
       cl: o.cl,

@@ -136,7 +136,7 @@ for (const politique of ['gourmand', 'prudent', 'hasard']) {
   let sansFin = 0
   for (const comp of compositions) {
     for (let n = 0; n < tirages.length; n++) {
-      const r = combat(comp, tirages[n], politique, 1000 + n)
+      const r = combat(comp, tirages[n], politique, 1000 + n, 900)
       total++
       tours += r.tours
       if (r.issue === 'gagne') {
@@ -173,7 +173,8 @@ for (const [id, e] of parProc) {
   console.log(`    ${id.padEnd(12)} ${((e.g / e.n) * 100).toFixed(0).padStart(3)} % · ${(e.t / e.n).toFixed(0)} tours`)
 }
 
-console.log('\n  noyaux (glouton) :')
+console.log('\n  noyaux, contre une équipe de fin d’acte I (glouton) —')
+console.log('  les actes III à V sont hors de portée à ce stade, et c’est voulu :')
 for (const noyau of NOYAUX) {
   const rencontre = noyau.escorte ? [noyau.id, ...noyau.escorte] : [noyau.id]
   let g = 0

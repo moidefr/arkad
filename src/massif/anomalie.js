@@ -11,6 +11,7 @@ import * as VM from './anomalie/vue/menus.js'
 import * as VK from './anomalie/vue/carte.js'
 import * as VE from './anomalie/vue/equipe.js'
 import { PROC } from './anomalie/donnees/ennemis.js'
+import * as SF from './anomalie/sansfin.js'
 
 /**
  * ANOMALIE — trois opérateurs plongent dans un système corrompu.
@@ -32,7 +33,7 @@ import { PROC } from './anomalie/donnees/ennemis.js'
  * fait pour ça — c'est le même chemin que les records.
  */
 const CLE_META = 'anomalie.meta'
-const metaVide = { victoires: 0, plongees: 0, meilleur: 0 }
+const metaVide = { victoires: 0, plongees: 0, profondeur: 0 }
 
 const litMeta = () => {
   try {
@@ -53,7 +54,7 @@ export default {
   sansScore: true,
   ciel: C.violet,
 
-  titreHud: (j) => (j.e.p ? `ACTE ${j.e.p.acte} · ${Carte.acteDe(j.e.p.acte).nom}` : 'ANOMALIE'),
+  titreHud: (j) => (j.e.p ? Carte.acteDe(j.e.p.acte, j.e.p.mode).nom : 'ANOMALIE'),
   finTitre: (j) =>
     j.e.gagne ? { texte: 'SYSTÈME PURGÉ', couleur: C.accent } : { texte: 'DÉCONNEXION', couleur: C.rouge },
 
@@ -114,6 +115,7 @@ export default {
     else if (e.vue === 'equipe') e.zones = VE.dessine(ctx, e.p, e.sel, e.detail)
     else if (e.vue === 'noeud') e.zones = VM.noeud(ctx, e.p, E.rencontre(e.p), E.noeudCourant(e.p))
     else if (e.vue === 'butin') e.zones = VM.butin(ctx, e.p, e.p.offre, e.jette)
+    else if (e.vue === 'fardeau') e.zones = VM.fardeau(ctx, e.p, e.offreF)
     else if (e.vue === 'bilan') e.zones = VM.bilan(ctx, e.p, e.gagne)
     else {
       VC.dessine(j, ctx, e.c, e.choisie)
@@ -127,7 +129,9 @@ export default {
     const z = e.zones.find((x) => p.x >= x.x && p.x <= x.x + x.w && p.y >= x.y && p.y <= x.y + x.h)
     if (!z) return
     const suites = {
-      plonger: () => commencePartie(j),
+      plonger: () => commencePartie(j, 'campagne'),
+      infini: () => commencePartie(j, 'infini'),
+      fardeau: () => prendFardeau(j, z.id),
       classe: () => choisitClasse(j, z.id),
       partir: () => entre(j),
       engager: () => engage(j),
@@ -153,8 +157,9 @@ export default {
 
 // --- Enchaînement des écrans ------------------------------------------------------------
 
-function commencePartie(j) {
+function commencePartie(j, mode = 'campagne') {
   j.son.niveau()
+  j.e.mode = mode
   j.e.graine = (j.hasard() * 4294967296) >>> 0
   j.e.offertes = E.classesOffertes(j.e.graine)
   j.e.prises = []
@@ -171,7 +176,7 @@ function choisitClasse(j, id) {
 }
 
 function entre(j) {
-  j.e.p = E.nouvelle(j.e.graine, j.e.prises)
+  j.e.p = E.nouvelle(j.e.graine, j.e.prises, j.e.mode ?? 'campagne')
   j.e.vue = 'carte'
   j.e.choisi = null
   j.e.meta.plongees++
@@ -197,6 +202,7 @@ function engage(j) {
     return avance(j)
   }
   e.c = K.commence(e.p.equipe, E.rencontre(e.p))
+  if (e.p.mode === 'infini') SF.applique(e.c, e.p.fardeaux)
   IA.annonce(e.c)
   e.choisie = null
   e.attente = 0.4
@@ -245,8 +251,9 @@ function avance(j) {
   e.choisi = null
 
   if (E.finActe(e.p)) {
-    if (!E.acteSuivant(e.p)) {
-      // Le dernier acte est tombé : la campagne est finie.
+    if (E.acteSuivant(e.p) === 'fin') {
+      // Le noyau est tombé : la campagne a une vraie fin, et elle ouvre la
+      // descente sans fin. C'est ce que le mode INFINI vient récompenser.
       e.gagne = true
       e.p.fini = true
       e.meta.victoires++
@@ -256,8 +263,24 @@ function avance(j) {
     }
     j.fx.eclat(180, 300, C.accent, { n: 36, vitesse: 260 })
     j.son.record()
+    if (E.doitChoisirFardeau(e.p)) {
+      e.offreF = SF.offreFardeaux(e.p.graine, e.p.acte, e.p.fardeaux)
+      e.vue = 'fardeau'
+      return sauve(j)
+    }
   }
   e.vue = 'carte'
+  sauve(j)
+}
+
+function prendFardeau(j, id) {
+  const e = j.e
+  if (!e.offreF?.includes(id)) return j.son.rate()
+  e.p.fardeaux.push(id)
+  e.offreF = null
+  e.vue = 'carte'
+  j.son.record()
+  j.fx.secoue(8)
   sauve(j)
 }
 
@@ -374,6 +397,10 @@ function termine(j) {
     // aucun — c'est exactement ce qui rendait ASCENSION creux.
     e.gagne = false
     e.vue = 'bilan'
+    if (e.p.mode === 'infini' && e.p.acte > e.meta.profondeur) {
+      e.meta.profondeur = e.p.acte
+      ecritMeta(e.meta)
+    }
     j.efface()
     j.son.mort()
     return

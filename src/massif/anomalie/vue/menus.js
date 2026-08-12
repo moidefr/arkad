@@ -5,6 +5,7 @@ import { COMP } from '../donnees/competences.js'
 import { MODULE, COULEUR_FAMILLE, oppose, EMPLACEMENTS_MODULE } from '../donnees/modules.js'
 import { PROC } from '../donnees/ennemis.js'
 import * as E from '../etat.js'
+import { FARDEAU } from '../sansfin.js'
 import * as P from './pieces.js'
 
 /**
@@ -46,9 +47,20 @@ export function titre(ctx, meta) {
     18,
   )
 
-  const b = [P.bouton(ctx, 50, 330, 260, 58, 'PLONGER', { vif: true, taille: 20 })]
-  if (meta?.victoires) texte(ctx, `${meta.victoires} système(s) purgé(s)`, 180, 412, 12, C.vert, 700, 300)
-  return [{ quoi: 'plonger', ...b[0] }]
+  const out = [{ quoi: 'plonger', ...P.bouton(ctx, 50, 330, 260, 58, 'PLONGER', { vif: true, taille: 20 }) }]
+
+  // Le mode INFINI ne s'ouvre qu'une fois le système purgé : c'est la
+  // récompense d'une campagne finie, et la seule progression entre parties.
+  if (meta?.victoires) {
+    texte(ctx, `${meta.victoires} système(s) purgé(s)`, 180, 412, 12, C.vert, 700, 300)
+    out.push({ quoi: 'infini', ...P.bouton(ctx, 50, 432, 260, 50, 'DESCENDRE SANS FIN', { taille: 16 }) })
+    if (meta.profondeur > 1) {
+      texte(ctx, `profondeur atteinte : ${meta.profondeur}`, 180, 500, 12, C.accent, 700, 300)
+    }
+  } else {
+    texte(ctx, 'purge le système pour ouvrir la descente sans fin', 180, 432, 11, C.bord, 700, 300)
+  }
+  return out
 }
 
 // --- Recrutement -------------------------------------------------------------------
@@ -248,6 +260,38 @@ export function butin(ctx, e, offre, jette) {
     if (!verrou) out.push({ quoi: 'jette', k, x: 24, y, w: 312, h: 54 })
   })
   out.push({ quoi: 'annule', ...P.bouton(ctx, 110, 588, 140, 38, 'ANNULER', { taille: 13 }) })
+  return out
+}
+
+// --- Un fardeau à choisir ---------------------------------------------------------
+
+/**
+ * Tous les trois actes de descente, on choisit **comment** ça devient dur.
+ * Une difficulté qu'on choisit se joue ; une difficulté qu'on subit s'endure.
+ */
+export function fardeau(ctx, e, offre) {
+  bandeau(ctx, 'UN FARDEAU', 'la descente ne se fait pas gratuitement', C.rouge, C.faible)
+  const out = []
+  ;(offre ?? []).forEach((id, k) => {
+    const f = FARDEAU[id]
+    const y = 180 + k * 108
+    rect(ctx, 24, y, 312, 92, C.panneau)
+    rect(ctx, 24, y, 4, 92, C.rouge)
+    cadre(ctx, 24, y, 312, 92, ton(C.rouge, -0.35))
+    texte(ctx, f.nom, 180, y + 26, 16, C.rouge, 700, 290)
+    P.texteLong(ctx, f.dit, 180, y + 54, 280, 12, C.faible, 15)
+    out.push({ quoi: 'fardeau', id, x: 24, y, w: 312, h: 92 })
+  })
+  texte(
+    ctx,
+    `déjà portés : ${e.fardeaux.map((id) => FARDEAU[id].nom).join(', ') || 'aucun'}`,
+    180,
+    560,
+    11,
+    C.bord,
+    700,
+    320,
+  )
   return out
 }
 

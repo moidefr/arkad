@@ -30,8 +30,21 @@ const POLITIQUES = {
   devant: (c, p, jouables) => jouables[0],
   /** Vise le plus faible : il achève. */
   faible: (c, p, jouables) => jouables[0],
-  /** Se protège dès qu'il le peut, sinon frappe. */
-  tenace: (c, p, jouables) => jouables.find((x) => COMP[p.comp[x]].blinde && !p.etats.pare) ?? jouables.at(-1),
+  /**
+   * Se protège quand sa couverture est basse, sinon frappe.
+   *
+   * Écrit « dès qu'il n'a aucun pare-feu », il repassait son tour à se
+   * re-blinder jusqu'au plafond sans jamais attaquer. Un adversaire qui ne
+   * frappe jamais n'est pas difficile, il est absent.
+   */
+  tenace: (c, p, jouables) => {
+    const couvert = (p.etats.pare ?? 0) >= 12
+    if (!couvert) {
+      const garde = jouables.find((x) => COMP[p.comp[x]].blinde)
+      if (garde !== undefined) return garde
+    }
+    return jouables.find((x) => COMP[p.comp[x]].base) ?? jouables.at(-1)
+  },
   /** Empoisonne d'abord, frappe ensuite. */
   rongeur: (c, p, jouables) => jouables.find((x) => COMP[p.comp[x]].fuite) ?? jouables[0],
   /** Garde son gros coup pour une cible déjà entamée. */
