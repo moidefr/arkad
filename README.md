@@ -72,19 +72,34 @@ se termine dans la séance.
 
 ### LONG — 20 minutes à 10 heures (3 jeux)
 
-**DONJON** un roguelike au tour par tour, on descend et on frappe en avançant
-dessus · **USINE** un incrémental qui produit même fermé · **EXPÉDITION** neuf
-cents kilomètres, un choix par jour
+**DONJON** — roguelike au tour par tour. Huit bêtes qui n'ont pas la même
+façon d'être pénibles : l'archer tire dans les lignes dégagées, donc les
+couloirs cessent d'être des refuges ; le spectre traverse les murs ; le golem
+ne bouge qu'un tour sur deux mais encaisse tout. Épées, plaques, fioles,
+parchemins, or, et un gardien tous les cinq étages.
+
+**USINE** — incrémental. Cinq machines, neuf améliorations qui cassent la
+courbe au lieu de l'allonger, production hors ligne créditée jusqu'à huit
+heures, et une **refonte** : on perd tout sauf des lingots, qui donnent +5 %
+définitifs chacun. C'est elle qui fait tenir le jeu au-delà d'une soirée.
+
+**EXPÉDITION** — 900 km à travers quatre pays, chacun avec ses propres
+journées. Trois objets se trouvent en route et ouvrent des options qui
+n'existent pas sans eux. Et quand une jauge tombe bas, ce ne sont plus les
+journées ordinaires qui sortent, mais les urgences.
 
 Ces trois-là **écrivent leur état à chaque tour**. On ferme l'application au
 milieu d'un couloir, on la rouvre trois jours plus tard au même endroit.
 
 ### MASSIF — sans fin (1 jeu)
 
-**ASCENSION** — une échelle de rangs sans plafond contre une IA qui compte ce
-que tu joues et te contre d'autant mieux que tu montes. Les améliorations sont
-permanentes, une défaite ne coûte qu'un rang. C'est la catégorie qui n'a pas
-vocation à se terminer.
+**ASCENSION** — une échelle de rangs sans plafond. Chaque rang a son
+caractère : LA BRUTE frappe, LE COMPTEUR retient ce que tu joues le plus, LE
+MIROIR contre ton dernier geste, et L'ANALYSTE retient ce que tu joues *après*
+chaque coup — ce qui casse les alternances, que la simple fréquence ne voit
+pas. Un gardien tous les dix rangs, une relique tous les trois. Les
+améliorations et les reliques sont permanentes, une défaite ne coûte qu'un
+rang. La catégorie n'a pas vocation à se terminer.
 
 ## Ajouter un mini-jeu
 
