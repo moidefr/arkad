@@ -10,9 +10,11 @@ export default {
   pitch: 'Survis sous les blocs, ramasse les étoiles',
   couleur: C.cyan,
   unite: 'm',
+  vies: 3,
 
   init(j) {
     j.e.x = j.W / 2
+    j.e.passage = j.W / 2
     j.e.blocs = []
     j.e.etoiles = []
     j.e.filantes = Array.from({ length: 18 }, () => ({
@@ -20,14 +22,15 @@ export default {
       y: j.hasard() * j.H,
       v: 200 + j.hasard() * 300,
     }))
-    j.e.prochainBloc = 0.5
     j.e.prochaineEtoile = 2
   },
 
   maj(j, dt) {
-    // Tout se durcit avec le temps : vitesse de chute et cadence.
-    const vitesse = 180 + j.t * 11
-    const cadence = Math.max(0.26, 0.8 - j.t * 0.012)
+    // La vitesse monte avec le temps, mais l'écart entre deux vagues se
+    // mesure en pixels, pas en secondes : c'est la seule façon de garantir
+    // qu'un passage reste atteignable quand tout accélère.
+    const vitesse = 170 + j.t * 6.5
+    const ecart = Math.max(190, 260 - j.t * 0.7)
 
     j.e.x = vers(j.e.x, borne(j.pointer.x, TAILLE / 2, j.W - TAILLE / 2), 640 * dt)
     j.score += dt * 10
@@ -37,12 +40,8 @@ export default {
       if (f.y > j.H) (f.y = j.HUD - 20), (f.x = j.hasard() * j.W)
     }
 
-    j.e.prochainBloc -= dt
-    if (j.e.prochainBloc <= 0) {
-      j.e.prochainBloc = cadence * (0.7 + j.hasard() * 0.6)
-      const w = 44 + Math.floor(j.hasard() * 5) * 24
-      j.e.blocs.push({ x: Math.floor((j.hasard() * (j.W - w)) / 4) * 4, y: -34, w, h: 24 })
-    }
+    const derniere = j.e.blocs.length ? Math.min(...j.e.blocs.map((b) => b.y)) : Infinity
+    if (derniere > ecart) vague(j)
 
     j.e.prochaineEtoile -= dt
     if (j.e.prochaineEtoile <= 0) {
@@ -90,4 +89,37 @@ export default {
     rect(ctx, px, py, TAILLE, TAILLE, C.cyan)
     rect(ctx, px + 6, py + 6, 12, 6, C.fond)
   },
+}
+
+
+/**
+ * Chaque vague laisse un passage, et ce passage ne s'éloigne jamais de plus
+ * de 140 px du précédent. Avant, les blocs tombaient à des abscisses tirées
+ * au sort : on mourait de malchance autant que de maladresse, et une partie
+ * durait trente secondes.
+ */
+function vague(j) {
+  const largeur = Math.max(78, 120 - j.t * 0.25)
+  const demi = largeur / 2
+  const min = Math.max(demi + 6, j.e.passage - 140)
+  const max = Math.min(j.W - demi - 6, j.e.passage + 140)
+  const passage = min + Math.random() * Math.max(1, max - min)
+  j.e.passage = passage
+
+  const bords = [
+    { x: 0, w: passage - demi },
+    { x: passage + demi, w: j.W - (passage + demi) },
+  ]
+  for (const b of bords) {
+    if (b.w < 14) continue
+    // On découpe les longs pans : visuellement des blocs, pas un mur.
+    let x = b.x
+    let reste = b.w
+    while (reste > 0) {
+      const w = Math.min(reste, 60 + Math.random() * 90)
+      j.e.blocs.push({ x: Math.round(x), y: -34, w: Math.round(w) - 2, h: 24 })
+      x += w
+      reste -= w
+    }
+  }
 }

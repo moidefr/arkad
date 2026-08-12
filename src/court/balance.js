@@ -12,6 +12,7 @@ export default {
   pitch: 'Le mât penche. Appuie du côté qui le redresse',
   couleur: C.accent,
   unite: 'pts',
+  vies: 3,
 
   init(j) {
     j.e.angle = 0.05 * (Math.random() < 0.5 ? -1 : 1)
@@ -27,7 +28,7 @@ export default {
     j.e.vitesse += Math.sin(j.e.angle) * 5.8 * dt
     // Une bourrasque, de plus en plus forte : sans elle, un joueur appliqué
     // tiendrait indéfiniment.
-    j.e.vitesse += (Math.random() * 2 - 1) * (0.5 + j.t * 0.03) * dt
+    j.e.vitesse += (Math.random() * 2 - 1) * (0.38 + j.t * 0.016) * dt
 
     j.e.angle += j.e.vitesse * dt
     if (Math.abs(j.e.angle) > LIMITE) {

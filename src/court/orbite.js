@@ -10,6 +10,7 @@ export default {
   pitch: 'Appuie pour changer de sens. Évite ce qui tombe',
   couleur: C.rouge,
   unite: 'pts',
+  vies: 3,
 
   init(j) {
     j.e.cx = j.W / 2
@@ -22,12 +23,12 @@ export default {
 
   maj(j, dt) {
     const { cx, cy } = j.e
-    const vitesse = 2 + j.t * 0.03
+    const vitesse = 2 + j.t * 0.018
     j.e.ang += j.e.sens * vitesse * dt
 
     j.e.prochain -= dt
     if (j.e.prochain <= 0) {
-      j.e.prochain = Math.max(0.34, 1 - j.t * 0.016)
+      j.e.prochain = Math.max(0.44, 1.05 - j.t * 0.010)
       j.e.obs.push({ a: Math.random() * Math.PI * 2, r: 300, v: 90 + Math.random() * 40 })
     }
 

@@ -11,6 +11,7 @@ export default {
   pitch: 'Appuie pour changer de direction. Vise les portes',
   couleur: C.cyan,
   unite: 'portes',
+  vies: 3,
 
   init(j) {
     j.e.x = j.W / 2
@@ -21,8 +22,8 @@ export default {
   },
 
   maj(j, dt) {
-    const descente = 150 + j.t * 4
-    const lateral = 130 + j.t * 2
+    const descente = 145 + j.t * 2.6
+    const lateral = 128 + j.t * 1.3
 
     j.e.x += j.e.dir * lateral * dt
     // On rebondit sur les bords plutôt que de s'y coller : rester bloqué
@@ -37,8 +38,8 @@ export default {
 
     j.e.prochain -= dt
     if (j.e.prochain <= 0) {
-      j.e.prochain = Math.max(0.62, 1.4 - j.t * 0.016)
-      const largeur = Math.max(56, 116 - j.t * 1.1)
+      j.e.prochain = Math.max(0.72, 1.45 - j.t * 0.010)
+      const largeur = Math.max(64, 120 - j.t * 0.62)
       j.e.murs.push({ y: j.HUD - MUR_H, trou: 30 + Math.random() * (j.W - 60 - largeur), largeur })
     }
 

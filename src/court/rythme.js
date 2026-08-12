@@ -21,13 +21,13 @@ export default {
   },
 
   maj(j, dt) {
-    const vitesse = 200 + j.t * 4
+    const vitesse = 190 + j.t * 2.4
     j.e.eclat = j.e.eclat.map((v) => Math.max(0, v - dt * 4))
 
     j.e.prochaine -= dt
     if (j.e.prochaine <= 0) {
       // La cadence se resserre, mais on garde toujours de quoi réagir.
-      j.e.prochaine = Math.max(0.34, 0.95 - j.t * 0.012)
+      j.e.prochaine = Math.max(0.42, 1 - j.t * 0.008)
       j.e.notes.push({ voie: Math.random() < 0.5 ? 0 : 1, y: j.HUD - 20 })
     }
 

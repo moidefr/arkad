@@ -14,7 +14,7 @@ export default {
   unite: 'pts',
 
   init(j) {
-    j.e.jauge = 9
+    j.e.jauge = 10.5
     j.e.cibles = []
     j.e.prochaine = 0.3
     j.e.combo = 1
@@ -24,14 +24,18 @@ export default {
   maj(j, dt) {
     j.e.flash = Math.max(0, j.e.flash - dt * 3)
 
+    // Économie du chrono : une cible touchée rend plus de temps qu'elle n'en
+    // coûte à atteindre. Sans ça, la partie a une durée fixe quel que soit le
+    // niveau du joueur — ce qui n'est pas un jeu d'adresse.
+
     // Le chrono se vide de plus en plus vite : c'est la seule difficulté.
-    j.e.jauge -= dt * (1 + j.t * 0.012)
+    j.e.jauge -= dt * (1 + j.t * 0.005)
     if (j.e.jauge <= 0) return j.perdu()
 
-    const duree = Math.max(0.85, 2.2 - j.t * 0.014)
+    const duree = Math.max(0.95, 2.3 - j.t * 0.009)
     j.e.prochaine -= dt
-    if (j.e.prochaine <= 0 && j.e.cibles.length < 4) {
-      j.e.prochaine = Math.max(0.35, 1 - j.t * 0.008)
+    if (j.e.prochaine <= 0 && j.e.cibles.length < 5) {
+      j.e.prochaine = Math.max(0.3, 0.72 - j.t * 0.004)
       j.e.cibles.push({
         x: 40 + j.hasard() * (j.W - 80),
         y: HAUT + 40 + j.hasard() * (j.H - HAUT - BAS - 80),
@@ -105,6 +109,6 @@ export default {
     j.fx.eclat(c.x, c.y, C.accent, { n: 14, vitesse: 170, taille: 5, gravite: 120 })
     j.fx.bulle(c.x, c.y - 20, '+' + gain, C.accent, 16)
     j.e.combo = Math.min(9, j.e.combo + 1)
-    j.e.jauge = Math.min(12, j.e.jauge + 0.75)
+    j.e.jauge = Math.min(12, j.e.jauge + 1.15)
   },
 }

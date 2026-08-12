@@ -15,6 +15,7 @@ export default {
   pitch: 'Ça rebondit tout seul. Le doigt dirige',
   couleur: C.vert,
   unite: 'm',
+  vies: 3,
 
   init(j) {
     j.e.x = j.W / 2
@@ -57,7 +58,7 @@ export default {
     const cible = j.e.y - 420
     if (cible < j.e.cam) j.e.cam = cible
     j.e.haut = Math.max(j.e.haut, -j.e.cam)
-    j.score = Math.floor(j.e.haut / 10)
+    j.score = Math.max(j.score, Math.floor(j.e.haut / 10))
 
     while (j.e.plats[j.e.plats.length - 1].y > j.e.cam - 120) ajoute(j)
     j.e.plats = j.e.plats.filter((p) => p.y < j.e.cam + j.H + 80)

@@ -59,13 +59,28 @@ un mât · **PILE** empiler sans dépasser · **CORDE** sauter au bon moment ·
 
 *Tête* — **TRI** · **MÉMOIRE** · **COULEUR** l'encre, pas le mot · **CALCUL**
 
-Un décompte de trois temps précède chaque partie : ces jeux démarrent à pleine
-vitesse, sans lui on perd la première seconde à comprendre où on est.
+Un décompte de trois temps précède chaque partie, et un palier s'affiche
+toutes les trente secondes.
+
+**Onze de ces jeux ont trois vies.** Une mort remet le jeu en place, garde le
+score et repart : c'est ce qui fait passer une partie de quarante secondes à
+deux ou trois minutes sans toucher à la difficulté. Les jeux qui avaient déjà
+leurs propres vies (BRIQUES, RYTHME, GARDIEN, TRI, COULEUR, CALCUL) n'en
+reçoivent pas.
+
+Un jeu déclare `vies: 3` et, s'il a besoin d'une reprise particulière,
+`reprend(j)` — MÉMOIRE conserve sa séquence, FUSÉE garde la largeur de sa
+piste. Sans ça, une faute au dixième coup effacerait deux minutes de
+mémorisation.
 
 ### MOYEN — 5 à 15 minutes (3 jeux)
 
-**DÉMINEUR** appui court pour creuser, appui long pour marquer · **2048** on
-glisse pour tout pousser · **TAQUIN** remettre les nombres dans l'ordre
+**DÉMINEUR** — appui court pour creuser, appui long pour marquer. Ce n'est pas
+une grille mais une **série** : chaque grille déminée en amène une plus lourde,
+trois mines de plus à chaque fois, et la partie ne s'arrête que sur une erreur.
+
+**2048** — on glisse pour tout pousser · **TAQUIN** — remettre les nombres dans
+l'ordre, mélangé par coups légaux donc toujours résoluble.
 
 Une grille, une solution, on y réfléchit. Rien ne se sauvegarde : une partie
 se termine dans la séance.
@@ -137,7 +152,8 @@ Range-le dans le dossier de sa durée (`src/court/`, `src/moyen/`, `src/long/`,
 | `j.score` | à toi de l'augmenter ; le moteur l'affiche et le sauvegarde |
 | `j.meilleur` | le record du joueur sur ce jeu |
 | `j.e` | ton état à toi, vide au départ |
-| `j.perdu()` | termine la partie |
+| `j.perdu()` | termine la partie — ou consomme une vie s'il en reste |
+| `j.vies` | vies restantes |
 | `j.pointer` | position du dernier appui (suit la souris sur PC) |
 | `j.maintenu` | vrai tant que c'est appuyé |
 | `j.son` | les bruitages |
@@ -145,7 +161,8 @@ Range-le dans le dossier de sa durée (`src/court/`, `src/moyen/`, `src/long/`,
 | `j.hasard()`, `j.entier(a, b)` | aléatoire |
 | `j.sauve(o)`, `j.charge()`, `j.efface()` | l'état d'une partie longue |
 
-Un jeu peut aussi déclarer `persistant: true` (il gère sa propre sauvegarde),
+Un jeu peut aussi déclarer `vies: 3` (avec `reprend(j)` si la reprise doit
+préserver quelque chose), `persistant: true` (il gère sa propre sauvegarde),
 `sansScore: true` avec `titreHud(j)` (le bandeau affiche autre chose qu'un
 score), et `finTitre(j)` pour choisir le titre de l'écran de fin — « RÉSOLU »
 n'est pas « GAME OVER ».

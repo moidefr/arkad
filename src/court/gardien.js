@@ -27,8 +27,8 @@ export default {
 
     j.e.prochain -= dt
     if (j.e.prochain <= 0) {
-      j.e.prochain = Math.max(0.55, 1.5 - j.t * 0.02)
-      j.e.tirs.push({ voie: Math.floor(Math.random() * VOIES), y: j.HUD, v: 150 + j.t * 5 })
+      j.e.prochain = Math.max(0.64, 1.6 - j.t * 0.013)
+      j.e.tirs.push({ voie: Math.floor(Math.random() * VOIES), y: j.HUD, v: 145 + j.t * 3.2 })
     }
 
     for (const t of j.e.tirs) t.y += t.v * dt

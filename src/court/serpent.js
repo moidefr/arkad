@@ -21,6 +21,7 @@ export default {
   pitch: 'Appuie à gauche ou à droite pour tourner',
   couleur: C.vert,
   unite: 'pts',
+  vies: 3,
 
   init(j) {
     j.e.corps = [

@@ -11,6 +11,7 @@ export default {
   pitch: 'Appuie pour poser. Ce qui dépasse tombe',
   couleur: C.violet,
   unite: 'étages',
+  vies: 3,
 
   init(j) {
     j.e.pile = [{ x: j.W / 2 - 70, w: 140 }]

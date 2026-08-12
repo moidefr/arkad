@@ -11,6 +11,19 @@ export default {
   pitch: 'Regarde la séquence, refais-la',
   couleur: C.vert,
   unite: 'pts',
+  vies: 3,
+
+  /**
+   * Une erreur ne renvoie pas au début : la séquence est conservée et
+   * rejouée. Sans ça, une faute au dixième coup efface deux minutes de
+   * mémorisation, ce qui est la punition la plus décourageante qui soit.
+   */
+  reprend(j) {
+    j.e.phase = 'montre'
+    j.e.i = 0
+    j.e.t = 0
+    j.e.actif = -1
+  },
 
   init(j) {
     j.e.suite = []

@@ -23,11 +23,11 @@ export default {
 
   maj(j, dt) {
     j.e.flash = Math.max(0, j.e.flash - dt * 3)
-    const vitesse = 90 + j.t * 3.4
+    const vitesse = 86 + j.t * 2.1
 
     j.e.prochain -= dt
     if (j.e.prochain <= 0) {
-      j.e.prochain = Math.max(0.7, 1.7 - j.t * 0.02)
+      j.e.prochain = Math.max(0.8, 1.8 - j.t * 0.013)
       j.e.objets.push({ x: j.W / 2, y: j.HUD, gauche: Math.random() < 0.5 })
     }
 

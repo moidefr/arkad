@@ -106,6 +106,6 @@ function tire(j) {
   const ecart = (1 + Math.floor(Math.random() * 3)) * (Math.random() < 0.5 ? -1 : 1)
 
   j.e.question = { texte: `${a} ${op} ${b}`, propose: juste ? vrai : vrai + ecart, juste }
-  j.e.duree = Math.max(1.8, 4.2 - niveau * 0.35)
+  j.e.duree = Math.max(2.1, 4.4 - niveau * 0.3)
   j.e.reste = j.e.duree
 }

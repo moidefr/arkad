@@ -12,6 +12,7 @@ export default {
   pitch: 'Saute quand la corde passe sous tes pieds',
   couleur: C.vert,
   unite: 'sauts',
+  vies: 3,
 
   init(j) {
     j.e.phase = 0
@@ -35,7 +36,7 @@ export default {
         return j.perdu()
       }
       j.score += 1
-      j.e.cadence = Math.min(1.9, j.e.cadence + 0.035)
+      j.e.cadence = Math.min(1.7, j.e.cadence + 0.021)
       j.e.eclat = 1
       j.son.touche(Math.min(9, 1 + Math.floor(j.score / 3)))
       j.fx.jet(j.W / 2, SOL, C.vert, { angle: -Math.PI / 2, ouverture: 2.8, n: 8, vitesse: 110, gravite: 400, duree: 0.3 })

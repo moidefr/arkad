@@ -108,6 +108,6 @@ function tire(j) {
   const niveau = 1 + Math.min(6, Math.floor(j.score / 120))
 
   j.e.question = { mot, encre, choix }
-  j.e.duree = Math.max(1.4, 3.4 - niveau * 0.3)
+  j.e.duree = Math.max(1.7, 3.6 - niveau * 0.26)
   j.e.reste = j.e.duree
 }

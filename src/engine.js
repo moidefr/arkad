@@ -48,6 +48,7 @@ const B_FIN = [
 ]
 const DECOMPTE_PAS = 0.42
 const DECOMPTE = DECOMPTE_PAS * 3
+const REPRISE = 0.9
 
 const MENU_X = 50
 const MENU_W = 260
@@ -61,7 +62,7 @@ export class Moteur {
     this.input.onPress = (p) => this._appui(p)
     this.input.onRelease = (p) => this._relache(p)
 
-    this.phase = 'accueil' // accueil | categorie | depart | jeu | pause | fin
+    this.phase = 'accueil' // accueil | categorie | depart | jeu | reprise | pause | fin
     this.phaseT = 0
     this.cat = null
     this.def = null
@@ -132,6 +133,7 @@ export class Moteur {
       HUD,
       t: 0,
       score: 0,
+      vies: def.vies ?? 1,
       meilleur: this.meilleur(def.id),
       pointer: this.input.pointer,
       son,
@@ -170,6 +172,27 @@ export class Moteur {
     this.phase = this.cat?.decompte ? 'depart' : 'jeu'
     this.phaseT = 0
     this.bip = -1
+    this.palier = 0
+  }
+
+  /**
+   * Une vie de perdue, mais pas la partie. Le jeu se remet en place et le
+   * score reste : c'est ce qui fait passer une partie de quarante secondes à
+   * deux ou trois minutes sans toucher à sa difficulté.
+   */
+  _reprise() {
+    const j = this.j
+    j.vies--
+    const score = j.score
+    const def = this.def
+    if (def.reprend) def.reprend(j)
+    else def.init?.(j)
+    j.score = score
+    j.fini = false
+    j.fx.secoue(9)
+    son.rate()
+    this.phase = 'reprise'
+    this.phaseT = 0
   }
 
   _termine() {
@@ -211,6 +234,12 @@ export class Moteur {
       return
     }
 
+    if (this.phase === 'reprise') {
+      this.j.fx.maj(dt)
+      if (this.phaseT >= REPRISE) this.phase = 'jeu'
+      return
+    }
+
     // Les effets continuent de vivre pendant l'écran de fin : la secousse
     // retombe et les grains achèvent leur chute, au lieu de se figer.
     if (this.phase !== 'pause') this.j.fx.maj(dt)
@@ -218,8 +247,23 @@ export class Moteur {
 
     const j = this.j
     j.t += dt
+
+    // Paliers : sur les jeux courts, un repère toutes les trente secondes.
+    // Sans lui, une bonne partie n'a aucune structure, juste une durée.
+    if (this.cat?.decompte) {
+      const palier = Math.floor(j.t / 30)
+      if (palier > this.palier) {
+        this.palier = palier
+        j.fx.bulle(W / 2, H / 2 - 60, `PALIER ${palier + 1}`, C.accent, 20)
+        son.niveau()
+      }
+    }
+
     this.def.maj?.(j, dt)
-    if (j.fini) this._termine()
+    if (j.fini) {
+      if (j.vies > 1) return this._reprise()
+      this._termine()
+    }
   }
 
   // --- Entrées --------------------------------------------------------------
@@ -256,9 +300,9 @@ export class Moteur {
       return
     }
 
-    // Pendant le décompte, tout appui est ignoré : sinon le premier geste
-    // part avant que le joueur ait vu l'écran.
-    if (this.phase === 'depart') return
+    // Pendant le décompte et la reprise, tout appui est ignoré : sinon le
+    // premier geste part avant que le joueur ait vu l'écran.
+    if (this.phase === 'depart' || this.phase === 'reprise') return
 
     if (this.phase === 'jeu') {
       if (dans(p, 0, 0, 52, HUD)) {
@@ -310,6 +354,7 @@ export class Moteur {
       ctx.textAlign = 'center'
       this._bandeau()
       if (this.phase === 'depart') this._depart()
+      if (this.phase === 'reprise') this._reprisEcran()
       if (this.phase === 'pause') this._pause()
       if (this.phase === 'fin') this._fin()
     }
@@ -446,6 +491,11 @@ export class Moteur {
       texte(ctx, `REC ${best}`, W - 12, 26, 12, C.faible, 700)
       ctx.textAlign = 'center'
     }
+
+    // Les vies restantes, à gauche sous le bouton pause.
+    if ((this.def.vies ?? 1) > 1) {
+      for (let i = 0; i < this.j.vies; i++) rect(ctx, 50 + i * 12, 22, 8, 8, C.rouge)
+    }
   }
 
   /** Trois temps avant de lâcher le joueur, sur les jeux qui démarrent vite. */
@@ -461,6 +511,16 @@ export class Moteur {
     texte(ctx, n > 0 ? String(n) : 'GO', 0, 0, 64, n === 1 ? C.accent : C.texte, 700)
     ctx.restore()
     texte(ctx, this.def.pitch, W / 2, H / 2 + 90, 14, C.faible, 700, 320)
+  }
+
+  /** Le temps de comprendre ce qui vient d'arriver, et de se replacer. */
+  _reprisEcran() {
+    const ctx = this.ctx
+    this._voile(0.5)
+    texte(ctx, 'ENCORE', W / 2, H / 2 - 20, 34, C.rouge, 700)
+    const reste = this.j.vies
+    for (let i = 0; i < reste; i++) rect(ctx, W / 2 - reste * 11 + i * 22, H / 2 + 20, 14, 14, C.accent)
+    texte(ctx, reste > 1 ? `${reste} vies` : 'dernière vie', W / 2, H / 2 + 60, 14, C.faible, 700)
   }
 
   _voile(alpha = 0.86) {
