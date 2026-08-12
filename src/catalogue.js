@@ -30,7 +30,7 @@ import mille from './moyen/mille.js'
 import taquin from './moyen/taquin.js'
 
 import donjon from './long/donjon.js'
-import usine from './long/usine.js'
+import usine from './long/usine/index.js'
 import expedition from './long/expedition.js'
 
 import ascension from './massif/ascension.js'

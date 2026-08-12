@@ -12,6 +12,22 @@ export const H = 640
 export const HUD = 56
 
 /**
+ * `bandeTramee` rend son tramage une fois dans une toile de côté. C'est le seul
+ * endroit de la boîte à dessin qui touche au DOM ; un `document` de six lignes
+ * suffit à le satisfaire, et évite d'avoir à charger un navigateur pour un
+ * dégradé en points.
+ */
+if (typeof globalThis.document === 'undefined') {
+  globalThis.document = {
+    createElement: () => ({
+      width: 0,
+      height: 0,
+      getContext: () => ({ fillStyle: '', fillRect() {} }),
+    }),
+  }
+}
+
+/**
  * Un contexte 2D qui enregistre au lieu de peindre. Les coordonnées sont
  * rendues absolues (les translations sont appliquées), donc une assertion sur
  * une position est une assertion sur ce que le joueur voit.
