@@ -823,3 +823,43 @@ test('aucune classe n’est morte en solo', () => {
     assert.ok(gagnes >= 4, `${cl.nom} seul ne gagne que ${gagnes}/8 combats d’ouverture`)
   }
 })
+
+// --- L'atelier -----------------------------------------------------------------------------
+
+test('l’atelier propose trois choses et n’en donne qu’une', () => {
+  const e = E.nouvelle(3, ['analyste', 'briseur', 'tisseur'])
+  assert.equal(E.ATELIER.length, 3)
+  for (const o of e.equipe) o.pv = 10
+  E.souffle(e)
+  for (const o of e.equipe) assert.ok(o.pv > 10 && o.pv <= o.pvMax, 'souffler ne rend rien')
+
+  // Affûter : moins cher, et recharge plus vite. Une seule fois par compétence.
+  const cible = E.affutables(e)[0]
+  const comp = COMP[cible.id]
+  const avant = K.cout(e.equipe[cible.op], comp)
+  assert.equal(E.affute(e, cible.op, cible.k), true)
+  const apres = K.cout(e.equipe[cible.op], comp)
+  assert.ok(apres < avant || comp.cout === 0, `affûter n’a pas changé le coût (${avant} → ${apres})`)
+  assert.ok(K.rechargeDe(e.equipe[cible.op], comp) <= comp.recharge)
+  assert.equal(E.affute(e, cible.op, cible.k), false, 'la même compétence s’affûte deux fois')
+})
+
+test('on ne désinstalle jamais une compétence verrouillée', () => {
+  const e = E.nouvelle(3, ['analyste', 'briseur', 'tisseur'])
+  e.equipe[0].comp[2] = 'balayage'
+  assert.equal(E.retire(e, 0, 0), false, 'une compétence de départ a été oubliée')
+  assert.equal(E.retire(e, 0, 1), false)
+  assert.equal(E.retire(e, 0, 2), true)
+  assert.equal(e.equipe[0].comp[2], null)
+  for (const x of E.retirables(e)) assert.ok(x.k >= E.VERROUS, 'un emplacement verrouillé est proposé au retrait')
+})
+
+test('l’affûtage traverse la sauvegarde et arrive jusqu’au combat', () => {
+  const e = E.nouvelle(9, ['briseur'])
+  E.affute(e, 0, 0)
+  const relu = E.migre(JSON.parse(JSON.stringify(E.sauvegarde(e))))
+  assert.deepEqual(relu.equipe[0].affute, e.equipe[0].affute)
+  const c = K.commence(relu.equipe, ['veille'])
+  const comp = COMP[relu.equipe[0].comp[0]]
+  assert.ok(K.cout(c.ops[0], comp) < comp.cout + K.surcoutAxe(c.ops[0], comp) || comp.cout === 0)
+})

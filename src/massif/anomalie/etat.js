@@ -76,6 +76,7 @@ export function nouvelOperateur(cl, nom, seul = false) {
     rang: c.rang,
     comp,
     mod: Array(seul ? MODULES_SOLO : EMPLACEMENTS_MODULE).fill(null),
+    affute: [],
   }
 }
 
@@ -185,6 +186,45 @@ export function prend(e, offreCourante, idComp, jette = -1) {
   return true
 }
 
+/**
+ * L'atelier propose trois choses et on n'en prend qu'une. Souffler, affûter,
+ * ou désinstaller : soigner tout de suite, gagner en économie pour la suite,
+ * ou libérer un emplacement pour ce qui viendra. Un nœud qui ne fait qu'une
+ * chose n'est pas un choix, c'est un couloir.
+ */
+export const ATELIER = [
+  { id: 'souffle', nom: 'SOUFFLER', dit: 'chaque opérateur récupère 35 % de son intégrité' },
+  { id: 'affute', nom: 'AFFÛTER', dit: 'une compétence coûte un cycle de moins et recharge plus vite' },
+  { id: 'retire', nom: 'DÉSINSTALLER', dit: 'oublier une compétence pour libérer sa place' },
+]
+
+export function souffle(e) {
+  for (const o of e.equipe) o.pv = Math.min(o.pvMax, o.pv + Math.round(o.pvMax * 0.35))
+}
+
+/** Les compétences qu'un atelier peut encore affûter, tous opérateurs confondus. */
+export const affutables = (e) =>
+  e.equipe.flatMap((o, i) => o.comp.map((id, k) => ({ op: i, k, id })).filter((x) => x.id && !o.affute.includes(x.id)))
+
+/** Celles qu'on peut désinstaller : jamais les deux verrouillées. */
+export const retirables = (e) =>
+  e.equipe.flatMap((o, i) => o.comp.map((id, k) => ({ op: i, k, id })).filter((x) => x.id && x.k >= VERROUS))
+
+export function affute(e, op, k) {
+  const o = e.equipe[op]
+  const id = o.comp[k]
+  if (!id || o.affute.includes(id)) return false
+  o.affute.push(id)
+  return true
+}
+
+export function retire(e, op, k) {
+  const o = e.equipe[op]
+  if (k < VERROUS || !o.comp[k]) return false
+  o.comp[k] = null
+  return true
+}
+
 // --- Sérialisation --------------------------------------------------------------------
 
 export const sauvegarde = (e) => ({
@@ -204,6 +244,7 @@ export const sauvegarde = (e) => ({
     rang: o.rang,
     comp: o.comp,
     mod: o.mod,
+    affute: o.affute ?? [],
   })),
   combat: e.combat ? compacte(e.combat) : null,
   offre: e.offre,
@@ -247,6 +288,7 @@ export function migre(s) {
       mod: (Array.isArray(o.mod) ? o.mod : [])
         .slice(0, s.equipe.length === 1 ? MODULES_SOLO : EMPLACEMENTS_MODULE)
         .map((id) => (MODULE[id] ? id : null)),
+      affute: (Array.isArray(o.affute) ? o.affute : []).filter((id) => COMP[id]),
     })),
     combat: s.combat ?? null,
     offre: s.offre ?? null,

@@ -191,7 +191,7 @@ export function noeud(ctx, e, rencontre, n) {
     texte(ctx, 'ATELIER', 180, 200, 24, C.vert, 700, 320, 3)
     P.texteLong(
       ctx,
-      'De quoi souffler. L’équipe récupère trente pour cent de son intégrité.',
+      'De quoi souffler, affûter une compétence, ou en désinstaller une. Une seule des trois.',
       180,
       240,
       300,
@@ -215,6 +215,49 @@ const resistances = (p) => {
     .filter(([, v]) => v !== 0)
     .map(([t, v]) => `${noms[t]} ${v > 0 ? '+' : ''}${Math.round(v * 100)} %`)
     .join('   ')
+}
+
+// --- Atelier : trois façons de souffler, une seule à prendre ---------------------------------
+
+export function atelier(ctx, e, choix) {
+  bandeau(ctx, 'ATELIER', 'une seule de ces trois choses', C.vert, C.faible)
+  const out = []
+
+  if (!choix) {
+    E.ATELIER.forEach((a, k) => {
+      const y = 176 + k * 104
+      rect(ctx, 24, y, 312, 88, C.panneau)
+      rect(ctx, 24, y, 4, 88, C.vert)
+      cadre(ctx, 24, y, 312, 88, ton(C.vert, -0.35))
+      texte(ctx, a.nom, 180, y + 26, 17, C.vert, 700, 290)
+      P.texteLong(ctx, a.dit, 180, y + 52, 280, 12, C.faible, 15)
+      out.push({ quoi: 'atelier', id: a.id, x: 24, y, w: 312, h: 88 })
+    })
+    out.push({ quoi: 'passer', ...P.bouton(ctx, 90, 552, 180, 44, 'RIEN PRENDRE', { taille: 14 }) })
+    return out
+  }
+
+  // Deuxième temps : sur quelle compétence.
+  const liste = choix === 'affute' ? E.affutables(e) : E.retirables(e)
+  texte(ctx, choix === 'affute' ? 'LAQUELLE AFFÛTER ?' : 'LAQUELLE OUBLIER ?', 180, 158, 15, C.vert, 700, 320)
+  const pas = liste.length > 8 ? 42 : 52
+  liste.slice(0, 10).forEach((x, k) => {
+    const comp = COMP[x.id]
+    const y = 180 + k * pas
+    const h = pas - 6
+    rect(ctx, 24, y, 312, h, C.panneau)
+    rect(ctx, 24, y, 4, h, CLASSE[e.equipe[x.op].cl].couleur)
+    cadre(ctx, 24, y, 312, h, ton(C.bord, -0.05))
+    ctx.textAlign = 'left'
+    texte(ctx, comp.nom, 42, y + 16, 13, C.texte, 700, 170)
+    ctx.textAlign = 'right'
+    texte(ctx, e.equipe[x.op].nom, 320, y + 16, 11, C.faible, 700, 110)
+    ctx.textAlign = 'center'
+    if (h > 40) texte(ctx, `${comp.cout} cycles · recharge ${comp.recharge}`, 180, y + 33, 10, C.faible, 700, 280)
+    out.push({ quoi: 'atelierCible', op: x.op, k: x.k, x: 24, y, w: 312, h })
+  })
+  out.push({ quoi: 'annule', ...P.bouton(ctx, 110, 596, 140, 34, 'ANNULER', { taille: 13 }) })
+  return out
 }
 
 // --- Butin : trois compétences, et un rejet forcé -------------------------------------------

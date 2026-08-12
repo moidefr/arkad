@@ -116,6 +116,7 @@ export default {
     else if (e.vue === 'equipe') e.zones = VE.dessine(ctx, e.p, e.sel, e.detail)
     else if (e.vue === 'noeud') e.zones = VM.noeud(ctx, e.p, E.rencontre(e.p), E.noeudCourant(e.p))
     else if (e.vue === 'butin') e.zones = VM.butin(ctx, e.p, e.p.offre, e.jette)
+    else if (e.vue === 'atelier') e.zones = VM.atelier(ctx, e.p, e.choixAtelier)
     else if (e.vue === 'fardeau') e.zones = VM.fardeau(ctx, e.p, e.offreF)
     else if (e.vue === 'bilan') e.zones = VM.bilan(ctx, e.p, e.gagne)
     else {
@@ -134,12 +135,14 @@ export default {
       plonger: () => commencePartie(j, 'campagne'),
       infini: () => commencePartie(j, 'infini'),
       fardeau: () => prendFardeau(j, z.id),
+      atelier: () => choisitAtelier(j, z.id),
+      atelierCible: () => appliqueAtelier(j, z.op, z.k),
       classe: () => choisitClasse(j, z.id),
       partir: () => entre(j),
       engager: () => engage(j),
       prend: () => prendComp(j, z.id),
       jette: () => jetteComp(j, z.k),
-      annule: () => ((e.jette = null), j.son.clic()),
+      annule: () => ((e.jette = null), (e.choixAtelier = null), j.son.clic()),
       passer: () => (avance(j), j.son.clic()),
       suite: () => (avance(j), j.son.clic()),
       fin: () => rejoue(j),
@@ -203,10 +206,9 @@ function engage(j) {
     return j.son.clic()
   }
   if (n.type === 'atelier') {
-    for (const o of e.p.equipe) o.pv = Math.min(o.pvMax, o.pv + Math.round(o.pvMax * 0.3))
-    j.son.record()
-    j.fx.eclat(180, 300, C.vert, { n: 26, vitesse: 200 })
-    return avance(j)
+    e.choixAtelier = null
+    e.vue = 'atelier'
+    return j.son.clic()
   }
   e.c = K.commence(e.p.equipe, E.rencontre(e.p))
   if (e.p.mode === 'infini') SF.applique(e.c, e.p.fardeaux)
@@ -279,6 +281,30 @@ function avance(j) {
   }
   e.vue = 'carte'
   sauve(j)
+}
+
+function choisitAtelier(j, id) {
+  const e = j.e
+  if (id === 'souffle') {
+    E.souffle(e.p)
+    j.son.record()
+    j.fx.eclat(180, 300, C.vert, { n: 28, vitesse: 210 })
+    return avance(j)
+  }
+  const liste = id === 'affute' ? E.affutables(e.p) : E.retirables(e.p)
+  if (!liste.length) return j.son.rate()
+  e.choixAtelier = id
+  j.son.clic()
+}
+
+function appliqueAtelier(j, op, k) {
+  const e = j.e
+  const ok = e.choixAtelier === 'affute' ? E.affute(e.p, op, k) : E.retire(e.p, op, k)
+  if (!ok) return j.son.rate()
+  e.choixAtelier = null
+  j.son.record()
+  j.fx.eclat(180, 300, C.vert, { n: 20, vitesse: 180 })
+  avance(j)
 }
 
 function prendFardeau(j, id) {

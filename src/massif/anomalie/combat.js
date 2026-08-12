@@ -83,6 +83,7 @@ export function commence(equipe, rencontre, { tracage = 0, cyclesMax = CYCLES_MA
       blindage: Math.max(0, cl.blindage + somme('blindage') + (seul ? SOLO.blindage : 0)),
       rang: o.rang ?? cl.rang,
       seul,
+      affute: (o.affute ?? []).slice(),
       comp: o.comp.slice(),
       mod: mods,
       rech: o.comp.map(() => 0),
@@ -297,8 +298,12 @@ const bonusDe = (u, comp) => {
 
 /** Coût réel d'une compétence, surcoût d'axe compris. */
 export function cout(acteur, comp) {
-  return comp.cout + surcoutAxe(acteur, comp)
+  const affute = acteur.affute?.includes(comp.id) ? 1 : 0
+  return Math.max(0, comp.cout + surcoutAxe(acteur, comp) - affute)
 }
+
+/** La recharge d'une compétence, affûtage compris. */
+export const rechargeDe = (acteur, comp) => Math.max(0, comp.recharge - (acteur.affute?.includes(comp.id) ? 1 : 0))
 
 /**
  * Le *n*-ième élément d'un même axe sur un opérateur coûte plus cher, et prend
@@ -332,7 +337,7 @@ export function joue(c, acteur, k, cible) {
   const rapport = { acteur: acteur.nom, comp: comp.nom, coups: [], prime: prime > 1 }
 
   if (joueur) c.cycles -= cout(acteur, comp)
-  acteur.rech[k] = comp.recharge
+  acteur.rech[k] = rechargeDe(acteur, comp)
 
   for (const but of buts) {
     // Un CACHE consomme l'attaque entière, pas une pile de dégâts.
