@@ -26,17 +26,35 @@ export default {
       glisse(j, c[Math.floor(Math.random() * c.length)], true)
     }
     j.e.coups = 0
+    j.e.anim = null
+  },
+
+  maj(j, dt) {
+    if (j.e.anim) {
+      j.e.anim.t += dt
+      if (j.e.anim.t >= GLISSE) j.e.anim = null
+    }
   },
 
   dessine(j, ctx) {
     const cote = N * (CASE + ECART) - ECART
     cadre(ctx, X0 - 6, Y0 - 6, cote + 12, cote + 12, C.bord)
 
+    const anim = j.e.anim
+    const k = anim ? Math.min(1, anim.t / GLISSE) : 1
+
     for (let i = 0; i < N * N; i++) {
       const v = j.e.g[i]
       if (!v) continue
-      const x = X0 + (i % N) * (CASE + ECART)
-      const y = Y0 + Math.floor(i / N) * (CASE + ECART)
+      let x = X0 + (i % N) * (CASE + ECART)
+      let y = Y0 + Math.floor(i / N) * (CASE + ECART)
+      // La tuile qui vient de bouger part de son ancienne case.
+      if (anim && anim.vers === i) {
+        const dx = X0 + (anim.de % N) * (CASE + ECART)
+        const dy = Y0 + Math.floor(anim.de / N) * (CASE + ECART)
+        x = dx + (x - dx) * k
+        y = dy + (y - dy) * k
+      }
       // Une tuile bien placée s'éteint : on voit sa progression d'un coup d'œil.
       const place = v === i + 1
       if (!place) lueur(ctx, x, y, CASE, CASE, C.vert, 2, 0.5)
@@ -74,7 +92,10 @@ function coups(vide) {
   return out
 }
 
+const GLISSE = 0.11
+
 function glisse(j, i, melange = false) {
+  if (!melange) j.e.anim = { de: i, vers: j.e.vide, t: 0 }
   j.e.g[j.e.vide] = j.e.g[i]
   j.e.g[i] = 0
   j.e.vide = i

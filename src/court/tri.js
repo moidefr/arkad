@@ -13,6 +13,7 @@ export default {
   pitch: 'Envoie chaque bloc dans le bac de sa couleur',
   couleur: C.cyan,
   unite: 'pts',
+  ciel: C.cyan,
 
   init(j) {
     j.e.objets = []

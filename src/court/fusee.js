@@ -15,6 +15,7 @@ export default {
   pitch: 'Maintiens pour freiner. Pose-toi en douceur',
   couleur: C.rouge,
   unite: 'pts',
+  ciel: C.violet,
   vies: 3,
 
   /** On repart du ciel, mais la piste garde sa largeur et le compte reste. */

@@ -40,6 +40,7 @@ export default {
   pitch: 'Descends, frappe en avançant dessus. Ça se garde',
   couleur: C.violet,
   unite: 'étages',
+  ciel: C.violet,
   persistant: true,
 
   finTitre: () => ({ texte: 'MORT', couleur: C.rouge }),

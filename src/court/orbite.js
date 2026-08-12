@@ -10,6 +10,7 @@ export default {
   pitch: 'Appuie pour changer de sens. Évite ce qui tombe',
   couleur: C.rouge,
   unite: 'pts',
+  ciel: C.violet,
   vies: 3,
 
   init(j) {

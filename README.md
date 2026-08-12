@@ -20,6 +20,13 @@ Un terminal à phosphore ambré. Trois règles, tenues partout :
 4. **Ce qui est vif est allumé.** Un halo déborde derrière les objets
    lumineux : sur un tube à phosphore la lumière bave, et c'est ce
    débordement qui distingue une couleur allumée d'une couleur peinte.
+5. **Les dégradés se font au tramage.** Aucune interpolation de couleur : une
+   matrice de Bayer fait décroître la densité de pixels, comme quand une
+   machine ne savait afficher que seize couleurs. Un jeu déclare `ciel:`
+   et reçoit son atmosphère.
+6. **Rien n'apparaît, tout arrive.** Une tuile glisse, une case s'ouvre en
+   vague, un bloc s'écrase en se posant. Un changement d'état instantané se
+   lit mal et se ressent encore moins.
 
 Si tu ajoutes quelque chose et que ça jure, c'est presque toujours qu'une de
 ces trois règles a sauté.
@@ -165,7 +172,8 @@ Range-le dans le dossier de sa durée (`src/court/`, `src/moyen/`, `src/long/`,
 | `j.hasard()`, `j.entier(a, b)` | aléatoire |
 | `j.sauve(o)`, `j.charge()`, `j.efface()` | l'état d'une partie longue |
 
-Un jeu peut aussi déclarer `vies: 3` (avec `reprend(j)` si la reprise doit
+Un jeu peut aussi déclarer `ciel: C.violet` (un ciel tramé derrière lui),
+`vies: 3` (avec `reprend(j)` si la reprise doit
 préserver quelque chose), `persistant: true` (il gère sa propre sauvegarde),
 `sansScore: true` avec `titreHud(j)` (le bandeau affiche autre chose qu'un
 score), et `finTitre(j)` pour choisir le titre de l'écran de fin — « RÉSOLU »
@@ -175,7 +183,8 @@ n'est pas « GAME OVER ».
 
 `rect`, `bloc` (un rectangle avec son relief), `cadre` (une boîte creuse),
 `pastille` (un disque en gros pixels), `lueur` (un halo), `ombre` (une ombre
-portée), `trame` (une grille de points), `vignette`, `texte`, plus `dist`,
+portée), `bandeTramee` (un dégradé au tramage de Bayer, rendu une fois puis
+recopié), `trame` (une grille de points), `vignette`, `texte`, plus `dist`,
 `borne`, `vers`. Et `ton(couleur, k)` dans la palette, pour éclaircir ou
 assombrir sans inventer de nouvelle teinte.
 

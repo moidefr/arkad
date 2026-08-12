@@ -139,6 +139,43 @@ export function vignette(ctx, w, h) {
   }
 }
 
+/**
+ * Un dégradé sans dégradé : la densité de pixels décroît du haut vers le bas
+ * selon une matrice de Bayer, exactement comme on faisait quand une machine
+ * ne savait afficher que seize couleurs. Le résultat est rendu une fois dans
+ * une toile de côté puis recopié — sinon ce serait des dizaines de milliers de
+ * rectangles à chaque image.
+ */
+const BAYER = [
+  [0, 8, 2, 10],
+  [12, 4, 14, 6],
+  [3, 11, 1, 9],
+  [15, 7, 13, 5],
+]
+const bandes = new Map()
+
+export function bandeTramee(ctx, x, y, w, h, couleur, densiteHaut = 0.9, densiteBas = 0) {
+  const cle = `${Math.round(w)}x${Math.round(h)}|${couleur}|${densiteHaut}|${densiteBas}`
+  let toile = bandes.get(cle)
+  if (!toile) {
+    toile = document.createElement('canvas')
+    toile.width = Math.max(1, Math.ceil(w))
+    toile.height = Math.max(1, Math.ceil(h))
+    const c = toile.getContext('2d')
+    c.fillStyle = couleur
+    for (let r = 0; r < toile.height; r += PX) {
+      const d = densiteHaut + (densiteBas - densiteHaut) * (r / toile.height)
+      if (d <= 0) continue
+      const ligne = BAYER[(r / PX) % 4]
+      for (let cc = 0; cc < toile.width; cc += PX) {
+        if (d > (ligne[(cc / PX) % 4] + 0.5) / 16) c.fillRect(cc, r, PX, PX)
+      }
+    }
+    bandes.set(cle, toile)
+  }
+  ctx.drawImage(toile, px(x), px(y))
+}
+
 /** Trame de points : donne du sol aux jeux sans encombrer l'écran. */
 export function trame(ctx, x, y, w, h, pas, couleur) {
   ctx.fillStyle = couleur

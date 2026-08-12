@@ -12,6 +12,7 @@ export default {
   pitch: 'Saute quand la corde passe sous tes pieds',
   couleur: C.vert,
   unite: 'sauts',
+  ciel: C.vert,
   vies: 3,
 
   init(j) {

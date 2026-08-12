@@ -11,6 +11,7 @@ export default {
   pitch: 'Appuie pour changer de direction. Vise les portes',
   couleur: C.cyan,
   unite: 'portes',
+  ciel: C.cyan,
   vies: 3,
 
   init(j) {

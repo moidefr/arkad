@@ -10,6 +10,7 @@ export default {
   pitch: 'Survis sous les blocs, ramasse les étoiles',
   couleur: C.cyan,
   unite: 'm',
+  ciel: C.cyan,
   vies: 3,
 
   init(j) {

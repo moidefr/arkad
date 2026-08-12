@@ -75,8 +75,11 @@ export default {
     const c = cases(j)
     c.forEach((z, i) => {
       const allume = j.e.actif === i
-      if (allume) lueur(ctx, z.x, z.y, z.w, z.h, TEINTES[i], 3)
-      bloc(ctx, z.x, z.y, z.w, z.h, allume ? TEINTES[i] : ton(TEINTES[i], -0.72), 4)
+      // La case allumée gonfle : on la remarque même du coin de l'œil.
+      const k = allume ? Math.min(1, j.e.t * 8) : 0
+      const m = -k * 5
+      if (allume) lueur(ctx, z.x + m, z.y + m, z.w - m * 2, z.h - m * 2, TEINTES[i], 3)
+      bloc(ctx, z.x + m, z.y + m, z.w - m * 2, z.h - m * 2, allume ? TEINTES[i] : ton(TEINTES[i], -0.72), 4)
     })
 
     texte(ctx, `SÉQUENCE ${j.e.suite.length}`, j.W / 2, HAUT - 40, 14, C.faible, 700)

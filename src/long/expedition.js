@@ -206,6 +206,7 @@ export default {
   pitch: 'Neuf cents kilomètres, quatre pays, un choix par jour',
   couleur: C.violet,
   unite: 'km',
+  ciel: C.accent,
   persistant: true,
 
   finTitre: (j) =>

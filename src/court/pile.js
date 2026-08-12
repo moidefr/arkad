@@ -11,10 +11,12 @@ export default {
   pitch: 'Appuie pour poser. Ce qui dépasse tombe',
   couleur: C.violet,
   unite: 'étages',
+  ciel: C.violet,
   vies: 3,
 
   init(j) {
     j.e.pile = [{ x: j.W / 2 - 70, w: 140 }]
+    j.e.tassement = 0
     j.e.v = 150
     nouveau(j)
   },
@@ -24,6 +26,8 @@ export default {
     c.x += c.dir * j.e.v * dt
     if (c.x < 0) (c.x = 0), (c.dir = 1)
     if (c.x + c.w > j.W) (c.x = j.W - c.w), (c.dir = -1)
+
+    j.e.tassement = Math.max(0, j.e.tassement - dt * 7)
 
     for (const d of j.e.chutes) {
       d.vy += 900 * dt
@@ -39,7 +43,9 @@ export default {
       const b = j.e.pile[i]
       const y = BASE_Y + (j.e.pile.length - 1 - i) * BLOC_H
       if (y > j.H) break
-      bloc(ctx, b.x, y, b.w, BLOC_H, TEINTES[i % TEINTES.length], 3)
+      // Le sommet s'écrase un instant : la pose se sent au lieu de se voir.
+      const ecrase = i === j.e.pile.length - 1 ? j.e.tassement * 4 : 0
+      bloc(ctx, b.x, y + ecrase, b.w, BLOC_H - ecrase, TEINTES[i % TEINTES.length], 3)
     }
 
     for (const d of j.e.chutes) rect(ctx, d.x, d.y, d.w, BLOC_H, C.bord)
@@ -81,6 +87,7 @@ export default {
       taille: 4,
     })
     j.fx.secoue(2.5)
+    j.e.tassement = 1
     if (large > sous.w - 3) j.fx.bulle(gauche + large / 2, BASE_Y - 40, 'PILE !', C.accent, 16)
     j.e.v = Math.min(420, j.e.v + 9)
     j.son.casse(Math.min(11, j.e.pile.length))

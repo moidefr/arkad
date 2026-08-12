@@ -13,6 +13,7 @@ export default {
   pitch: 'Maintiens pour monter, lâche pour descendre',
   couleur: C.cyan,
   unite: 'm',
+  ciel: C.cyan,
   vies: 3,
 
   init(j) {

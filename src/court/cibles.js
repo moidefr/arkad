@@ -12,6 +12,7 @@ export default {
   pitch: 'Touche tout. Chaque touche rallonge le chrono',
   couleur: C.accent,
   unite: 'pts',
+  ciel: C.accent,
 
   init(j) {
     j.e.jauge = 10.5

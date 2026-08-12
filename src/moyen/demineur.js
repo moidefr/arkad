@@ -62,7 +62,17 @@ export default {
         continue
       }
 
-      rect(ctx, x + 1, y + 1, CASE - 2, CASE - 2, C.fond)
+      // Ouverture en vague : la case se creuse en grandissant, avec un retard
+      // proportionnel à sa distance du point cliqué. La propagation se voit.
+      const age = j.t - (c.ouvert ?? 0)
+      if (age < 0) {
+        bloc(ctx, x + 1, y + 1, CASE - 2, CASE - 2, ton(C.panneau, 0.22), 3)
+        continue
+      }
+      const k = Math.min(1, age / 0.16)
+      const m = (1 - k) * (CASE / 2 - 2)
+      rect(ctx, x + 1 + m, y + 1 + m, CASE - 2 - m * 2, CASE - 2 - m * 2, C.fond)
+      if (k < 1) continue
       cadre(ctx, x + 1, y + 1, CASE - 2, CASE - 2, C.panneau)
       if (c.mine) {
         lueur(ctx, x + 10, y + 10, CASE - 20, CASE - 20, C.rouge, 2)
@@ -111,6 +121,7 @@ function pose(j) {
     vu: false,
     drapeau: false,
     voisins: 0,
+    ouvert: 0,
   }))
   j.e.place = false // les mines ne sont posées qu'au premier creusement
   j.e.marque = 0
@@ -180,16 +191,23 @@ function creuse(j, i) {
     return j.perdu()
   }
 
-  // Propagation : une case sans voisin miné ouvre tout son voisinage.
-  const pile = [i]
+  // Propagation en largeur : la profondeur donne le retard d'ouverture, donc
+  // la vague se voit partir du doigt.
+  let front = [i]
+  let profondeur = 0
   let ouvertes = 0
-  while (pile.length) {
-    const k = pile.pop()
-    const cc = j.e.cases[k]
-    if (cc.vu || cc.drapeau) continue
-    cc.vu = true
-    ouvertes++
-    if (cc.voisins === 0) pile.push(...voisins(k))
+  while (front.length) {
+    const suivant = []
+    for (const k of front) {
+      const cc = j.e.cases[k]
+      if (cc.vu || cc.drapeau) continue
+      cc.vu = true
+      cc.ouvert = j.t + profondeur * 0.035
+      ouvertes++
+      if (cc.voisins === 0) suivant.push(...voisins(k))
+    }
+    front = suivant
+    profondeur++
   }
   j.score += ouvertes * 10 * j.e.grille
   j.son.touche(Math.min(9, 1 + Math.floor(ouvertes / 3)))

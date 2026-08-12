@@ -15,6 +15,7 @@ export default {
   pitch: 'Ça rebondit tout seul. Le doigt dirige',
   couleur: C.vert,
   unite: 'm',
+  ciel: C.vert,
   vies: 3,
 
   init(j) {

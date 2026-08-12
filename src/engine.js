@@ -16,7 +16,7 @@ import { C, ton } from './palette.js'
 import { son } from './son.js'
 import { Effets } from './effets.js'
 import { lis, ecris } from './stockage.js'
-import { texte, rect, cadre, bloc, lueur, ombre, vignette, scanlines, largeurTexte, PX } from './dessin.js'
+import { texte, rect, cadre, bloc, lueur, ombre, vignette, bandeTramee, scanlines, largeurTexte, PX } from './dessin.js'
 
 export const W = 360
 export const H = 640
@@ -349,6 +349,13 @@ export class Moteur {
       const fx = this.j.fx
       ctx.save()
       ctx.translate(Math.round(fx.dx), Math.round(fx.dy))
+      // Un ciel tramé derrière le jeu, quand il en déclare un : une ligne dans
+      // sa définition, et l'écran cesse d'être un fond noir.
+      if (this.def.ciel) {
+        // Assez sombre pour que le HUD des jeux reste lisible par-dessus, et
+        // assez haut pour que la trame s'éteigne au lieu de s'arrêter net.
+        bandeTramee(ctx, 0, HUD, W, 340, ton(this.def.ciel, -0.6), 0.5, 0)
+      }
       this.def.dessine?.(this.j, ctx)
       fx.dessine(ctx)
       ctx.restore()

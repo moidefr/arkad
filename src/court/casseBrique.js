@@ -68,12 +68,18 @@ export default {
         if (q.morte) continue
         if (b.x + BALLE_R < q.x || b.x - BALLE_R > q.x + q.w) continue
         if (b.y + BALLE_R < q.y || b.y - BALLE_R > q.y + BRIQUE_H) continue
-        q.morte = true
-        j.score += 10 * j.e.niveau
-        // La note dépend de la rangée : vider une colonne fait une gamme.
+        q.pv--
+        // On rebondit dans tous les cas ; la brique ne cède qu'à zéro.
         j.son.casse(RANGS - 1 - q.rang)
-        j.fx.eclat(q.x + q.w / 2, q.y + BRIQUE_H / 2, q.couleur, { n: 9, vitesse: 130, taille: 5 })
-        j.fx.secoue(1.5)
+        if (q.pv > 0) {
+          j.fx.eclat(q.x + q.w / 2, q.y + BRIQUE_H / 2, q.couleur, { n: 4, vitesse: 90, taille: 3 })
+          j.fx.secoue(1)
+        } else {
+          q.morte = true
+          j.score += 10 * j.e.niveau * q.pvMax
+          j.fx.eclat(q.x + q.w / 2, q.y + BRIQUE_H / 2, q.couleur, { n: 9, vitesse: 130, taille: 5 })
+          j.fx.secoue(1.5)
+        }
         // On rebondit sur l'axe où la balle est le moins enfoncée.
         const dx = Math.min(Math.abs(b.x - q.x), Math.abs(b.x - (q.x + q.w)))
         const dy = Math.min(Math.abs(b.y - q.y), Math.abs(b.y - (q.y + BRIQUE_H)))
@@ -105,7 +111,14 @@ export default {
 
     for (const q of j.e.briques) {
       if (q.morte) continue
-      bloc(ctx, q.x, q.y, q.w, BRIQUE_H, q.couleur, 3)
+      const entamee = q.pv < q.pvMax
+      bloc(ctx, q.x, q.y, q.w, BRIQUE_H, entamee ? ton(q.couleur, -0.4) : q.couleur, 3)
+      // Fissures : quatre pixels en diagonale, et on voit qu'elle a pris.
+      if (entamee) {
+        for (let k = 0; k < 5; k++) {
+          rect(ctx, q.x + 6 + k * 6, q.y + 5 + (k % 2) * 6, 3, 3, ton(q.couleur, 0.5))
+        }
+      }
     }
 
     bloc(ctx, j.e.raquette - RAQUETTE_W / 2, j.H - RAQUETTE_Y, RAQUETTE_W, 10, C.texte, 2)
@@ -137,6 +150,10 @@ function poseBriques(j) {
         y: j.HUD + 34 + r * (BRIQUE_H + 6),
         w,
         rang: r,
+        // Les deux rangées du haut tiennent deux coups : la fissure prévient,
+        // et le joueur apprend à viser plutôt qu'à espérer.
+        pv: r < 2 ? 2 : 1,
+        pvMax: r < 2 ? 2 : 1,
         couleur: TEINTES[r % TEINTES.length],
         morte: false,
       })

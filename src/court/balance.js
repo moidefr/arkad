@@ -12,6 +12,7 @@ export default {
   pitch: 'Le mât penche. Appuie du côté qui le redresse',
   couleur: C.accent,
   unite: 'pts',
+  ciel: C.accent,
   vies: 3,
 
   init(j) {

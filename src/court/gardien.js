@@ -13,6 +13,7 @@ export default {
   pitch: 'Plonge du bon côté avant que le tir arrive',
   couleur: C.vert,
   unite: 'arrêts',
+  ciel: C.vert,
 
   init(j) {
     j.e.voie = 1

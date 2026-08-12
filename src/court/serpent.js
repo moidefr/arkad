@@ -55,9 +55,13 @@ export default {
     lueur(ctx, f.x * CASE + 6, TOP + f.y * CASE + 6, 12, 12, C.accent, 3)
     bloc(ctx, f.x * CASE + 6, TOP + f.y * CASE + 6, 12, 12, C.accent, 2)
 
+    // Chaque anneau glisse depuis la case du suivant : le serpent avance au
+    // lieu de sauter, alors que la logique reste au tour par tour.
+    const k = Math.min(1, j.e.pas)
     j.e.corps.forEach((c, i) => {
-      const x = c.x * CASE + 2
-      const y = TOP + c.y * CASE + 2
+      const de = j.e.corps[i + 1] ?? c
+      const x = (de.x + (c.x - de.x) * k) * CASE + 2
+      const y = TOP + (de.y + (c.y - de.y) * k) * CASE + 2
       if (i === 0) lueur(ctx, x, y, CASE - 4, CASE - 4, C.vert, 2)
       bloc(ctx, x, y, CASE - 4, CASE - 4, i === 0 ? C.vert : ton(C.vert, -0.45), 3)
     })
