@@ -17,6 +17,8 @@ import { CLASSES } from '../src/massif/anomalie/donnees/classes.js'
 import { PROCESSUS, NOYAUX, TOUS_PROCESSUS } from '../src/massif/anomalie/donnees/ennemis.js'
 import { ETATS } from '../src/massif/anomalie/donnees/etats.js'
 import { ROLES, AXES, FORMES, TYPES, TAGS } from '../src/massif/anomalie/donnees/competences.js'
+import * as Carte from '../src/massif/anomalie/carte.js'
+import { ANTAGONISTES } from '../src/massif/anomalie/donnees/modules.js'
 import { graine } from './faux.js'
 
 const equipe = (...cl) => cl.map((c, i) => E.nouvelOperateur(c, 'OP' + i))
@@ -416,6 +418,7 @@ test('les noyaux sont plus durs que les processus, sans être infaisables', () =
 
 test('une partie se sauve, se relit, et reprend au même tour', () => {
   const e = E.nouvelle(4242, ['analyste', 'briseur', 'tisseur'])
+  E.descend(e, 0, 0)
   const c = K.commence(e.equipe, E.rencontre(e))
   c.cycles = 7
   c.tracage = 33
@@ -467,9 +470,143 @@ test('on ne finit jamais avec tout : au-delà de six, il faut jeter', () => {
 test('la même graine donne la même partie', () => {
   const a = E.nouvelle(999, ['analyste', 'briseur', 'tisseur'])
   const b = E.nouvelle(999, ['analyste', 'briseur', 'tisseur'])
+  E.descend(a, 0, 0)
+  E.descend(b, 0, 0)
   assert.deepEqual(E.rencontre(a), E.rencontre(b))
   assert.deepEqual(
     a.equipe.map((o) => o.nom),
     b.equipe.map((o) => o.nom),
   )
+})
+
+// --- La carte ------------------------------------------------------------------------------------
+
+test('aucune carte n’enferme le joueur dans un cul-de-sac', () => {
+  // Un graphe où un nœud n'est atteignable par personne, ou d'où l'on ne peut
+  // plus descendre, est une carte fausse. On le vérifie sur des centaines de
+  // graines plutôt que sur celle qu'on a sous les yeux.
+  for (let g = 0; g < 400; g++) {
+    for (let acte = 1; acte <= Carte.ACTES.length; acte++) {
+      const carte = Carte.engendre(g * 7919 + 3, acte)
+      carte.couches.forEach((ligne, i) => {
+        if (i === carte.couches.length - 1) return
+        for (const n of ligne) {
+          assert.ok(n.liens.length > 0, `graine ${g}, acte ${acte} : nœud sans issue en couche ${i}`)
+          for (const k of n.liens) assert.ok(carte.couches[i + 1][k], `lien vers un nœud inexistant`)
+        }
+        // Toute la couche suivante doit être atteignable depuis celle-ci.
+        const atteints = new Set(ligne.flatMap((n) => n.liens))
+        carte.couches[i + 1].forEach((_, k) => {
+          assert.ok(atteints.has(k), `graine ${g}, acte ${acte} : nœud ${i + 1}/${k} inatteignable`)
+        })
+      })
+    }
+  }
+})
+
+test('chaque acte se termine par un noyau, et commence par un combat', () => {
+  for (let acte = 1; acte <= Carte.ACTES.length; acte++) {
+    for (let g = 0; g < 60; g++) {
+      const carte = Carte.engendre(g * 131 + 1, acte)
+      for (const n of carte.couches.at(-1)) assert.equal(n.type, 'noyau', `acte ${acte} ne finit pas sur un noyau`)
+      for (const n of carte.couches[0]) assert.equal(n.type, 'processus', `acte ${acte} ouvre sur ${n.type}`)
+    }
+  }
+})
+
+test('un acte offre toujours de quoi souffler et de quoi se renforcer', () => {
+  for (let acte = 1; acte <= Carte.ACTES.length; acte++) {
+    for (let g = 0; g < 80; g++) {
+      const tous = Carte.engendre(g * 977 + 5, acte)
+        .couches.flat()
+        .map((n) => n.type)
+      assert.ok(tous.includes('atelier'), `acte ${acte}, graine ${g} : aucun atelier`)
+      assert.ok(tous.includes('archive'), `acte ${acte}, graine ${g} : aucune archive`)
+    }
+  }
+})
+
+test('une rencontre ne contient que des processus de l’acte', () => {
+  for (let acte = 1; acte <= Carte.ACTES.length; acte++) {
+    const bassin = Carte.acteDe(acte).bassin
+    const carte = Carte.engendre(4242, acte)
+    carte.couches.forEach((ligne, i) => {
+      ligne.forEach((n, k) => {
+        const r = Carte.rencontre(4242, acte, i, k, n.type)
+        if (n.type === 'noyau') {
+          assert.ok(r.length >= 1)
+          return
+        }
+        if (n.type !== 'processus' && n.type !== 'elite') return
+        assert.ok(r.length >= 1 && r.length <= 4, `rencontre de ${r.length} processus`)
+        for (const id of r) assert.ok(bassin.includes(id), `${id} n’appartient pas à l’acte ${acte}`)
+      })
+    })
+  }
+})
+
+// --- Les modules -----------------------------------------------------------------------------------
+
+test('un module pris verrouille son antagoniste pour toute la partie', () => {
+  const e = E.nouvelle(11, ['analyste', 'briseur', 'tisseur'])
+  E.descend(e, 0, 0)
+  const paire = ANTAGONISTES[0]
+  const ok = E.prendModule(e, { op: 0, quoi: 'module', choix: [paire[0]] }, paire[0])
+  assert.equal(ok, true)
+  assert.ok(e.verrous.includes(paire[1]), 'l’antagoniste n’a pas été verrouillé')
+  // Et il ne peut plus être proposé, même à un autre opérateur.
+  for (let n = 0; n < 40; n++) {
+    e.position = { couche: n % 4, k: n % 2 }
+    const offre = E.offre(e, 'module')
+    if (offre) assert.equal(offre.choix.includes(paire[1]), false, 'un module verrouillé est encore proposé')
+  }
+})
+
+test('les modules changent vraiment les statistiques', () => {
+  const nu = K.commence(
+    [E.nouvelOperateur('briseur', 'A'), E.nouvelOperateur('tisseur', 'B'), E.nouvelOperateur('analyste', 'C')],
+    ['veille'],
+  )
+  const equipeMod = [
+    E.nouvelOperateur('briseur', 'A'),
+    E.nouvelOperateur('tisseur', 'B'),
+    E.nouvelOperateur('analyste', 'C'),
+  ]
+  equipeMod[0].mod = ['md_plaque', 'md_noyaudur', 'md_horloge']
+  const arme = K.commence(equipeMod, ['veille'])
+  assert.equal(arme.ops[0].blindage, nu.ops[0].blindage + 3)
+  assert.equal(arme.ops[0].puiss, nu.ops[0].puiss + 2)
+  assert.equal(arme.ops[0].vit, nu.ops[0].vit + 3)
+})
+
+test('un greffon fait percer toute une famille de compétences', () => {
+  const equipeMod = [
+    E.nouvelOperateur('briseur', 'A'),
+    E.nouvelOperateur('tisseur', 'B'),
+    E.nouvelOperateur('analyste', 'C'),
+  ]
+  equipeMod[0].mod = ['md_percant', null, null]
+  const c = K.commence(equipeMod, ['veille', 'boucle'])
+  const arriere = c.proc.find((p) => p.rang === 1)
+  // MASSE est CONTACT : sans PERÇANT, l'arrière n'est même pas une cible légale.
+  assert.ok(K.cibles(c, c.ops[0], COMP.masse).includes(arriere), 'le greffon ne donne pas accès à l’arrière')
+  const nu = K.commence(
+    [E.nouvelOperateur('briseur', 'A'), E.nouvelOperateur('tisseur', 'B'), E.nouvelOperateur('analyste', 'C')],
+    ['veille', 'boucle'],
+  )
+  assert.equal(K.cibles(nu, nu.ops[0], COMP.masse).includes(nu.proc.find((p) => p.rang === 1)), false)
+})
+
+test('le bus de tags rend bien des cycles', () => {
+  const equipeMod = [
+    E.nouvelOperateur('analyste', 'A'),
+    E.nouvelOperateur('tisseur', 'B'),
+    E.nouvelOperateur('briseur', 'C'),
+  ]
+  equipeMod[0].mod = ['md_moisson', null, null]
+  const c = K.commence(equipeMod, ['tampon'])
+  c.cycles = 5
+  const avant = c.cycles
+  K.joue(c, c.ops[0], 0, c.proc[0]) // SONDE porte le tag MARQUE, coût 1
+  assert.equal(c.cycles, avant - 1 + 1, 'MOISSON n’a pas rendu son cycle')
 })

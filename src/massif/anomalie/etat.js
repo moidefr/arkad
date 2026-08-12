@@ -1,7 +1,8 @@
-import { melange32, sousGraine, pioche, parmi, entier } from './rng.js'
+import { melange32, sousGraine, pioche, entier } from './rng.js'
 import { CLASSES, CLASSE, NOMS } from './donnees/classes.js'
 import { COMP } from './donnees/competences.js'
-import { PROCESSUS, NOYAUX } from './donnees/ennemis.js'
+import { MODULE, MODULES, oppose, EMPLACEMENTS_MODULE } from './donnees/modules.js'
+import * as Carte from './carte.js'
 
 /**
  * L'état d'une partie, sa sérialisation et sa migration.
@@ -17,7 +18,7 @@ import { PROCESSUS, NOYAUX } from './donnees/ennemis.js'
  * tenir : renommer un `id` casse le test des données.
  */
 
-export const VERSION = 1
+export const VERSION = 2
 
 /** Six emplacements par opérateur : deux verrouillés, quatre libres. */
 export const EMPLACEMENTS = 6
@@ -33,7 +34,9 @@ export function nouvelle(graine, classes) {
     graine,
     mode: 'campagne',
     acte: 1,
-    noeud: 0,
+    position: null, // null = on n'est pas encore entré dans la première couche
+    visites: [],
+    verrous: [], // les modules verrouillés par leur antagoniste, pour la partie
     equipe: classes.map((cl, i) => nouvelOperateur(cl, noms[i])),
     combat: null,
     offre: null,
@@ -45,48 +48,50 @@ export function nouvelOperateur(cl, nom) {
   const c = CLASSE[cl]
   const comp = c.depart.slice()
   while (comp.length < EMPLACEMENTS) comp.push(null)
-  return { cl, nom, pv: c.pv, pvMax: c.pv, rang: c.rang, comp }
+  return { cl, nom, pv: c.pv, pvMax: c.pv, rang: c.rang, comp, mod: Array(EMPLACEMENTS_MODULE).fill(null) }
 }
 
-/** Trois classes tirées, différentes. Le recrutement en propose plus qu'il n'en faut. */
+/** Quatre classes proposées, trois à prendre : le recrutement est déjà un choix. */
 export const classesOffertes = (graine) =>
   pioche(
     melange32(sousGraine(graine, 7)),
     CLASSES.map((c) => c.id),
-    CLASSES.length,
+    Math.min(4, CLASSES.length),
   )
 
 // --- L'acte ------------------------------------------------------------------------
 
-/**
- * L'acte I est une ligne droite de sept nœuds : le graphe à embranchements
- * vient au lot suivant. Ce qui compte d'abord, c'est que le combat soit juste ;
- * une carte magnifique par-dessus un combat faux ne vaut rien.
- */
-export const NOEUDS_ACTE = [
-  { type: 'processus', force: 0 },
-  { type: 'processus', force: 1 },
-  { type: 'archive' },
-  { type: 'processus', force: 2 },
-  { type: 'atelier' },
-  { type: 'processus', force: 3 },
-  { type: 'noyau' },
-]
+/** La carte de l'acte courant, reconstruite à la demande depuis la graine. */
+export const carteDe = (e) => Carte.engendre(e.graine, e.acte)
 
-export const noeudCourant = (e) => NOEUDS_ACTE[e.noeud] ?? null
+export const noeudCourant = (e) => {
+  if (!e.position) return null
+  const c = carteDe(e)
+  return Carte.noeudA(c, e.position.couche, e.position.k)
+}
 
-/** La rencontre d'un nœud, tirée de la graine : la même partie donne la même carte. */
-export function rencontre(e) {
+export const rencontre = (e) => {
   const n = noeudCourant(e)
-  if (!n) return []
-  const rng = melange32(sousGraine(e.graine, e.acte, e.noeud, 11))
-  if (n.type === 'noyau') {
-    const noyau = parmi(rng, NOYAUX)
-    // Un noyau à règle d'escorte n'arrive jamais seul, sinon la règle ne dit rien.
-    return noyau.escorte ? [noyau.id, ...noyau.escorte] : [noyau.id]
-  }
-  const combien = Math.min(4, 1 + Math.floor(n.force / 1.5) + entier(rng, 2))
-  return pioche(rng, PROCESSUS, Math.min(combien, PROCESSUS.length)).map((p) => p.id)
+  return n ? Carte.rencontre(e.graine, e.acte, e.position.couche, e.position.k, n.type) : []
+}
+
+/** Avance sur la carte. Rend `'acte'` quand l'acte est fini, `'carte'` sinon. */
+export function descend(e, couche, k) {
+  e.position = { couche, k }
+  e.visites.push([couche, k])
+  return 'noeud'
+}
+
+export function finActe(e) {
+  const c = carteDe(e)
+  return Carte.termine(c, e.position)
+}
+
+export function acteSuivant(e) {
+  e.acte++
+  e.position = null
+  e.visites = []
+  return e.acte <= Carte.ACTES.length
 }
 
 // --- Le butin -----------------------------------------------------------------------
@@ -97,13 +102,35 @@ export function rencontre(e) {
  * la réponse directe au défaut d'ASCENSION, où l'on finissait avec les huit
  * reliques du jeu : ici **on ne finit jamais avec tout, on finit avec un choix**.
  */
-export function offre(e) {
-  const rng = melange32(sousGraine(e.graine, e.acte, e.noeud, 23))
+export function offre(e, quoi = 'comp') {
+  const rng = melange32(sousGraine(e.graine, e.acte, e.position?.couche ?? 0, e.position?.k ?? 0, 23))
   const i = entier(rng, e.equipe.length)
   const op = e.equipe[i]
+  if (quoi === 'module') {
+    // Un module verrouillé par son antagoniste n'est même pas proposé : le
+    // choix exclusif doit être annoncé au moment où on le fait, pas subi après.
+    const dispo = MODULES.filter((m) => !e.verrous.includes(m.id) && !porte(e, m.id))
+    if (!dispo.length) return null
+    return { op: i, quoi: 'module', choix: pioche(rng, dispo, Math.min(3, dispo.length)).map((m) => m.id) }
+  }
   const dispo = CLASSE[op.cl].reserve.filter((id) => !op.comp.includes(id))
   if (!dispo.length) return null
-  return { op: i, choix: pioche(rng, dispo, Math.min(3, dispo.length)) }
+  return { op: i, quoi: 'comp', choix: pioche(rng, dispo, Math.min(3, dispo.length)) }
+}
+
+const porte = (e, id) => e.equipe.some((o) => (o.mod ?? []).includes(id))
+
+/** Prend un module. Son antagoniste devient inaccessible pour toute la partie. */
+export function prendModule(e, offreCourante, id, jette = -1) {
+  const op = e.equipe[offreCourante.op]
+  if (!offreCourante.choix.includes(id) || !MODULE[id]) return false
+  const libre = op.mod.indexOf(null)
+  const place = libre >= 0 ? libre : jette
+  if (place < 0 || place >= EMPLACEMENTS_MODULE) return false
+  op.mod[place] = id
+  const adverse = oppose(id)
+  if (adverse && !e.verrous.includes(adverse)) e.verrous.push(adverse)
+  return true
 }
 
 export const librePour = (op) => op.comp.indexOf(null)
@@ -129,8 +156,18 @@ export const sauvegarde = (e) => ({
   graine: e.graine,
   mode: e.mode,
   acte: e.acte,
-  noeud: e.noeud,
-  equipe: e.equipe.map((o) => ({ cl: o.cl, nom: o.nom, pv: o.pv, pvMax: o.pvMax, rang: o.rang, comp: o.comp })),
+  position: e.position,
+  visites: e.visites,
+  verrous: e.verrous,
+  equipe: e.equipe.map((o) => ({
+    cl: o.cl,
+    nom: o.nom,
+    pv: o.pv,
+    pvMax: o.pvMax,
+    rang: o.rang,
+    comp: o.comp,
+    mod: o.mod,
+  })),
   combat: e.combat ? compacte(e.combat) : null,
   offre: e.offre,
   fini: e.fini,
@@ -158,8 +195,10 @@ export function migre(s) {
     v: VERSION,
     graine: s.graine >>> 0,
     mode: s.mode === 'infini' ? 'infini' : 'campagne',
-    acte: Math.max(1, s.acte | 0),
-    noeud: Math.max(0, Math.min(NOEUDS_ACTE.length, s.noeud | 0)),
+    acte: Math.max(1, Math.min(Carte.ACTES.length, s.acte | 0)),
+    position: s.position?.couche >= 0 ? { couche: s.position.couche | 0, k: s.position.k | 0 } : null,
+    visites: Array.isArray(s.visites) ? s.visites : [],
+    verrous: Array.isArray(s.verrous) ? s.verrous.filter((id) => MODULE[id]) : [],
     equipe: s.equipe.map((o) => ({
       cl: o.cl,
       nom: String(o.nom ?? '?'),
@@ -167,6 +206,7 @@ export function migre(s) {
       pvMax: Math.max(1, o.pvMax | 0),
       rang: o.rang === 1 ? 1 : 0,
       comp: o.comp.slice(0, EMPLACEMENTS),
+      mod: (Array.isArray(o.mod) ? o.mod : []).slice(0, EMPLACEMENTS_MODULE).map((id) => (MODULE[id] ? id : null)),
     })),
     combat: s.combat ?? null,
     offre: s.offre ?? null,

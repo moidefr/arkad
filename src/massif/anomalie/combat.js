@@ -2,6 +2,7 @@ import { COMP } from './donnees/competences.js'
 import { CLASSE } from './donnees/classes.js'
 import { PROC } from './donnees/ennemis.js'
 import { ETAT } from './donnees/etats.js'
+import { MODULE } from './donnees/modules.js'
 
 /**
  * Le moteur de combat.
@@ -40,20 +41,28 @@ export const FILE_VUE = 7
 export function commence(equipe, rencontre, { tracage = 0, cyclesMax = CYCLES_MAX } = {}) {
   const ops = equipe.map((o, i) => {
     const cl = CLASSE[o.cl]
+    const mods = (o.mod ?? [])
+      .filter(Boolean)
+      .map((id) => MODULE[id])
+      .filter(Boolean)
+    const somme = (cle) => mods.reduce((s, m) => s + (m[cle] ?? 0), 0)
+    const pvMax = Math.max(10, (o.pvMax ?? cl.pv) + somme('pvMax'))
+    const vit = Math.max(3, cl.vit + somme('vit'))
     return {
       i,
       nom: o.nom,
       cl: o.cl,
-      pv: o.pv ?? cl.pv,
-      pvMax: o.pvMax ?? cl.pv,
-      puiss: cl.puiss,
-      vit: cl.vit,
-      blindage: cl.blindage,
+      pv: Math.min(o.pv ?? pvMax, pvMax),
+      pvMax,
+      puiss: cl.puiss + somme('puiss'),
+      vit,
+      blindage: Math.max(0, cl.blindage + somme('blindage')),
       rang: o.rang ?? cl.rang,
       comp: o.comp.slice(),
+      mod: mods,
       rech: o.comp.map(() => 0),
       etats: {},
-      att: 100 / cl.vit,
+      att: 100 / vit,
     }
   })
 
@@ -78,11 +87,12 @@ export function commence(equipe, rencontre, { tracage = 0, cyclesMax = CYCLES_MA
     }
   })
 
+  const bonusCycles = ops.reduce((s, o) => s + (o.mod ?? []).reduce((t, m) => t + (m.cyclesMax ?? 0), 0), 0)
   const c = {
     ops,
     proc,
     cycles: 4,
-    cyclesMax,
+    cyclesMax: cyclesMax + bonusCycles,
     tracage,
     chaine: [],
     tour: 0,
@@ -160,7 +170,7 @@ export function cibles(c, acteur, comp) {
   if (comp.forme === 'allie') return vivants(allie)
   const front = frontDe(ennemi)
   const liste = vivants(ennemi)
-  if (comp.contact && !comp.perce) return liste.filter((u) => u.rang === front)
+  if (comp.contact && !perceAvec(acteur, comp)) return liste.filter((u) => u.rang === front)
   return liste
 }
 
@@ -197,9 +207,9 @@ export const blindageDe = (u) => Math.max(0, u.blindage - 2 * (u.etats.fragment 
  */
 export function degats(c, acteur, comp, cible, { prime = 1 } = {}) {
   if (!comp.base) return 0
-  const brut = comp.base * (1 + 0.1 * acteur.puiss) * multiplie(bonusDe(acteur)) * prime
+  const brut = comp.base * (1 + 0.1 * acteur.puiss) * multiplie(bonusDe(acteur, comp)) * prime
   const encaisse = 1 + 0.2 * (cible.etats.marque ?? 0)
-  const rang = reducRang(c, comp, cible)
+  const rang = reducRang(c, comp, cible, acteur)
   const res = cible.resist ? (cible.resist[comp.type] ?? 0) : 0
   let apres = brut * rang * encaisse * (1 - res)
 
@@ -216,14 +226,25 @@ export function degats(c, acteur, comp, cible, { prime = 1 } = {}) {
   return { apres, absorbe, final }
 }
 
-function reducRang(c, comp, cible) {
-  if (comp.perce) return 1
+/** Un greffon de module peut faire percer une famille entière de compétences. */
+export const perceAvec = (acteur, comp) =>
+  comp.perce || (acteur.mod ?? []).some((m) => m.greffe?.perce && comp.tags?.includes(m.greffe.tag))
+
+function reducRang(c, comp, cible, acteur) {
+  if (perceAvec(acteur ?? {}, comp)) return 1
   const camp = campDe(c, cible)
   if (cible.rang === frontDe(camp)) return 1
   return 0.6
 }
 
-const bonusDe = (u) => [u.etats.surcadence > 0 ? 0.2 : 0]
+/** Les bonus multiplicatifs de l'acteur, avant rendement décroissant. */
+const bonusDe = (u, comp) => {
+  const out = [u.etats.surcadence > 0 ? 0.2 : 0]
+  for (const m of u.mod ?? []) {
+    if (m.greffe?.mult && comp?.tags?.includes(m.greffe.tag)) out.push(m.greffe.mult)
+  }
+  return out
+}
 
 // --- Résolution --------------------------------------------------------------------------
 
@@ -295,7 +316,10 @@ export function joue(c, acteur, k, cible) {
 
   if (comp.avance) acteur.rang = 0
   if (comp.cycles) c.cycles = Math.min(c.cyclesMax, c.cycles + comp.cycles)
-  if (joueur) monteTracage(c, comp)
+  if (joueur) {
+    bus(c, acteur, comp, buts)
+    monteTracage(c, acteur, comp)
+  }
 
   finTour(c, acteur, comp)
   // Le repérage est une conséquence de l'action, pas une case à cocher par
@@ -336,9 +360,35 @@ function chaine(c, comp, joueur) {
   return CHAINE_PRIME
 }
 
-function monteTracage(c, comp) {
-  const vitesse = c.regles.includes('tracage') ? 2 : 1
-  c.tracage = Math.min(TRACAGE_MAX, c.tracage + (comp.cout * 3 + 2) * vitesse)
+/**
+ * Le bus de tags : chaque module écoute un tag et agit quand il passe.
+ *
+ * Trente lignes pour brancher tous les modules du jeu. C'est ce qui fait qu'un
+ * assemblage vaut plus que la somme de ses parts sans qu'aucune combinaison
+ * n'ait été écrite à la main — et donc sans qu'aucune ne puisse être oubliée
+ * dans l'équilibrage.
+ */
+function bus(c, acteur, comp, buts) {
+  for (const m of acteur.mod ?? []) {
+    if (!m.ecoute || !comp.tags?.includes(m.ecoute)) continue
+    if (m.cycles) c.cycles = Math.min(c.cyclesMax, c.cycles + m.cycles)
+    if (m.pare) applique(acteur, 'pare', m.pare)
+    if (m.pareEquipe) for (const o of vivants(c.ops)) applique(o, 'pare', m.pareEquipe)
+    if (m.soinSoi) acteur.pv = Math.min(acteur.pvMax, acteur.pv + m.soinSoi)
+    if (m.tracage) c.tracage = Math.max(plancherTracage(c), c.tracage + m.tracage)
+    if (m.marque) for (const b of buts) if (!estOperateur(c, b)) applique(b, 'marque', m.marque)
+  }
+  // Le greffon de corruption allonge les fuites posées par cette action.
+  for (const m of acteur.mod ?? []) {
+    if (!m.greffe?.fuite || !comp.tags?.includes(m.greffe.tag)) continue
+    for (const b of buts) if (b.etats.fuite) applique(b, 'fuite', m.greffe.fuite)
+  }
+}
+
+function monteTracage(c, acteur, comp) {
+  const regle = c.regles.includes('tracage') ? 2 : 1
+  const mods = (acteur.mod ?? []).reduce((k, m) => k * (m.tracageMult ?? 1), 1)
+  c.tracage = Math.min(TRACAGE_MAX, c.tracage + (comp.cout * 3 + 2) * regle * mods)
 }
 
 /** Le tempo. Une PRIORITÉ le rend gratuit une fois. */

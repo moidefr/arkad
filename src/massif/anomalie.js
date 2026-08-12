@@ -5,8 +5,12 @@ import * as IA from './anomalie/ia.js'
 import * as E from './anomalie/etat.js'
 import { COMP } from './anomalie/donnees/competences.js'
 import { CLASSE } from './anomalie/donnees/classes.js'
+import * as Carte from './anomalie/carte.js'
 import * as VC from './anomalie/vue/combat.js'
 import * as VM from './anomalie/vue/menus.js'
+import * as VK from './anomalie/vue/carte.js'
+import * as VE from './anomalie/vue/equipe.js'
+import { PROC } from './anomalie/donnees/ennemis.js'
 
 /**
  * ANOMALIE — trois opérateurs plongent dans un système corrompu.
@@ -49,7 +53,7 @@ export default {
   sansScore: true,
   ciel: C.violet,
 
-  titreHud: (j) => (j.e.vue === 'combat' ? `ACTE ${j.e.p?.acte ?? 1} · ${(j.e.p?.noeud ?? 0) + 1}/7` : 'ANOMALIE'),
+  titreHud: (j) => (j.e.p ? `ACTE ${j.e.p.acte} · ${Carte.acteDe(j.e.p.acte).nom}` : 'ANOMALIE'),
   finTitre: (j) =>
     j.e.gagne ? { texte: 'SYSTÈME PURGÉ', couleur: C.accent } : { texte: 'DÉCONNEXION', couleur: C.rouge },
 
@@ -61,13 +65,16 @@ export default {
     j.e.prises = []
     j.e.gagne = false
     j.e.attente = 0
+    j.e.sel = 0
+    j.e.detail = null
+    j.e.choisi = null
 
     const brut = E.migre(j.charge())
     if (brut) {
       j.e.p = brut
       j.e.c = brut.combat ? E.reprend(brut, brut.combat, K.commence) : null
       if (j.e.c) IA.annonce(j.e.c)
-      j.e.vue = j.e.c ? 'combat' : 'noeud'
+      j.e.vue = j.e.c ? 'combat' : brut.position ? 'noeud' : 'carte'
     } else {
       j.e.p = null
       j.e.vue = 'titre'
@@ -103,7 +110,9 @@ export default {
     const e = j.e
     if (e.vue === 'titre') e.zones = VM.titre(ctx, e.meta)
     else if (e.vue === 'recrutement') e.zones = VM.recrutement(ctx, e.offertes, e.prises)
-    else if (e.vue === 'noeud') e.zones = VM.noeud(ctx, e.p, E.rencontre(e.p))
+    else if (e.vue === 'carte') e.zones = ecranCarte(ctx, e)
+    else if (e.vue === 'equipe') e.zones = VE.dessine(ctx, e.p, e.sel, e.detail)
+    else if (e.vue === 'noeud') e.zones = VM.noeud(ctx, e.p, E.rencontre(e.p), E.noeudCourant(e.p))
     else if (e.vue === 'butin') e.zones = VM.butin(ctx, e.p, e.p.offre, e.jette)
     else if (e.vue === 'bilan') e.zones = VM.bilan(ctx, e.p, e.gagne)
     else {
@@ -128,8 +137,15 @@ export default {
       passer: () => (avance(j), j.son.clic()),
       suite: () => (avance(j), j.son.clic()),
       fin: () => rejoue(j),
-      comp: () => choisitComp(j, z.k),
+      comp: () => (e.vue === 'equipe' ? lit(j, 'comp', z.k) : choisitComp(j, z.k)),
       cible: () => frappe(j, z.cible),
+      noeud: () => ((e.choisi = { couche: z.couche, k: z.k }), j.son.clic()),
+      descendre: () => descend(j),
+      equipe: () => ((e.vue = 'equipe'), (e.detail = null), j.son.clic()),
+      retour: () => ((e.vue = 'carte'), j.son.clic()),
+      op: () => ((e.sel = z.k), (e.detail = null), j.son.clic()),
+      mod: () => lit(j, 'mod', z.k),
+      rang: () => bascule(j),
     }
     suites[z.quoi]?.()
   },
@@ -156,7 +172,8 @@ function choisitClasse(j, id) {
 
 function entre(j) {
   j.e.p = E.nouvelle(j.e.graine, j.e.prises)
-  j.e.vue = 'noeud'
+  j.e.vue = 'carte'
+  j.e.choisi = null
   j.e.meta.plongees++
   ecritMeta(j.e.meta)
   j.son.niveau()
@@ -166,8 +183,8 @@ function entre(j) {
 function engage(j) {
   const e = j.e
   const n = E.noeudCourant(e.p)
-  if (n.type === 'archive') {
-    e.p.offre = E.offre(e.p)
+  if (n.type === 'archive' || n.type === 'marche') {
+    e.p.offre = E.offre(e.p, n.type === 'marche' ? 'module' : 'comp')
     if (!e.p.offre) return avance(j)
     e.jette = null
     e.vue = 'butin'
@@ -191,6 +208,15 @@ function engage(j) {
 function prendComp(j, id) {
   const e = j.e
   const op = e.p.equipe[e.p.offre.op]
+  if (e.p.offre.quoi === 'module') {
+    if (op.mod.indexOf(null) < 0) {
+      e.jette = id
+      return j.son.clic()
+    }
+    E.prendModule(e.p, e.p.offre, id)
+    j.son.record()
+    return avance(j)
+  }
   if (E.librePour(op) < 0) {
     // Plus de place : il faut choisir ce qu'on sacrifie, tout de suite.
     e.jette = id
@@ -203,27 +229,75 @@ function prendComp(j, id) {
 
 function jetteComp(j, k) {
   const e = j.e
-  if (!E.prend(e.p, e.p.offre, e.jette, k)) return j.son.rate()
+  const ok =
+    e.p.offre.quoi === 'module' ? E.prendModule(e.p, e.p.offre, e.jette, k) : E.prend(e.p, e.p.offre, e.jette, k)
+  if (!ok) return j.son.rate()
   j.son.record()
   e.jette = null
   avance(j)
 }
 
-/** Passe au nœud suivant, ou termine l'acte. */
+/** Fin d'un nœud : on remonte à la carte, ou on passe à l'acte suivant. */
 function avance(j) {
   const e = j.e
   e.p.offre = null
-  e.p.noeud++
   e.c = null
-  if (e.p.noeud >= E.NOEUDS_ACTE.length) {
-    e.gagne = true
-    e.p.fini = true
-    e.meta.victoires++
-    ecritMeta(e.meta)
-    j.efface()
-    return j.perdu()
+  e.choisi = null
+
+  if (E.finActe(e.p)) {
+    if (!E.acteSuivant(e.p)) {
+      // Le dernier acte est tombé : la campagne est finie.
+      e.gagne = true
+      e.p.fini = true
+      e.meta.victoires++
+      ecritMeta(e.meta)
+      j.efface()
+      return j.perdu()
+    }
+    j.fx.eclat(180, 300, C.accent, { n: 36, vitesse: 260 })
+    j.son.record()
   }
+  e.vue = 'carte'
+  sauve(j)
+}
+
+function ecranCarte(ctx, e) {
+  const carte = E.carteDe(e.p)
+  const zones = VK.dessine(ctx, carte, e.p.position, e.p.visites, e.choisi)
+  const apercu = e.choisi
+    ? Carte.rencontre(
+        e.p.graine,
+        e.p.acte,
+        e.choisi.couche,
+        e.choisi.k,
+        carte.couches[e.choisi.couche][e.choisi.k].type,
+      ).map((id) => PROC[id].nom)
+    : []
+  const type = e.choisi ? carte.couches[e.choisi.couche][e.choisi.k].type : null
+  VK.panneau(ctx, carte, e.choisi, type === 'processus' || type === 'elite' || type === 'noyau' ? apercu : [])
+  return [...zones, ...VK.boutons(ctx, !!e.choisi)]
+}
+
+function descend(j) {
+  const e = j.e
+  if (!e.choisi) return j.son.rate()
+  E.descend(e.p, e.choisi.couche, e.choisi.k)
+  e.choisi = null
   e.vue = 'noeud'
+  j.son.clic()
+  sauve(j)
+}
+
+function lit(j, quoi, k) {
+  const e = j.e
+  e.detail = e.detail?.quoi === quoi && e.detail.k === k ? null : { quoi, k }
+  j.son.clic()
+}
+
+function bascule(j) {
+  const op = j.e.p.equipe[j.e.sel]
+  op.rang = op.rang === 0 ? 1 : 0
+  j.son.clic()
   sauve(j)
 }
 
