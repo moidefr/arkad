@@ -1,0 +1,326 @@
+import { C } from '../palette.js'
+import { lis, ecris } from '../stockage.js'
+import * as K from './anomalie/combat.js'
+import * as IA from './anomalie/ia.js'
+import * as E from './anomalie/etat.js'
+import { COMP } from './anomalie/donnees/competences.js'
+import { CLASSE } from './anomalie/donnees/classes.js'
+import * as VC from './anomalie/vue/combat.js'
+import * as VM from './anomalie/vue/menus.js'
+
+/**
+ * ANOMALIE — trois opérateurs plongent dans un système corrompu.
+ *
+ * Il remplace ASCENSION, qui n'était pas déséquilibré mais **inopérant** : une
+ * défaite y rapportait un point, garder ne faisait jamais perdre d'intégrité,
+ * on ramassait les huit reliques du jeu dès le quatrième rang, et la mémoire
+ * de son « IA qui apprend » était effacée avant chaque duel.
+ *
+ * Ce fichier ne fait que router : toute la règle est dans `anomalie/combat.js`,
+ * qui ne connaît ni canvas ni stockage et tourne sous `node --test`.
+ */
+
+/**
+ * La méta vit dans **sa propre clé**.
+ *
+ * Le moteur appelle `j.efface()` quand on choisit NOUVELLE PARTIE : passer les
+ * déblocages par `j.sauve()` les effacerait avec la partie. `stockage.js` est
+ * fait pour ça — c'est le même chemin que les records.
+ */
+const CLE_META = 'anomalie.meta'
+const metaVide = { victoires: 0, plongees: 0, meilleur: 0 }
+
+const litMeta = () => {
+  try {
+    return { ...metaVide, ...JSON.parse(lis(CLE_META, '{}')) }
+  } catch {
+    return { ...metaVide }
+  }
+}
+const ecritMeta = (m) => ecris(CLE_META, JSON.stringify(m))
+
+export default {
+  id: 'anomalie',
+  nom: 'ANOMALIE',
+  pitch: 'Trois opérateurs dans un système corrompu. Tour par tour',
+  couleur: C.accent,
+  unite: '',
+  persistant: true,
+  sansScore: true,
+  ciel: C.violet,
+
+  titreHud: (j) => (j.e.vue === 'combat' ? `ACTE ${j.e.p?.acte ?? 1} · ${(j.e.p?.noeud ?? 0) + 1}/7` : 'ANOMALIE'),
+  finTitre: (j) =>
+    j.e.gagne ? { texte: 'SYSTÈME PURGÉ', couleur: C.accent } : { texte: 'DÉCONNEXION', couleur: C.rouge },
+
+  init(j) {
+    j.e.meta = litMeta()
+    j.e.zones = []
+    j.e.choisie = null
+    j.e.jette = null
+    j.e.prises = []
+    j.e.gagne = false
+    j.e.attente = 0
+
+    const brut = E.migre(j.charge())
+    if (brut) {
+      j.e.p = brut
+      j.e.c = brut.combat ? E.reprend(brut, brut.combat, K.commence) : null
+      if (j.e.c) IA.annonce(j.e.c)
+      j.e.vue = j.e.c ? 'combat' : 'noeud'
+    } else {
+      j.e.p = null
+      j.e.vue = 'titre'
+    }
+  },
+
+  /**
+   * Le temps ne sert qu'à laisser respirer les tours adverses : le combat lui
+   * même est au tour par tour, rien ne s'anime tout seul.
+   */
+  maj(j, dt) {
+    if (j.e.vue !== 'combat' || !j.e.c) return
+    const c = j.e.c
+    if (K.fini(c)) return termine(j)
+
+    j.e.attente = Math.max(0, j.e.attente - dt)
+    if (j.e.attente > 0) return
+
+    const u = K.actif(c)
+    if (!u || K.estOperateur(c, u)) return
+    K.ouvreTour(c, u)
+    K.recharge(u)
+    IA.tourProcessus(c, u)
+    IA.annonce(c)
+    j.son.casse(3)
+    j.e.attente = 0.55
+    sauve(j)
+  },
+
+  quitte: (j) => sauve(j),
+
+  dessine(j, ctx) {
+    const e = j.e
+    if (e.vue === 'titre') e.zones = VM.titre(ctx, e.meta)
+    else if (e.vue === 'recrutement') e.zones = VM.recrutement(ctx, e.offertes, e.prises)
+    else if (e.vue === 'noeud') e.zones = VM.noeud(ctx, e.p, E.rencontre(e.p))
+    else if (e.vue === 'butin') e.zones = VM.butin(ctx, e.p, e.p.offre, e.jette)
+    else if (e.vue === 'bilan') e.zones = VM.bilan(ctx, e.p, e.gagne)
+    else {
+      VC.dessine(j, ctx, e.c, e.choisie)
+      VC.journal(ctx, e.c)
+      e.zones = VC.zones(e.c, e.choisie)
+    }
+  },
+
+  appui(j, p) {
+    const e = j.e
+    const z = e.zones.find((x) => p.x >= x.x && p.x <= x.x + x.w && p.y >= x.y && p.y <= x.y + x.h)
+    if (!z) return
+    const suites = {
+      plonger: () => commencePartie(j),
+      classe: () => choisitClasse(j, z.id),
+      partir: () => entre(j),
+      engager: () => engage(j),
+      prend: () => prendComp(j, z.id),
+      jette: () => jetteComp(j, z.k),
+      annule: () => ((e.jette = null), j.son.clic()),
+      passer: () => (avance(j), j.son.clic()),
+      suite: () => (avance(j), j.son.clic()),
+      fin: () => rejoue(j),
+      comp: () => choisitComp(j, z.k),
+      cible: () => frappe(j, z.cible),
+    }
+    suites[z.quoi]?.()
+  },
+}
+
+// --- Enchaînement des écrans ------------------------------------------------------------
+
+function commencePartie(j) {
+  j.son.niveau()
+  j.e.graine = (j.hasard() * 4294967296) >>> 0
+  j.e.offertes = E.classesOffertes(j.e.graine)
+  j.e.prises = []
+  j.e.vue = 'recrutement'
+}
+
+function choisitClasse(j, id) {
+  const pris = j.e.prises
+  const k = pris.indexOf(id)
+  if (k >= 0) pris.splice(k, 1)
+  else if (pris.length < 3) pris.push(id)
+  else return j.son.rate()
+  j.son.clic()
+}
+
+function entre(j) {
+  j.e.p = E.nouvelle(j.e.graine, j.e.prises)
+  j.e.vue = 'noeud'
+  j.e.meta.plongees++
+  ecritMeta(j.e.meta)
+  j.son.niveau()
+  sauve(j)
+}
+
+function engage(j) {
+  const e = j.e
+  const n = E.noeudCourant(e.p)
+  if (n.type === 'archive') {
+    e.p.offre = E.offre(e.p)
+    if (!e.p.offre) return avance(j)
+    e.jette = null
+    e.vue = 'butin'
+    return j.son.clic()
+  }
+  if (n.type === 'atelier') {
+    for (const o of e.p.equipe) o.pv = Math.min(o.pvMax, o.pv + Math.round(o.pvMax * 0.3))
+    j.son.record()
+    j.fx.eclat(180, 300, C.vert, { n: 26, vitesse: 200 })
+    return avance(j)
+  }
+  e.c = K.commence(e.p.equipe, E.rencontre(e.p))
+  IA.annonce(e.c)
+  e.choisie = null
+  e.attente = 0.4
+  e.vue = 'combat'
+  j.son.niveau()
+  sauve(j)
+}
+
+function prendComp(j, id) {
+  const e = j.e
+  const op = e.p.equipe[e.p.offre.op]
+  if (E.librePour(op) < 0) {
+    // Plus de place : il faut choisir ce qu'on sacrifie, tout de suite.
+    e.jette = id
+    return j.son.clic()
+  }
+  E.prend(e.p, e.p.offre, id)
+  j.son.record()
+  avance(j)
+}
+
+function jetteComp(j, k) {
+  const e = j.e
+  if (!E.prend(e.p, e.p.offre, e.jette, k)) return j.son.rate()
+  j.son.record()
+  e.jette = null
+  avance(j)
+}
+
+/** Passe au nœud suivant, ou termine l'acte. */
+function avance(j) {
+  const e = j.e
+  e.p.offre = null
+  e.p.noeud++
+  e.c = null
+  if (e.p.noeud >= E.NOEUDS_ACTE.length) {
+    e.gagne = true
+    e.p.fini = true
+    e.meta.victoires++
+    ecritMeta(e.meta)
+    j.efface()
+    return j.perdu()
+  }
+  e.vue = 'noeud'
+  sauve(j)
+}
+
+// --- Le combat ----------------------------------------------------------------------------
+
+function choisitComp(j, k) {
+  const e = j.e
+  const u = K.actif(e.c)
+  if (!u || !K.estOperateur(e.c, u)) return
+  const comp = COMP[u.comp[k]]
+  if (!comp) return j.son.rate()
+
+  // Deuxième appui sur la même carte : on valide sur la cible par défaut. Le
+  // cas courant ne demande jamais d'aller toucher le haut de l'écran, ce qui
+  // est pénible à une main sur un grand téléphone.
+  if (e.choisie === k) {
+    const legales = K.cibles(e.c, u, comp)
+    if (!K.jouable(e.c, u, comp, k) || !legales.length) {
+      e.choisie = null
+      return j.son.rate()
+    }
+    return frappe(j, defaut(e.c, comp, legales), k)
+  }
+  if (!K.jouable(e.c, u, comp, k)) return j.son.rate()
+  const legales = K.cibles(e.c, u, comp)
+  j.son.clic()
+  // Une seule cible possible : on saute l'étape du ciblage.
+  if (legales.length === 1) return frappe(j, legales[0], k)
+  e.choisie = k
+}
+
+const defaut = (c, comp, legales) =>
+  comp.soin || comp.forme === 'allie' || comp.forme === 'soi'
+    ? legales.reduce((a, b) => (a.pv / a.pvMax <= b.pv / b.pvMax ? a : b))
+    : legales.reduce((a, b) => (a.pv <= b.pv ? a : b))
+
+function frappe(j, cible, indice) {
+  const e = j.e
+  const u = K.actif(e.c)
+  const k = indice ?? e.choisie
+  if (k == null || !u || !K.estOperateur(e.c, u)) return
+  K.ouvreTour(e.c, u)
+  K.recharge(u)
+  const r = K.joue(e.c, u, k, cible)
+  e.choisie = null
+  IA.annonce(e.c)
+
+  const somme = r.coups.reduce((s, x) => s + (x.degats ?? 0), 0)
+  if (somme > 0) {
+    j.son.casse(Math.min(11, 3 + Math.floor(somme / 8)))
+    j.fx.secoue(r.prime ? 7 : 3)
+    const b = K.estOperateur(e.c, cible) ? VC.placeOp(e.c.ops.indexOf(cible)) : VC.placeProc(e.c, cible)
+    j.fx.bulle(b.x + b.w / 2, b.y - 4, '−' + somme, r.prime ? C.vert : C.accent, r.prime ? 19 : 15)
+  } else j.son.clic()
+  if (r.repere) {
+    j.son.rate()
+    j.fx.secoue(11)
+  }
+  e.attente = 0.35
+  sauve(j)
+}
+
+function termine(j) {
+  const e = j.e
+  const issue = K.fini(e.c)
+  // L'intégrité restante est conservée d'un combat à l'autre : c'est ce qui
+  // fait qu'un combat gagné de justesse coûte quelque chose.
+  e.c.ops.forEach((o, i) => (e.p.equipe[i].pv = o.pv))
+  e.c = null
+  e.p.combat = null
+
+  if (issue === 'perdu') {
+    // Une défaite termine la partie. Sans prix à l'échec, la progression n'en a
+    // aucun — c'est exactement ce qui rendait ASCENSION creux.
+    e.gagne = false
+    e.vue = 'bilan'
+    j.efface()
+    j.son.mort()
+    return
+  }
+  e.gagne = true
+  e.vue = 'bilan'
+  j.son.record()
+  sauve(j)
+}
+
+function rejoue(j) {
+  j.e.p = null
+  j.e.c = null
+  j.e.vue = 'titre'
+  j.e.meta = litMeta()
+  j.son.clic()
+}
+
+function sauve(j) {
+  if (!j.e.p) return
+  j.e.p.combat = j.e.c
+  j.sauve(E.sauvegarde(j.e.p))
+  j.e.p.combat = null
+}
