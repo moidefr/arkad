@@ -1,0 +1,26 @@
+name: Tests
+
+# Celui-ci tourne tout seul, contrairement aux deux workflows de déploiement :
+# il ne publie rien, il ne fait que dire si le dépôt est sain.
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # Aucune dépendance à installer : le projet n'en a pas, et le banc
+      # d'essai tourne sur `node --test`, livré avec Node.
+      - name: Banc d'essai
+        run: npm test
+
+      - name: Assemble www/
+        run: node build.mjs

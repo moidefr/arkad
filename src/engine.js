@@ -68,6 +68,8 @@ export class Moteur {
     this.def = null
     this.j = null
     this.record = false
+    // Secondes restantes pendant lesquelles « NOUVELLE PARTIE » est armé.
+    this.arme = 0
 
     addEventListener('keydown', (e) => {
       if (e.code === 'Escape') this._bascullePause()
@@ -217,10 +219,12 @@ export class Moteur {
     if (this.phase === 'jeu') this.phase = 'pause'
     else if (this.phase === 'pause') this.phase = 'jeu'
     this.phaseT = 0
+    this.arme = 0
   }
 
   _maj(dt) {
     this.phaseT += dt
+    if (this.arme > 0) this.arme -= dt
     if (!this.j) return
 
     if (this.phase === 'depart') {
@@ -316,8 +320,18 @@ export class Moteur {
 
     if (this.phase === 'pause') {
       const i = index(p, B_PAUSE)
+      if (i !== 1) this.arme = 0
       if (i === 0) return son.clic(), this._bascullePause()
-      if (i === 1) return son.clic(), this.lance(this.def, { neuve: true })
+      if (i === 1) {
+        // Sur un jeu persistant, ce bouton efface une partie de plusieurs
+        // heures. Un doigt qui glisse ne doit pas pouvoir le faire : il faut
+        // le demander deux fois, et l'armement retombe tout seul.
+        if (this.def.persistant && this.arme <= 0) {
+          this.arme = 4
+          return son.rate()
+        }
+        return son.clic(), this.lance(this.def, { neuve: true })
+      }
       if (i === 2) return son.clic(), this._quitte()
       if (i === 3) return son.bascule()
       return
@@ -590,11 +604,15 @@ export class Moteur {
     texte(ctx, '-- PAUSE --', W / 2, 174, 26, C.accent, 700, undefined, 3)
     B_PAUSE.forEach((b, i) => {
       let libelle = b.libelle
+      let teinte
       if (i === 3) libelle = son.muet ? 'SON : NON' : 'SON : OUI'
       // Sur un jeu long, « recommencer » efface une partie de plusieurs
-      // heures : autant que le bouton le dise.
-      if (i === 1 && this.def.persistant) libelle = 'NOUVELLE PARTIE'
-      bouton(ctx, b.y, b.h, libelle, i === 0)
+      // heures : autant que le bouton le dise, et qu'il le demande deux fois.
+      if (i === 1 && this.def.persistant) {
+        libelle = this.arme > 0 ? 'EFFACER ? CONFIRME' : 'NOUVELLE PARTIE'
+        if (this.arme > 0) teinte = C.rouge
+      }
+      bouton(ctx, b.y, b.h, libelle, i === 0, teinte)
     })
   }
 
@@ -635,15 +653,15 @@ function tuile(i) {
   }
 }
 
-function bouton(ctx, y, h, libelle, primaire) {
-  const couleur = primaire ? C.accent : C.faible
+function bouton(ctx, y, h, libelle, primaire, teinte) {
+  const vif = teinte ?? (primaire ? C.accent : null)
   ombre(ctx, MENU_X, y, MENU_W, h, 5)
-  if (primaire) lueur(ctx, MENU_X, y, MENU_W, h, C.accent, 3, 0.7)
+  if (vif) lueur(ctx, MENU_X, y, MENU_W, h, vif, 3, 0.7)
   rect(ctx, MENU_X, y, MENU_W, h, C.panneau)
   rect(ctx, MENU_X, y, MENU_W, 3, ton(C.panneau, 0.55))
   rect(ctx, MENU_X, y + h - 3, MENU_W, 3, ton(C.panneau, -0.55))
-  cadre(ctx, MENU_X, y, MENU_W, h, couleur)
-  texte(ctx, libelle, MENU_X + MENU_W / 2, y + h / 2, 19, primaire ? C.accent : C.texte, 700, MENU_W - 24, 1)
+  cadre(ctx, MENU_X, y, MENU_W, h, vif ?? C.faible)
+  texte(ctx, libelle, MENU_X + MENU_W / 2, y + h / 2, 19, vif ?? C.texte, 700, MENU_W - 24, 1)
 }
 
 function index(p, boutons) {

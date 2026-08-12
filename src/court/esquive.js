@@ -119,8 +119,12 @@ function vague(j) {
     let x = b.x
     let reste = b.w
     while (reste > 0) {
-      const w = Math.min(reste, 60 + Math.random() * 90)
-      j.e.blocs.push({ x: Math.round(x), y: -34, w: Math.round(w) - 2, h: 24 })
+      let w = Math.min(reste, 60 + Math.random() * 90)
+      // Le dernier morceau est absorbé plutôt que découpé : sinon on pousse
+      // dans la liste des blocs des échardes de deux pixels, voire de largeur
+      // négative, qu'on ne voit pas et qu'on ne peut pas heurter.
+      if (reste - w < 16) w = reste
+      j.e.blocs.push({ x: Math.round(x), y: -34, w: Math.max(4, Math.round(w) - 2), h: 24 })
       x += w
       reste -= w
     }

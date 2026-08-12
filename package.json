@@ -6,6 +6,7 @@
   "description": "ARKAD, une borne de petits jeux, un seul code pour le web et Android",
   "scripts": {
     "build": "node build.mjs",
+    "test": "node --test test/*.test.js",
     "dev": "node build.mjs && npx --yes http-server -p 8000 -c-1",
     "android": "node build.mjs && npx cap sync android"
   },
