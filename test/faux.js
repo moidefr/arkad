@@ -62,8 +62,10 @@ export function fauxCtx() {
     setTransform() {},
     measureText(s) {
       // Approximation monospace, suffisante : on ne teste pas la typo, on
-      // teste que rien ne déborde.
-      const taille = parseFloat(this.font) || 12
+      // teste que rien ne déborde. La police s'écrit « 700 11px … » — un
+      // `parseFloat` naïf y lisait la graisse, donc onze pixels de texte en
+      // mesuraient sept cents, et toute mesure de largeur était fausse.
+      const taille = parseFloat(/(\d+(?:\.\d+)?)px/.exec(this.font)?.[1] ?? '') || 12
       return { width: String(s).length * taille * 0.6 }
     },
     fillRect(x, y, w, h) {

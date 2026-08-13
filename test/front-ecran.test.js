@@ -17,6 +17,8 @@ import { fauxJeu, fauxCtx, PAS, W, H, HUD } from './faux.js'
 import { CHAMP } from '../src/massif/front/vue/champ.js'
 import * as VC from '../src/massif/front/vue/champ.js'
 import { cle } from '../src/massif/front/hex.js'
+import { OBJECTIFS } from '../src/massif/front/carte.js'
+import { largeurTexte } from '../src/dessin.js'
 
 const dessine = (j) => {
   const ctx = fauxCtx()
@@ -357,5 +359,19 @@ test('chaque écran dessine réellement quelque chose', () => {
       ctx.ops.some((o) => o.type === 'texte' && o.s.length > 2),
       `${nom} : aucun texte`,
     )
+  }
+})
+
+test('le libellé d’objectif tient dans la place que lui laisse le bandeau', () => {
+  const ctx = fauxCtx()
+  for (const o of OBJECTIFS) {
+    const c = Cie.nouvelle(5)
+    c.niveau = 12
+    Cie.planifie(c)
+    c.plan[0].objectif = o.id
+    const bat = Cie.prepare(c, 0)
+    const s = B.etatObjectif(bat)
+    // 118 px : ce que laisse le bouton ZOOM, qui commence à x = 136.
+    assert.ok(largeurTexte(ctx, s, 11) <= 118, `« ${s} » fait ${Math.round(largeurTexte(ctx, s, 11))} px`)
   }
 })

@@ -156,7 +156,7 @@ export const OBJECTIFS = [
   {
     id: 'decapitation',
     nom: 'DÉCAPITER',
-    court: 'DÉCAPITER',
+    court: 'OFFICIER',
     texte: 'Abattre l’officier adverse. Le reste se rendra.',
     rang: 5,
   },
@@ -170,7 +170,7 @@ export const OBJECTIFS = [
   {
     id: 'survie',
     nom: 'TENIR LE CHOC',
-    court: 'TENIR BON',
+    court: 'DURER',
     texte: 'Tenir jusqu’au dernier tour. L’ennemi est en force.',
     rang: 9,
   },

@@ -829,7 +829,7 @@ export function etatObjectif(bat) {
   if (o.id === 'survie') return `${nom} · ${Math.max(0, bat.toursMax - bat.tour + 1)} TOURS`
   if (o.id === 'decapitation') {
     const chef = vivantes(bat, 1).find((u) => u.ref === o.chef)
-    return `${nom} ${chef ? nomComplet(chef) : '—'}`
+    return `${nom} · ${chef ? 'DEBOUT' : 'ABATTU'}`
   }
   return `${nom} ${vivantes(bat, 1).length}`
 }
