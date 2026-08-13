@@ -42,9 +42,9 @@ export default {
       b.x += b.vx * dt * 0.5
       b.y += b.vy * dt * 0.5
 
-      if (b.x < BALLE_R) (b.x = BALLE_R), (b.vx = Math.abs(b.vx)), j.son.rebond()
-      if (b.x > j.W - BALLE_R) (b.x = j.W - BALLE_R), (b.vx = -Math.abs(b.vx)), j.son.rebond()
-      if (b.y < j.HUD + BALLE_R) (b.y = j.HUD + BALLE_R), (b.vy = Math.abs(b.vy)), j.son.rebond()
+      if (b.x < BALLE_R) ((b.x = BALLE_R), (b.vx = Math.abs(b.vx)), j.son.rebond())
+      if (b.x > j.W - BALLE_R) ((b.x = j.W - BALLE_R), (b.vx = -Math.abs(b.vx)), j.son.rebond())
+      if (b.y < j.HUD + BALLE_R) ((b.y = j.HUD + BALLE_R), (b.vy = Math.abs(b.vy)), j.son.rebond())
 
       const ry = j.H - RAQUETTE_Y
       if (

@@ -274,7 +274,7 @@ export default {
         12,
         ouvert ? C.faible : C.bord,
         700,
-        296
+        296,
       )
     })
   },
@@ -323,8 +323,8 @@ function choisis(j, o) {
 
   // La faim et la soif ne tuent pas directement : elles rongent la santé.
   let mal = ''
-  if (h.vivres <= 0) (h.sante -= 10), (h.vivres = 0), (mal = 'la faim te ronge')
-  if (h.eau <= 0) (h.sante -= 13), (h.eau = 0), (mal = 'la soif te brûle')
+  if (h.vivres <= 0) ((h.sante -= 10), (h.vivres = 0), (mal = 'la faim te ronge'))
+  if (h.eau <= 0) ((h.sante -= 13), (h.eau = 0), (mal = 'la soif te brûle'))
 
   h.jour++
   j.score = Math.floor(h.km)

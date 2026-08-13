@@ -20,7 +20,8 @@ import { texte } from '../../dessin.js'
 import { lis, ecris } from '../../stockage.js'
 import * as L from './logique.js'
 import * as V from './vues.js'
-import { PIECE, encombrement } from './donnees.js'
+import { PIECE, encombrement, MONDES } from './donnees.js'
+import { pourMonde } from '../../musique.js'
 
 const CLE_META = 'breche.meta'
 const metaVide = { meilleurMonde: 0, parties: 0, meilleurCombo: 0 }
@@ -60,6 +61,7 @@ export default {
     const brut = L.migre(j.charge())
     j.e.p = brut ?? L.nouvelle((j.hasard() * 4294967296) >>> 0)
     j.score = j.e.p.total
+    accorde(j)
     if (!brut) sauve(j)
   },
 
@@ -148,6 +150,7 @@ export default {
         L.suivant(e.p)
         e.vue = 'jeu'
         j.son.niveau()
+        accorde(j)
         sauve(j)
       }
       return
@@ -302,4 +305,13 @@ function finit(j) {
 
 function sauve(j) {
   j.sauve(L.sauvegarde(j.e.p))
+}
+
+/**
+ * La bande du monde courant. Cinq par famille de monde : on refait quatre fois
+ * le tour des dix mondes avant de réentendre le premier morceau.
+ */
+function accorde(j) {
+  const n = j.e.p.n
+  j.musique(pourMonde(n % MONDES.length, Math.floor(n / MONDES.length)))
 }

@@ -190,7 +190,15 @@ export function pose(p, k, c, l) {
 
   p.main[k] = null
   p.poses++
-  const r = { pose: cellules, lignes: 0, colonnes: 0, emportees: [], points: cellules.length, combo: p.combo, monte: false }
+  const r = {
+    pose: cellules,
+    lignes: 0,
+    colonnes: 0,
+    emportees: [],
+    points: cellules.length,
+    combo: p.combo,
+    monte: false,
+  }
   p.score += cellules.length
   p.total += cellules.length
 
@@ -371,7 +379,7 @@ function monteSiBesoin(p) {
   if (p.depuisMontee < pas) return false
   p.depuisMontee = 0
   const t = p.taille
-  for (let c = 0; c < t; c++) if (p.cases[indice(p, c, 0)] > 0) return (p.fini = true), true
+  for (let c = 0; c < t; c++) if (p.cases[indice(p, c, 0)] > 0) return ((p.fini = true), true)
   for (let l = 0; l < t - 1; l++) {
     for (let c = 0; c < t; c++) {
       const haut = indice(p, c, l)

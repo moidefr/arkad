@@ -45,7 +45,12 @@ export class Effets {
   }
 
   /** Un jet dirigé : réacteur, poussière d'atterrissage, traînée. */
-  jet(x, y, couleur, { angle = Math.PI / 2, ouverture = 0.6, n = 3, vitesse = 120, taille = 3, duree = 0.35, gravite = 0 } = {}) {
+  jet(
+    x,
+    y,
+    couleur,
+    { angle = Math.PI / 2, ouverture = 0.6, n = 3, vitesse = 120, taille = 3, duree = 0.35, gravite = 0 } = {},
+  ) {
     for (let i = 0; i < n; i++) {
       const a = angle + (Math.random() - 0.5) * ouverture
       const v = vitesse * (0.5 + Math.random() * 0.8)

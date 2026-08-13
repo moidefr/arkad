@@ -21,6 +21,7 @@ import { CATEGORIES } from './catalogue.js'
 import { Input } from './input.js'
 import { C, ton } from './palette.js'
 import { son } from './son.js'
+import { musique, pourJeu } from './musique.js'
 import { Effets } from './effets.js'
 import { lis, ecris } from './stockage.js'
 import { FORMATS, HUD, orientationAppareil, formatPour, tailleDe, suggestion } from './format.js'
@@ -275,6 +276,8 @@ export class Moteur {
       get paysage() {
         return moteur.format === 'paysage'
       },
+      /** Change la bande-son. Un jeu à mondes s'en sert à chaque palier. */
+      musique: (quoi) => musique.joue(quoi),
       e: {},
       hasard: Math.random,
       entier: (a, b) => a + Math.floor(Math.random() * (b - a)),
@@ -302,6 +305,9 @@ export class Moteur {
     if (options.neuve) j.efface()
     this.j = j
     def.init?.(j)
+    // La bande par défaut est celle du jeu ; `init` a pu en demander une autre
+    // (BRÈCHE choisit selon le monde), et on ne l'écrase pas.
+    if (!musique.voulue) musique.joue(pourJeu(def.id))
     this.phase = this.cat?.decompte ? 'depart' : 'jeu'
     this.phaseT = 0
     this.bip = -1
@@ -342,6 +348,7 @@ export class Moteur {
 
   _quitte() {
     this.def?.quitte?.(this.j)
+    musique.arrete()
     this.phase = this.cat ? 'categorie' : 'accueil'
     this.phaseT = 0
     this.def = null
@@ -413,7 +420,7 @@ export class Moteur {
     son.reveille()
 
     if (this.phase === 'accueil') {
-      if (dans(p, dispoSon(this.W))) return son.bascule()
+      if (dans(p, dispoSon(this.W))) return (son.bascule(), musique.accorde())
       const d = dispoAccueil(this.W, this.H)
       const i = CATEGORIES.findIndex((_, k) => dans(p, carteAccueil(k, d)))
       if (i >= 0) {
@@ -485,7 +492,7 @@ export class Moteur {
         return (son.clic(), this.lance(this.def, { neuve: true }))
       }
       if (i === 2) return (son.clic(), this._quitte())
-      if (i === 3) return son.bascule()
+      if (i === 3) return (son.bascule(), musique.accorde())
       return
     }
 
@@ -683,7 +690,9 @@ export class Moteur {
     const { x, y, w, h } = dispoSon(this.W)
     rect(ctx, x, y, w, h, C.panneau)
     cadre(ctx, x, y, w, h, son.muet ? C.bord : C.faible)
-    texte(ctx, son.muet ? 'x' : '♪', x + w / 2, y + h / 2, 15, son.muet ? C.faible : C.accent, 700)
+    // Trois positions, trois glyphes : tout, bruitages seuls, silence.
+    const glyphe = son.mode === 'tout' ? '♪' : son.mode === 'bruitages' ? '·' : 'x'
+    texte(ctx, glyphe, x + w / 2, y + h / 2, 15, son.muet ? C.faible : C.accent, 700)
   }
 
   // --- En jeu ---------------------------------------------------------------
@@ -759,7 +768,7 @@ export class Moteur {
     libelles.forEach((libelle, i) => {
       let l = libelle
       let teinte
-      if (i === 3) l = son.muet ? 'SON : NON' : 'SON : OUI'
+      if (i === 3) l = son.libelle
       // Sur un jeu long, « recommencer » efface une partie de plusieurs
       // heures : autant que le bouton le dise, et qu'il le demande deux fois.
       if (i === 1 && this.def.persistant) {

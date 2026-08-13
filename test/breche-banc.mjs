@@ -160,7 +160,9 @@ console.log('\n  ensemble —')
 // qui se présentent et ne prépare rien. Son plafond dans ces mondes-là mesure
 // donc sa myopie autant que leur difficulté — c'est le seul endroit du banc où
 // il faut lire les chiffres avec cette réserve en tête.
-console.log(`    ${(coupsTotal / PARTIES).toFixed(0)} poses par partie · ${(totalPoints / PARTIES).toFixed(0)} points en moyenne`)
+console.log(
+  `    ${(coupsTotal / PARTIES).toFixed(0)} poses par partie · ${(totalPoints / PARTIES).toFixed(0)} points en moyenne`,
+)
 console.log(`    monde le plus loin : ${plusLoin + 1} sur ${MONDES.length}`)
 
 // --- Les pièces ------------------------------------------------------------------

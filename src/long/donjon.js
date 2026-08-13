@@ -49,20 +49,20 @@ function dispo(j) {
     }
   }
   const cote = CASE_L
-  const x = 12
-  const y = 64
-  const bord = x + COLS * cote + x // la frontière entre ce qu'on foule et ce qu'on lit
+  const marge = 12
+  const y = 64 // la grille centrée entre le bandeau et le bas de l'écran
+  const bord = marge + COLS * cote + marge // la frontière entre ce qu'on foule et ce qu'on lit
   const col = bord + 12
   const large = j.W - col - 16
   return {
     taille: cote,
-    x,
+    x: marge,
     y,
     zone: { x: 0, y: 0, w: bord, h: j.H },
     panneau: { x: col, w: large },
     bandeau: { pv: 72, barre: 84, xp: 102, bas: 118, sac: { x: col, y: 138, align: 'left', w: large } },
     journal: { x: col, y: 180, pas: 26, n: 6, w: large },
-    tresor: { x: x + (COLS * cote) / 2, y: y + (RANGS * cote) / 2 },
+    tresor: { x: marge + (COLS * cote) / 2, y: y + (RANGS * cote) / 2 },
   }
 }
 
@@ -184,8 +184,8 @@ export default {
       const y = g.y + m.r * cote
       // Une bête entamée porte sa blessure : on choisit sur quoi s'acharner.
       if (m.pv < m.pvMax) {
-        const bord = ech(g, 4)
-        rect(ctx, x + bord, y + cote - ech(g, 6), (cote - ech(g, 8)) * (m.pv / m.pvMax), ech(g, 3), C.rouge)
+        const retrait = ech(g, 4)
+        rect(ctx, x + retrait, y + cote - ech(g, 6), (cote - ech(g, 8)) * (m.pv / m.pvMax), ech(g, 3), C.rouge)
       }
       texte(ctx, t.l, x + cote / 2, y + cote / 2 - ech(g, 2), ech(g, 22), t.couleur, 700)
     }
@@ -198,7 +198,8 @@ export default {
 
     if (j.paysage) {
       // La règle verticale dit aussi où s'arrête la manette : à gauche on
-      // marche, à droite on lit.
+      // marche, à droite on lit. La seconde sépare ce que vaut le personnage de
+      // ce qui vient de lui arriver.
       rect(ctx, g.zone.w, g.y, PX, RANGS * cote, C.bord)
       rect(ctx, g.panneau.x, g.journal.y - 22, g.panneau.w, PX, C.bord)
     }

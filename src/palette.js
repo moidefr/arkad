@@ -40,7 +40,11 @@ export function ton(hex, k) {
   const sortie =
     '#' +
     c
-      .map((v, i) => Math.round(v + (cible[i] - v) * t).toString(16).padStart(2, '0'))
+      .map((v, i) =>
+        Math.round(v + (cible[i] - v) * t)
+          .toString(16)
+          .padStart(2, '0'),
+      )
       .join('')
   cache.set(cle, sortie)
   return sortie

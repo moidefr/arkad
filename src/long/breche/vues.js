@@ -131,7 +131,8 @@ const caseTenant = (piece, z, marge = 14) => {
 export function dessinePiece(ctx, piece, x, y, c, couleur, alpha = 1) {
   const a = ctx.globalAlpha
   ctx.globalAlpha = a * alpha
-  for (const [dc, dl] of piece.cases) bloc(ctx, x + dc * c + 1, y + dl * c + 1, c - 2, c - 2, couleur, Math.max(2, c / 10))
+  for (const [dc, dl] of piece.cases)
+    bloc(ctx, x + dc * c + 1, y + dl * c + 1, c - 2, c - 2, couleur, Math.max(2, c / 10))
   ctx.globalAlpha = a
 }
 
@@ -167,7 +168,16 @@ export function main(ctx, j, p, d, prise) {
     dessinePiece(ctx, piece, ox, oy, c, places ? TEINTES[k % TEINTES.length] : ton(C.rouge, -0.4), pris ? 0.3 : 1)
 
     ctx.textAlign = 'center'
-    texte(ctx, places ? `${places}` : 'BLOQUÉE', z.x + z.w / 2, z.y + z.h - 9, 10, places ? C.faible : C.rouge, 700, z.w - 6)
+    texte(
+      ctx,
+      places ? `${places}` : 'BLOQUÉE',
+      z.x + z.w / 2,
+      z.y + z.h - 9,
+      10,
+      places ? C.faible : C.rouge,
+      700,
+      z.w - 6,
+    )
     ctx.textAlign = 'left'
   })
   return zones
@@ -237,7 +247,16 @@ export function outils(ctx, j, p, d, arme) {
     cadre(ctx, z.x, z.y, z.w, z.h, arme === z.quoi ? teinte : C.faible)
     ctx.textAlign = 'center'
     const nom = z.quoi === 'marteau' ? 'MARTEAU' : 'ÉCHANGE'
-    texte(ctx, `${nom} ${n}`, z.x + z.w / 2, z.y + z.h / 2, 12, actif ? (arme === z.quoi ? teinte : C.texte) : C.faible, 700, z.w - 8)
+    texte(
+      ctx,
+      `${nom} ${n}`,
+      z.x + z.w / 2,
+      z.y + z.h / 2,
+      12,
+      actif ? (arme === z.quoi ? teinte : C.texte) : C.faible,
+      700,
+      z.w - 8,
+    )
     ctx.textAlign = 'left'
     ctx.globalAlpha = a
   }

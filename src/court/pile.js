@@ -24,8 +24,8 @@ export default {
   maj(j, dt) {
     const c = j.e.courant
     c.x += c.dir * j.e.v * dt
-    if (c.x < 0) (c.x = 0), (c.dir = 1)
-    if (c.x + c.w > j.W) (c.x = j.W - c.w), (c.dir = -1)
+    if (c.x < 0) ((c.x = 0), (c.dir = 1))
+    if (c.x + c.w > j.W) ((c.x = j.W - c.w), (c.dir = -1))
 
     j.e.tassement = Math.max(0, j.e.tassement - dt * 7)
 

@@ -101,7 +101,7 @@ test('appuyer n’importe où dans la fenêtre allumée passe toujours', () => {
     const { j, mort } = partie({
       duree: 25,
       decide: (vu) => {
-        if (!vu.fenetre) return (compte = -1), false
+        if (!vu.fenetre) return ((compte = -1), false)
         compte++
         return compte === retard
       },

@@ -29,7 +29,7 @@ export default {
 
     j.e.prochain -= dt
     if (j.e.prochain <= 0) {
-      j.e.prochain = Math.max(0.44, 1.05 - j.t * 0.010)
+      j.e.prochain = Math.max(0.44, 1.05 - j.t * 0.01)
       j.e.obs.push({ a: Math.random() * Math.PI * 2, r: 300, v: 90 + Math.random() * 40 })
     }
 

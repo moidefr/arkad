@@ -10,7 +10,17 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 
 import * as L from '../src/long/breche/logique.js'
-import { PIECES, PIECE, MONDES, TRANSFOS, TRANSFO, REGLES, EFFETS, encombrement, bassinDe } from '../src/long/breche/donnees.js'
+import {
+  PIECES,
+  PIECE,
+  MONDES,
+  TRANSFOS,
+  TRANSFO,
+  REGLES,
+  EFFETS,
+  encombrement,
+  bassinDe,
+} from '../src/long/breche/donnees.js'
 
 /** Un plateau vide, à la taille voulue, sans passer par la génération d'un monde. */
 function plateau(taille = 8) {
@@ -45,7 +55,10 @@ test('chaque pièce est cohérente, et aucune n’est en double', () => {
     assert.ok(w <= 5 && h <= 5, `${piece.id} fait ${w}×${h}, trop gros pour la plus petite grille`)
     // Une pièce doit toucher les deux bords de son encombrement, sinon elle
     // porte un décalage invisible qui fausse le centrage à l'écran.
-    assert.ok(piece.cases.some((c) => c[0] === 0) && piece.cases.some((c) => c[1] === 0), `${piece.id} n’est pas calée en haut à gauche`)
+    assert.ok(
+      piece.cases.some((c) => c[0] === 0) && piece.cases.some((c) => c[1] === 0),
+      `${piece.id} n’est pas calée en haut à gauche`,
+    )
     const forme = piece.cases
       .map((c) => c.join(','))
       .sort()
@@ -62,7 +75,8 @@ test('chaque monde ne parle que le vocabulaire de règles admis', () => {
     vus.add(m.id)
     assert.ok(m.nom && m.texte?.length > 20 && m.objectif > 0, m.id)
     for (const cle of Object.keys(m.regles)) assert.ok(REGLES.includes(cle), `${m.id} : règle inconnue « ${cle} »`)
-    for (const id of Object.keys(m.regles.semis ?? {})) assert.ok(TRANSFO[id], `${m.id} : semis d’une transformation inconnue`)
+    for (const id of Object.keys(m.regles.semis ?? {}))
+      assert.ok(TRANSFO[id], `${m.id} : semis d’une transformation inconnue`)
     const t = m.regles.taille ?? 8
     assert.ok(t >= 8 && t <= 10, `${m.id} : grille de ${t}`)
     assert.ok(bassinDe(m.regles).length >= 10, `${m.id} : vivier de pièces trop maigre`)
@@ -77,7 +91,10 @@ test('aucune règle de monde n’est décorative', async () => {
   const src = lus.join('\n')
   for (const cle of REGLES) {
     assert.ok(src.includes(`.${cle}`), `la règle « ${cle} » n’est lue nulle part`)
-    assert.ok(MONDES.some((m) => m.regles[cle] != null), `la règle « ${cle} » n’est utilisée par aucun monde`)
+    assert.ok(
+      MONDES.some((m) => m.regles[cle] != null),
+      `la règle « ${cle} » n’est utilisée par aucun monde`,
+    )
   }
   for (const t of TRANSFOS) {
     assert.ok(EFFETS.includes(t.effet), `${t.id} : effet hors vocabulaire`)
@@ -104,7 +121,13 @@ test('poser retire la pièce de la main et remplit exactement ses cases', () => 
   assert.ok(r)
   assert.equal(p.main[0], null)
   assert.equal(compte(p), 4)
-  for (const [c, l] of [[1, 1], [2, 1], [1, 2], [2, 2]]) assert.ok(L.pleine(p, c, l))
+  for (const [c, l] of [
+    [1, 1],
+    [2, 1],
+    [1, 2],
+    [2, 2],
+  ])
+    assert.ok(L.pleine(p, c, l))
   assert.equal(r.points, 4, 'quatre cases posées, quatre points')
 })
 
@@ -161,7 +184,11 @@ test('une bombe prise dans une ligne emporte ses voisines', () => {
   const p = plateau(8)
   for (let c = 0; c < 7; c++) remplis(p, [[c, 4]])
   p.spec[L.indice(p, 3, 4)] = 'bombe'
-  remplis(p, [[3, 3], [3, 5], [2, 3]])
+  remplis(p, [
+    [3, 3],
+    [3, 5],
+    [2, 3],
+  ])
   p.main = ['unite', null, null]
   L.pose(p, 0, 7, 4)
   assert.equal(L.pleine(p, 3, 3), false, 'la case au-dessus de la bombe a survécu')
@@ -256,7 +283,10 @@ test('l’échange change la main sans avancer la crue', () => {
 
 test('la crue pousse tout vers le haut, et un doublé la repousse', () => {
   const p = L.nouvelle(3)
-  L.entreMonde(p, MONDES.findIndex((m) => m.regles.montee))
+  L.entreMonde(
+    p,
+    MONDES.findIndex((m) => m.regles.montee),
+  )
   const pas = L.regles(p).montee
   assert.ok(pas > 0)
   // On pose jusqu'à la montée, sans jamais éclater.

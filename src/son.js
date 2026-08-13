@@ -9,11 +9,39 @@
  */
 import { lis, ecris } from './stockage.js'
 
+/**
+ * Trois états, pas deux.
+ *
+ * Une borne qui a cinquante bandes-son ne peut pas s'en remettre à un seul
+ * interrupteur : il y a ceux qui veulent tout, ceux qui veulent les bruitages
+ * sans la musique — le cas le plus courant, dans le métro ou à côté de
+ * quelqu'un — et ceux qui veulent le silence. Un bouton, trois positions.
+ */
+export const MODES = ['tout', 'bruitages', 'muet']
+const LIBELLES = { tout: 'SON : TOUT', bruitages: 'SON : SANS MUSIQUE', muet: 'SON : MUET' }
+
 class Sons {
   constructor() {
-    this.muet = lis('muet') === '1'
+    // L'ancien réglage n'avait que deux positions : on le relit sans le perdre.
+    const ancien = lis('muet') === '1' ? 'muet' : null
+    const lu = lis('son.mode', null)
+    this.mode = MODES.includes(lu) ? lu : (ancien ?? 'tout')
     this.ctx = null
     this.maitre = null
+  }
+
+  /** Vrai quand plus rien ne doit sortir. Le reste du code ne connaît que ça. */
+  get muet() {
+    return this.mode === 'muet'
+  }
+
+  /** Vrai quand la bande-son doit tourner. */
+  get musique() {
+    return this.mode === 'tout'
+  }
+
+  get libelle() {
+    return LIBELLES[this.mode]
   }
 
   reveille() {
@@ -29,9 +57,11 @@ class Sons {
   }
 
   bascule() {
-    this.muet = !this.muet
+    this.mode = MODES[(MODES.indexOf(this.mode) + 1) % MODES.length]
+    ecris('son.mode', this.mode)
     ecris('muet', this.muet ? '1' : '0')
     if (!this.muet) this.clic()
+    return this.mode
   }
 
   get actif() {

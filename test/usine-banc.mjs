@@ -90,13 +90,19 @@ while (t < HEURES * 3600) {
   t += PAS
 }
 
-const hms = (s) => `${String(Math.floor(s / 3600)).padStart(2, '0')}h${String(Math.floor((s % 3600) / 60)).padStart(2, '0')}`
+const hms = (s) =>
+  `${String(Math.floor(s / 3600)).padStart(2, '0')}h${String(Math.floor((s % 3600) / 60)).padStart(2, '0')}`
 for (const l of journal) console.log(`  ${hms(l.t)}  ${l.quoi}`)
 
 console.log(`\n--- après ${HEURES} h ---`)
 console.log(`  production   ${L.nombre(L.production(e))} / s`)
 console.log(`  extrait      ${L.nombre(e.total)}   (cumulé depuis la dernière refonte)`)
-console.log(`  machines     ${e.n.map((v, i) => (v ? `${MACHINES[i].nom.slice(0, 4)}×${v}` : null)).filter(Boolean).join('  ')}`)
+console.log(
+  `  machines     ${e.n
+    .map((v, i) => (v ? `${MACHINES[i].nom.slice(0, 4)}×${v}` : null))
+    .filter(Boolean)
+    .join('  ')}`,
+)
 console.log(`  ouvriers     ${e.ouvriers}  (couverture ${(L.couverture(e) * 100).toFixed(0)} %)`)
 console.log(`  lingots      ${e.lingots}  en ${e.fontes} refonte(s)  →  global ×${(1 + e.lingots * 0.25).toFixed(1)}`)
 console.log(`  améliorations ${e.ame.length} / ${AMELIORATIONS.length}`)

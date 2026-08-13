@@ -38,7 +38,7 @@ export default {
 
     for (const f of j.e.filantes) {
       f.y += (f.v + vitesse) * dt
-      if (f.y > j.H) (f.y = j.HUD - 20), (f.x = j.hasard() * j.W)
+      if (f.y > j.H) ((f.y = j.HUD - 20), (f.x = j.hasard() * j.W))
     }
 
     const derniere = j.e.blocs.length ? Math.min(...j.e.blocs.map((b) => b.y)) : Infinity
@@ -93,7 +93,6 @@ export default {
     rect(ctx, px + 6, py + 6, 12, 6, C.fond)
   },
 }
-
 
 /**
  * Chaque vague laisse un passage, et ce passage ne s'éloigne jamais de plus

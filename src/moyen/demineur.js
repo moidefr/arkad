@@ -131,8 +131,7 @@ export default {
       if (c.mine) {
         lueur(ctx, x + 10, y + 10, CASE - 20, CASE - 20, C.rouge, 2)
         bloc(ctx, x + 10, y + 10, CASE - 20, CASE - 20, C.rouge, 2)
-      }
-      else if (c.voisins) texte(ctx, c.voisins, x + CASE / 2, y + CASE / 2, 20, TEINTE[c.voisins - 1], 700)
+      } else if (c.voisins) texte(ctx, c.voisins, x + CASE / 2, y + CASE / 2, 20, TEINTE[c.voisins - 1], 700)
     }
 
     // Debout les quatre informations s'empilent en deux lignes ; couché, la

@@ -121,6 +121,7 @@ export function fauxJeu(def, options = {}) {
     pointer: { x: taille.W / 2, y: taille.H / 2 },
     son: RIEN,
     fx: RIEN,
+    musique: () => {},
     maintenu: false,
     e: {},
     hasard,

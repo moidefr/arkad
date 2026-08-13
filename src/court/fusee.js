@@ -43,7 +43,7 @@ export default {
     }
     j.e.y += j.e.vy * dt
 
-    if (j.e.y < j.HUD + 20) (j.e.y = j.HUD + 20), (j.e.vy = 0)
+    if (j.e.y < j.HUD + 20) ((j.e.y = j.HUD + 20), (j.e.vy = 0))
 
     if (j.maintenu && j.e.carburant > 0) {
       j.fx.jet(j.e.x, j.e.y + HAUT / 2, C.accent, { angle: Math.PI / 2, n: 3, vitesse: 160, duree: 0.3 })

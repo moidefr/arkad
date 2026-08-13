@@ -1,6 +1,7 @@
 import { C, ton } from '../../palette.js'
 import { texte, rect, lueur, borne } from '../../dessin.js'
 import { MACHINES, RECHERCHES, CONTRATS } from './donnees.js'
+import * as D from './dispo.js'
 import * as L from './logique.js'
 import * as S from './scene.js'
 import * as V from './vues.js'
@@ -15,6 +16,12 @@ export default {
   unite: '',
   persistant: true,
   sansScore: true,
+  // Un incrémental se joue à deux endroits en même temps : la scène qui montre
+  // ce qu'on a bâti, et la liste où on l'achète. Debout ils se partagent la
+  // hauteur et sont tous deux à l'étroit ; couché, chacun tient une moitié de
+  // l'écran et on les voit ensemble — c'est là que ce jeu est chez lui.
+  paysage: true,
+  confort: 'paysage',
   // Pas de `ciel` : la scène peint le sien, et il change avec l'heure. Deux
   // dégradés tramés l'un sur l'autre ne font pas un ciel, ils font du bruit.
 
@@ -31,7 +38,20 @@ export default {
     j.e.horsLigne = L.credite(j.e)
   },
 
+  /**
+   * L'écran a tourné. Le défilement d'un gabarit ne veut rien dire dans
+   * l'autre — la fenêtre n'a pas la même hauteur, et un défilement conservé
+   * pointerait au milieu de nulle part. On remonte en haut de liste, et on
+   * oublie le doigt en cours : il a été posé sur des coordonnées qui
+   * n'existent plus.
+   */
+  redim(j) {
+    j.e.defile = 0
+    j.e.drag = null
+  },
+
   maj(j, dt) {
+    const d = D.dispo(j)
     j.e.coup = Math.max(0, j.e.coup - dt * 3)
     if (j.e.avis) {
       j.e.avis.reste -= dt
@@ -40,10 +60,10 @@ export default {
 
     // Le défilement suit le doigt tant qu'il est posé.
     if (j.e.drag && j.maintenu) {
-      const d = j.pointer.y - j.e.drag.y
-      if (Math.abs(d) > GLISSE) j.e.drag.bouge = true
+      const dy = j.pointer.y - j.e.drag.y
+      if (Math.abs(dy) > GLISSE) j.e.drag.bouge = true
       if (j.e.drag.bouge)
-        j.e.defile = borne(j.e.drag.depart - d, 0, Math.max(0, hauteurVue(j.e) - V.fenetreDe(j.e.vue)))
+        j.e.defile = borne(j.e.drag.depart - dy, 0, Math.max(0, hauteurVue(j.e) - D.fenetreDe(d, j.e.vue)))
     }
 
     L.avance(j.e, dt, j.hasard, {
@@ -59,7 +79,7 @@ export default {
       contrat: (c, reussi) => {
         j.son[reussi ? 'record' : 'rate']()
         avis(j, CONTRATS[c.m].nom + (reussi ? ' LIVRÉ' : ' PERDU'), reussi ? C.vert : C.rouge)
-        if (reussi) j.fx.eclat(180, 400, C.vert, { n: 24, vitesse: 220 })
+        if (reussi) j.fx.eclat(d.ligne.centre, d.liste.y + 50, C.vert, { n: 24, vitesse: 220 })
       },
     })
 
@@ -74,59 +94,69 @@ export default {
 
   dessine(j, ctx) {
     const e = j.e
-    texte(ctx, L.nombre(e.minerai), 180, 82, 30, C.texte, 700, 320)
+    const d = D.dispo(j)
+    const en = d.entete
+    texte(ctx, L.nombre(e.minerai), en.cx, en.y, 30, C.texte, 700, en.max)
     ctx.textAlign = 'left'
-    texte(ctx, `${L.nombre(L.production(e))} / s`, 16, 104, 13, e.boost > 0 ? C.vert : C.faible, 700, 150)
+    const rythme = `${L.nombre(L.production(e))} / s`
+    texte(ctx, rythme, en.gauche, en.yBas, 13, e.boost > 0 ? C.vert : C.faible, 700, en.prod)
     ctx.textAlign = 'right'
     if (e.lingots) {
-      texte(ctx, `${e.lingots} lingots · tout ×${L.nombre(L.global(e))}`, 344, 104, 12, C.accent, 700, 180)
+      const dit = `${e.lingots} lingots · tout ×${L.nombre(L.global(e))}`
+      texte(ctx, dit, en.droite, en.yBas, 12, C.accent, 700, en.lingots)
     }
     ctx.textAlign = 'center'
 
-    S.dessine(j, ctx)
-    V.dessineOnglets(j, ctx)
+    S.dessine(j, ctx, d)
+    // Couché, une règle sépare l'atelier de la liste : sans elle, les deux
+    // moitiés flottent dans le même noir.
+    if (d.separateur) rect(ctx, d.separateur.x, d.separateur.y, d.separateur.w, d.separateur.h, C.bord)
+    V.dessineOnglets(j, ctx, d)
 
-    if (e.vue === 'usine') V.dessineUsine(j, ctx)
-    else if (e.vue === 'atelier') V.dessineAtelier(j, ctx)
-    else if (e.vue === 'recherche') V.dessineRecherche(j, ctx)
-    else V.dessineContrats(j, ctx)
+    if (e.vue === 'usine') V.dessineUsine(j, ctx, d)
+    else if (e.vue === 'atelier') V.dessineAtelier(j, ctx, d)
+    else if (e.vue === 'recherche') V.dessineRecherche(j, ctx, d)
+    else V.dessineContrats(j, ctx, d)
 
     // Un bandeau d'annonce, posé sur la scène : une panne ou une recherche
     // trouvée pendant qu'on regardait un autre onglet ne doit pas passer inaperçue.
+    const a = d.avis
     if (e.avis) {
-      const alpha = Math.min(1, e.avis.reste * 2)
-      ctx.globalAlpha = alpha
-      lueur(ctx, 40, 284, 280, 22, e.avis.couleur, 3, 0.7)
-      rect(ctx, 40, 284, 280, 22, ton(C.fond, 0.15))
-      texte(ctx, e.avis.texte, 180, 295, 12, e.avis.couleur, 700, 268)
+      ctx.globalAlpha = Math.min(1, e.avis.reste * 2)
+      lueur(ctx, a.x, a.y, a.w, a.h, e.avis.couleur, 3, 0.7)
+      rect(ctx, a.x, a.y, a.w, a.h, ton(C.fond, 0.15))
+      texte(ctx, e.avis.texte, a.x + a.w / 2, a.y + 11, 12, e.avis.couleur, 700, a.w - 12)
       ctx.globalAlpha = 1
     } else if (e.horsLigne > 1 && j.t < 8) {
-      texte(ctx, `pendant ton absence : +${L.nombre(e.horsLigne)}`, 180, 295, 12, C.accent, 700, 300)
+      const dit = `pendant ton absence : +${L.nombre(e.horsLigne)}`
+      texte(ctx, dit, a.x + a.w / 2, a.y + 11, 12, C.accent, 700, a.w - 12)
     }
   },
 
   appui(j, p) {
-    // Le haut de l'écran répond au doigt qui se pose : la scène et les onglets
-    // ne défilent pas, donc rien ne justifierait d'attendre.
-    const onglet = V.ongletTouche(p)
+    const d = D.dispo(j)
+    // La scène et les onglets répondent au doigt qui se pose : ils ne défilent
+    // pas, donc rien ne justifierait d'attendre.
+    const onglet = V.ongletTouche(d, p)
     if (onglet) {
       if (onglet !== j.e.vue) j.e.defile = 0
       j.e.vue = onglet
       return j.son.clic()
     }
-    if (p.y < V.LISTE.y) return appuiScene(j, p)
+    if (!D.dansListe(d, p)) return appuiScene(j, p, d)
 
     // Dans la liste, on décide au relâchement : sinon un défilement achète.
     j.e.drag = { y: p.y, depart: j.e.defile, bouge: false }
   },
 
   relache(j, p) {
-    const d = j.e.drag
+    const d = D.dispo(j)
+    const drag = j.e.drag
     j.e.drag = null
-    if (!d || d.bouge || p.y < V.LISTE.y) return
-    if (j.e.vue === 'usine') V.appuiUsine(j, p)
-    else if (j.e.vue === 'atelier') V.appuiAtelier(j, p)
-    else if (j.e.vue === 'recherche') V.appuiRecherche(j, p)
+    if (!drag || drag.bouge || !D.dansListe(d, p)) return
+    if (j.e.vue === 'usine') V.appuiUsine(j, p, d)
+    else if (j.e.vue === 'atelier') V.appuiAtelier(j, p, d)
+    else if (j.e.vue === 'recherche') V.appuiRecherche(j, p, d)
   },
 }
 
@@ -142,8 +172,8 @@ function avis(j, texteAvis, couleur) {
 }
 
 /** La scène est jouable : on frappe la paroi, on répare les machines. */
-function appuiScene(j, p) {
-  for (const z of S.zones(j.e)) {
+function appuiScene(j, p, d) {
+  for (const z of S.zones(j)) {
     if (p.x < z.x || p.x > z.x + z.w || p.y < z.y || p.y > z.y + z.h) continue
     if (z.quoi === 'roche') {
       const gain = L.gainMain(j.e)
@@ -154,7 +184,7 @@ function appuiScene(j, p) {
       j.fx.bulle(z.x + z.w + 14, p.y - 8, '+' + L.nombre(gain), C.accent, 14)
       return
     }
-    if (L.enPanne(j.e, z.i)) return V.repare(j, z.i)
+    if (L.enPanne(j.e, z.i)) return V.repare(j, z.i, d)
     // Une machine en marche qu'on tapote : elle ne fait rien, mais elle le dit.
     j.son.clic()
     j.fx.bulle(z.x + z.w / 2, z.y - 6, MACHINES[z.i].nom, MACHINES[z.i].couleur, 11)

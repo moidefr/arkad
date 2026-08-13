@@ -29,8 +29,8 @@ export default {
     j.e.x += j.e.dir * lateral * dt
     // On rebondit sur les bords plutôt que de s'y coller : rester bloqué
     // contre un mur invisible est la pire sensation possible.
-    if (j.e.x < TAILLE / 2) (j.e.x = TAILLE / 2), (j.e.dir = 1)
-    if (j.e.x > j.W - TAILLE / 2) (j.e.x = j.W - TAILLE / 2), (j.e.dir = -1)
+    if (j.e.x < TAILLE / 2) ((j.e.x = TAILLE / 2), (j.e.dir = 1))
+    if (j.e.x > j.W - TAILLE / 2) ((j.e.x = j.W - TAILLE / 2), (j.e.dir = -1))
 
     // La trace ne garde que les positions passées : dessinée sous le joueur,
     // elle donne à voir le zigzag qu'on vient de faire.
@@ -39,7 +39,7 @@ export default {
 
     j.e.prochain -= dt
     if (j.e.prochain <= 0) {
-      j.e.prochain = Math.max(0.72, 1.45 - j.t * 0.010)
+      j.e.prochain = Math.max(0.72, 1.45 - j.t * 0.01)
       const largeur = Math.max(64, 120 - j.t * 0.62)
       j.e.murs.push({ y: j.HUD - MUR_H, trou: 30 + Math.random() * (j.W - 60 - largeur), largeur })
     }
