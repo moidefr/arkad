@@ -9,6 +9,13 @@
  * Les jeux longs, eux, ne se « perdent » pas : ils écrivent leur état avec
  * `j.sauve()` et le relisent au lancement. C'est ce qui permet une partie de
  * dix heures étalée sur trois semaines.
+ *
+ * **Deux formats.** L'espace logique vaut 360 × 640 par défaut, et 640 × 360
+ * pour les jeux qui déclarent `paysage: true`. Le moteur ne connaît que ces
+ * deux gabarits ; toutes ses mises en page sont calculées à partir de `this.W`
+ * et `this.H`, jamais écrites en dur — et **le dessin et le test de clic
+ * passent par la même fonction de disposition**, ce qui rend impossible le
+ * bouton décalé de huit pixels.
  */
 import { CATEGORIES } from './catalogue.js'
 import { Input } from './input.js'
@@ -16,53 +23,122 @@ import { C, ton } from './palette.js'
 import { son } from './son.js'
 import { Effets } from './effets.js'
 import { lis, ecris } from './stockage.js'
+import { FORMATS, HUD, orientationAppareil, formatPour, tailleDe, suggestion } from './format.js'
 import { texte, rect, cadre, bloc, lueur, ombre, vignette, bandeTramee, scanlines, largeurTexte, PX } from './dessin.js'
 
-export const W = 360
-export const H = 640
+/** Le gabarit de référence — celui des tests et des jeux qui n'en changent pas. */
+export const W = FORMATS.portrait.W
+export const H = FORMATS.portrait.H
+export { HUD }
 
-/** Hauteur du bandeau du haut pendant une partie. */
-export const HUD = 56
-
-const BTN_SON = { x: 302, y: 16, w: 40, h: 30 }
-const BTN_RETOUR = { x: 16, y: 14, w: 74, h: 34 }
-
-// Accueil : une carte par catégorie.
-const CAT_Y = 96
-const CAT_H = 88
-const CAT_PAS = 102
-
-// Catégorie : grille serrée quand il y a beaucoup de jeux, sinon des rangées.
-const GRILLE = { x: 20, y: 116, cols: 4, w: 74, h: 70, ecart: 8 }
-const RANGEE = { x: 20, y: 130, w: 320, h: 92, ecart: 14 }
-
-const B_PAUSE = [
-  { y: 250, h: 56, libelle: 'REPRENDRE' },
-  { y: 318, h: 56, libelle: 'RECOMMENCER' },
-  { y: 386, h: 56, libelle: 'QUITTER' },
-  { y: 454, h: 56, libelle: 'SON' },
-]
-const B_FIN = [
-  { y: 404, h: 62, libelle: 'REJOUER' },
-  { y: 480, h: 54, libelle: 'QUITTER' },
-]
 const DECOMPTE_PAS = 0.42
 const DECOMPTE = DECOMPTE_PAS * 3
 const REPRISE = 0.9
 
-const MENU_X = 50
-const MENU_W = 260
+/** La clé qui retient « ne me le propose plus ». */
+const CLE_MUET = 'orientation.muette'
+
+// --- Les dispositions ---------------------------------------------------------
+//
+// Une fonction par écran, appelée à la fois par le dessin et par l'appui. Elles
+// ne dépendent que de la largeur et de la hauteur : le même code sert les deux
+// formats, et un troisième ne demanderait rien.
+
+const estLarge = (W, H) => W > H
+
+function dispoSon(W) {
+  return { x: W - 62, y: 14, w: 44, h: 32 }
+}
+
+const BTN_RETOUR = { x: 16, y: 14, w: 74, h: 34 }
+
+/** L'accueil : une carte par catégorie, en colonne ou en deux colonnes. */
+function dispoAccueil(W, H) {
+  if (!estLarge(W, H)) return { cols: 1, x: 20, y: 96, w: W - 40, h: 88, pasX: 0, pasY: 102 }
+  const w = Math.floor((W - 60) / 2)
+  return { cols: 2, x: 20, y: 84, w, h: 112, pasX: w + 20, pasY: 124 }
+}
+
+const carteAccueil = (i, d) => ({
+  x: d.x + (i % d.cols) * d.pasX,
+  y: d.y + Math.floor(i / d.cols) * d.pasY,
+  w: d.w,
+  h: d.h,
+})
+
+/** Les tuiles serrées, quand une catégorie a beaucoup de jeux. */
+function dispoTuiles(W, H) {
+  const w = 74
+  const h = 70
+  const ecart = 8
+  const cols = Math.max(3, Math.floor((W - 40 + ecart) / (w + ecart)))
+  const large = cols * w + (cols - 1) * ecart
+  return { cols, w, h, ecart, x: Math.round((W - large) / 2), y: estLarge(W, H) ? 100 : 116 }
+}
+
+const tuile = (i, d) => ({
+  x: d.x + (i % d.cols) * (d.w + d.ecart),
+  y: d.y + Math.floor(i / d.cols) * (d.h + d.ecart),
+  w: d.w,
+  h: d.h,
+})
+
+/** Les rangées détaillées, quand une catégorie n'a que deux ou trois jeux. */
+function dispoRangees(W, H, n) {
+  if (!estLarge(W, H)) return { cols: 1, x: 20, y: 130, w: W - 40, h: 92, ecart: 14 }
+  const cols = n > 1 ? 2 : 1
+  const w = cols === 2 ? Math.floor((W - 60) / 2) : W - 40
+  return { cols, x: 20, y: 104, w, h: 92, ecart: 14 }
+}
+
+const rangee = (i, d) => ({
+  x: d.x + (i % d.cols) * (d.w + 20),
+  y: d.y + Math.floor(i / d.cols) * (d.h + d.ecart),
+  w: d.w,
+  h: d.h,
+})
+
+/**
+ * Rangées détaillées ou tuiles serrées ? On ne tranche pas sur un nombre écrit
+ * à la main mais sur ce qui **tient** : six rangées débordaient de l'écran en
+ * portrait, et aucune catégorie n'en avait six — le jour où l'une en aurait
+ * eu, deux jeux auraient été hors de portée sans que rien ne le signale.
+ */
+export function enRangees(W, H, n) {
+  if (n > 6) return false
+  const dernier = rangee(n - 1, dispoRangees(W, H, n))
+  return dernier.y + dernier.h <= H - 20
+}
+
+/** Les menus empilés de la pause et de la fin. */
+function dispoMenu(W, H, n) {
+  const large = estLarge(W, H)
+  const w = Math.min(300, Math.round(W * (large ? 0.5 : 0.722)))
+  const h = large ? 42 : 56
+  const pas = h + 12
+  return { x: Math.round((W - w) / 2), w, h, pas, y: large ? Math.round(H * 0.3) : Math.round(H * 0.39) }
+}
+
+const boutonMenu = (i, d) => ({ x: d.x, y: d.y + i * d.pas, w: d.w, h: d.h })
+
+const dans = (p, z) => p.x >= z.x && p.x <= z.x + z.w && p.y >= z.y && p.y <= z.y + z.h
 
 export class Moteur {
   constructor(canvas) {
     this.canvas = canvas
     this.ctx = canvas.getContext('2d')
 
-    this.input = new Input(canvas, W, H)
+    this.orientation = orientationAppareil()
+    this.format = this.orientation
+    const t = tailleDe(this.format)
+    this.W = t.W
+    this.H = t.H
+
+    this.input = new Input(canvas, this.W, this.H)
     this.input.onPress = (p) => this._appui(p)
     this.input.onRelease = (p) => this._relache(p)
 
-    this.phase = 'accueil' // accueil | categorie | depart | jeu | reprise | pause | fin
+    this.phase = 'accueil' // accueil | categorie | depart | jeu | reprise | pause | fin | tourne
     this.phaseT = 0
     this.cat = null
     this.def = null
@@ -70,6 +146,9 @@ export class Moteur {
     this.record = false
     // Secondes restantes pendant lesquelles « NOUVELLE PARTIE » est armé.
     this.arme = 0
+    /** Le sens qu'on conseille de prendre, ou null si tout va bien.  */
+    this.suggere = null
+    this.muet = lis(CLE_MUET, '0') === '1'
 
     addEventListener('keydown', (e) => {
       if (e.code === 'Escape') this._bascullePause()
@@ -77,6 +156,7 @@ export class Moteur {
 
     this._redim()
     addEventListener('resize', () => this._redim())
+    addEventListener('orientationchange', () => this._redim())
   }
 
   demarre() {
@@ -91,15 +171,57 @@ export class Moteur {
     requestAnimationFrame(tick)
   }
 
+  // --- Format et orientation -------------------------------------------------
+
+  /**
+   * Recalcule le gabarit. Appelée au démarrage, à chaque rotation, et au
+   * lancement d'un jeu. Si le format change en pleine partie, le jeu est
+   * prévenu : il lit `j.W` et `j.H` à chaque image, mais certains gardent une
+   * mise en page calculée une fois.
+   */
   _redim() {
+    this.orientation = orientationAppareil()
+    const voulu = this.def ? formatPour(this.def, this.orientation) : this.orientation
+    const change = voulu !== this.format
+    this.format = voulu
+    const t = tailleDe(voulu)
+    this.W = t.W
+    this.H = t.H
+
+    this.input.W = this.W
+    this.input.H = this.H
+    this.canvas.style.aspectRatio = `${this.W} / ${this.H}`
+
     // À la densité réelle de l'écran : c'est ce qui rend le texte net. Le côté
     // pixel vient des formes, pas d'une toile basse résolution.
     const dpr = Math.min(devicePixelRatio || 1, 3)
-    this.canvas.width = Math.round(W * dpr)
-    this.canvas.height = Math.round(H * dpr)
+    this.canvas.width = Math.round(this.W * dpr)
+    this.canvas.height = Math.round(this.H * dpr)
     this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
     this.ctx.textAlign = 'center'
     this.ctx.textBaseline = 'middle'
+
+    // `j.W` et `j.H` sont des accesseurs branchés sur le moteur : ils suivent
+    // tout seuls. Seuls les jeux qui gardent une mise en page calculée une
+    // fois ont besoin d'être prévenus.
+    if (this.j && change) this.def?.redim?.(this.j)
+    this._verifieSuggestion()
+  }
+
+  /** Décide s'il faut conseiller une rotation, et la met à l'écran. */
+  _verifieSuggestion() {
+    if (this.muet || !this.def || this.phase === 'accueil' || this.phase === 'categorie') {
+      if (this.phase === 'tourne') this.phase = 'jeu'
+      this.suggere = null
+      return
+    }
+    const s = suggestion(this.def, this.orientation)
+    if (s === this.suggere) return
+    this.suggere = s
+    if (s && (this.phase === 'jeu' || this.phase === 'depart')) {
+      this.phase = 'tourne'
+      this.phaseT = 0
+    } else if (!s && this.phase === 'tourne') this.phase = 'jeu'
   }
 
   // --- Records et sauvegardes ----------------------------------------------
@@ -123,15 +245,21 @@ export class Moteur {
 
   lance(def, options = {}) {
     this.def = def
+    this._redim()
     // On recentre le pointeur : sinon un jeu qui suit le doigt démarre là où
     // on a appuyé sur sa tuile, ce qui peut le tuer avant la première image.
-    this.input.pointer.x = W / 2
-    this.input.pointer.y = H / 2
+    this.input.pointer.x = this.W / 2
+    this.input.pointer.y = this.H / 2
 
     const cle = 'sauve.' + def.id
+    const moteur = this
     const j = {
-      W,
-      H,
+      get W() {
+        return moteur.W
+      },
+      get H() {
+        return moteur.H
+      },
       HUD,
       t: 0,
       score: 0,
@@ -143,6 +271,9 @@ export class Moteur {
       __input: this.input,
       get maintenu() {
         return this.__input.held
+      },
+      get paysage() {
+        return moteur.format === 'paysage'
       },
       e: {},
       hasard: Math.random,
@@ -175,6 +306,8 @@ export class Moteur {
     this.phaseT = 0
     this.bip = -1
     this.palier = 0
+    this.suggere = null
+    this._verifieSuggestion()
   }
 
   /**
@@ -203,7 +336,7 @@ export class Moteur {
     this.phaseT = 0
     son.mort()
     this.j.fx.secoue(11)
-    this.j.fx.eclat(W / 2, H / 2, C.rouge, { n: 26, vitesse: 260, taille: 6, duree: 0.9 })
+    this.j.fx.eclat(this.W / 2, this.H / 2, C.rouge, { n: 26, vitesse: 260, taille: 6, duree: 0.9 })
     if (this.record) setTimeout(() => son.record(), 450)
   }
 
@@ -213,6 +346,8 @@ export class Moteur {
     this.phaseT = 0
     this.def = null
     this.j = null
+    this.suggere = null
+    this._redim()
   }
 
   _bascullePause() {
@@ -246,7 +381,7 @@ export class Moteur {
 
     // Les effets continuent de vivre pendant l'écran de fin : la secousse
     // retombe et les grains achèvent leur chute, au lieu de se figer.
-    if (this.phase !== 'pause') this.j.fx.maj(dt)
+    if (this.phase !== 'pause' && this.phase !== 'tourne') this.j.fx.maj(dt)
     if (this.phase !== 'jeu') return
 
     const j = this.j
@@ -258,7 +393,7 @@ export class Moteur {
       const palier = Math.floor(j.t / 30)
       if (palier > this.palier) {
         this.palier = palier
-        j.fx.bulle(W / 2, H / 2 - 60, `PALIER ${palier + 1}`, C.accent, 20)
+        j.fx.bulle(this.W / 2, this.H / 2 - 60, `PALIER ${palier + 1}`, C.accent, 20)
         son.niveau()
       }
     }
@@ -278,9 +413,10 @@ export class Moteur {
     son.reveille()
 
     if (this.phase === 'accueil') {
-      if (dans(p, BTN_SON.x, BTN_SON.y, BTN_SON.w, BTN_SON.h)) return son.bascule()
-      const i = Math.floor((p.y - CAT_Y) / CAT_PAS)
-      if (i >= 0 && i < CATEGORIES.length && p.y >= CAT_Y && p.y <= CAT_Y + i * CAT_PAS + CAT_H) {
+      if (dans(p, dispoSon(this.W))) return son.bascule()
+      const d = dispoAccueil(this.W, this.H)
+      const i = CATEGORIES.findIndex((_, k) => dans(p, carteAccueil(k, d)))
+      if (i >= 0) {
         son.clic()
         this.cat = CATEGORIES[i]
         this.phase = 'categorie'
@@ -290,7 +426,7 @@ export class Moteur {
     }
 
     if (this.phase === 'categorie') {
-      if (dans(p, BTN_RETOUR.x, BTN_RETOUR.y, BTN_RETOUR.w, BTN_RETOUR.h)) {
+      if (dans(p, BTN_RETOUR)) {
         son.clic()
         this.cat = null
         this.phase = 'accueil'
@@ -305,12 +441,27 @@ export class Moteur {
       return
     }
 
+    // L'écran d'orientation : un appui reprend, le bouton du bas le fait taire
+    // pour de bon.
+    if (this.phase === 'tourne') {
+      const d = dispoMenu(this.W, this.H, 1)
+      const z = boutonMenu(0, { ...d, y: Math.round(this.H * 0.74) })
+      if (dans(p, z)) {
+        this.muet = true
+        ecris(CLE_MUET, '1')
+        son.clic()
+      } else son.touche(3)
+      this.suggere = null
+      this.phase = 'jeu'
+      return
+    }
+
     // Pendant le décompte et la reprise, tout appui est ignoré : sinon le
     // premier geste part avant que le joueur ait vu l'écran.
     if (this.phase === 'depart' || this.phase === 'reprise') return
 
     if (this.phase === 'jeu') {
-      if (dans(p, 0, 0, 52, HUD)) {
+      if (dans(p, { x: 0, y: 0, w: 52, h: HUD })) {
         son.clic()
         return this._bascullePause()
       }
@@ -319,9 +470,10 @@ export class Moteur {
     }
 
     if (this.phase === 'pause') {
-      const i = index(p, B_PAUSE)
+      const d = dispoMenu(this.W, this.H, 4)
+      const i = [0, 1, 2, 3].findIndex((k) => dans(p, boutonMenu(k, d)))
       if (i !== 1) this.arme = 0
-      if (i === 0) return son.clic(), this._bascullePause()
+      if (i === 0) return (son.clic(), this._bascullePause())
       if (i === 1) {
         // Sur un jeu persistant, ce bouton efface une partie de plusieurs
         // heures. Un doigt qui glisse ne doit pas pouvoir le faire : il faut
@@ -330,17 +482,18 @@ export class Moteur {
           this.arme = 4
           return son.rate()
         }
-        return son.clic(), this.lance(this.def, { neuve: true })
+        return (son.clic(), this.lance(this.def, { neuve: true }))
       }
-      if (i === 2) return son.clic(), this._quitte()
+      if (i === 2) return (son.clic(), this._quitte())
       if (i === 3) return son.bascule()
       return
     }
 
     if (this.phase === 'fin' && this.phaseT > 0.4) {
-      const i = index(p, B_FIN)
-      if (i === 0) return son.clic(), this.lance(this.def, { neuve: true })
-      if (i === 1) return son.clic(), this._quitte()
+      const b = this._dispoFin()
+      const i = b.findIndex((z) => dans(p, z))
+      if (i === 0) return (son.clic(), this.lance(this.def, { neuve: true }))
+      if (i === 1) return (son.clic(), this._quitte())
     }
   }
 
@@ -353,7 +506,7 @@ export class Moteur {
   _dessine() {
     const ctx = this.ctx
     ctx.fillStyle = C.fond
-    ctx.fillRect(0, 0, W, H)
+    ctx.fillRect(0, 0, this.W, this.H)
 
     if (this.phase === 'accueil') this._accueil()
     else if (this.phase === 'categorie') this._categorie()
@@ -368,7 +521,7 @@ export class Moteur {
       if (this.def.ciel) {
         // Assez sombre pour que le HUD des jeux reste lisible par-dessus, et
         // assez haut pour que la trame s'éteigne au lieu de s'arrêter net.
-        bandeTramee(ctx, 0, HUD, W, 340, ton(this.def.ciel, -0.6), 0.5, 0)
+        bandeTramee(ctx, 0, HUD, this.W, this.H - HUD, ton(this.def.ciel, -0.6), 0.5, 0)
       }
       this.def.dessine?.(this.j, ctx)
       fx.dessine(ctx)
@@ -378,11 +531,12 @@ export class Moteur {
       if (this.phase === 'depart') this._depart()
       if (this.phase === 'reprise') this._reprisEcran()
       if (this.phase === 'pause') this._pause()
+      if (this.phase === 'tourne') this._tourne()
       if (this.phase === 'fin') this._fin()
     }
 
-    vignette(ctx, W, H)
-    scanlines(ctx, W, H)
+    vignette(ctx, this.W, this.H)
+    scanlines(ctx, this.W, this.H)
   }
 
   /**
@@ -411,10 +565,10 @@ export class Moteur {
       }
     }
     ctx.textAlign = 'center'
-    rect(ctx, 20, 56, 320, PX, C.bord)
+    rect(ctx, 20, 56, this.W - 40, PX, C.bord)
     if (sousTitre) {
       ctx.textAlign = 'left'
-      texte(ctx, sousTitre, 20, 76, 13, C.faible, 700, 320)
+      texte(ctx, sousTitre, 20, 76, 13, C.faible, 700, this.W - 40)
       ctx.textAlign = 'center'
     }
   }
@@ -423,48 +577,49 @@ export class Moteur {
     const ctx = this.ctx
     this._entete('> ARKAD')
     this._boutonSon()
+    const d = dispoAccueil(this.W, this.H)
 
     CATEGORIES.forEach((cat, i) => {
       const { k, dy } = this._entree(i)
       if (k <= 0) return
-      const y = CAT_Y + i * CAT_PAS + dy
+      const z = carteAccueil(i, d)
+      const y = z.y + dy
       ctx.globalAlpha = k
 
-      ombre(ctx, 20, y, 320, CAT_H, 5)
-      rect(ctx, 20, y, 320, CAT_H, C.panneau)
-      rect(ctx, 20, y, 320, 3, ton(C.panneau, 0.5))
-      cadre(ctx, 20, y, 320, CAT_H, ton(cat.couleur, -0.3))
+      ombre(ctx, z.x, y, z.w, z.h, 5)
+      rect(ctx, z.x, y, z.w, z.h, C.panneau)
+      rect(ctx, z.x, y, z.w, 3, ton(C.panneau, 0.5))
+      cadre(ctx, z.x, y, z.w, z.h, ton(cat.couleur, -0.3))
       // Le bandeau de couleur, allumé : c'est le seul repère de catégorie.
-      lueur(ctx, 20, y + 10, 7, CAT_H - 20, cat.couleur, 2, 0.9)
-      bloc(ctx, 20, y + 10, 7, CAT_H - 20, cat.couleur, 2)
+      lueur(ctx, z.x, y + 10, 7, z.h - 20, cat.couleur, 2, 0.9)
+      bloc(ctx, z.x, y + 10, 7, z.h - 20, cat.couleur, 2)
 
       ctx.textAlign = 'left'
-      texte(ctx, cat.nom, 40, y + 26, 24, cat.couleur, 700, 200, 2)
-      texte(ctx, cat.duree, 40, y + 52, 14, C.texte, 700, 240)
-      texte(ctx, cat.detail, 40, y + 72, 12, C.faible, 700, 268)
+      texte(ctx, cat.nom, z.x + 20, y + 26, 24, cat.couleur, 700, z.w - 110, 2)
+      texte(ctx, cat.duree, z.x + 20, y + 52, 14, C.texte, 700, z.w - 40)
+      texte(ctx, cat.detail, z.x + 20, y + 72, 12, C.faible, 700, z.w - 32)
       ctx.textAlign = 'right'
       const n = cat.jeux.length
-      texte(ctx, `${n} ${n > 1 ? 'jeux' : 'jeu'}`, 324, y + 26, 14, C.faible, 700)
+      texte(ctx, `${n} ${n > 1 ? 'jeux' : 'jeu'}`, z.x + z.w - 16, y + 26, 14, C.faible, 700)
       ctx.textAlign = 'center'
       ctx.globalAlpha = 1
     })
 
-    texte(ctx, `${CATEGORIES.reduce((n, c) => n + c.jeux.length, 0)} jeux · une seule touche`, W / 2, 612, 12, C.faible, 700)
+    const total = CATEGORIES.reduce((n, c) => n + c.jeux.length, 0)
+    texte(ctx, `${total} jeux · une seule touche`, this.W / 2, this.H - 28, 12, C.faible, 700)
   }
 
   _categorie() {
-    const ctx = this.ctx
     const cat = this.cat
     this._entete(cat.nom, `${cat.duree} · ${cat.detail}`, true)
-
-    if (cat.jeux.length > 6) cat.jeux.forEach((def, i) => this._tuile(def, i))
-    else cat.jeux.forEach((def, i) => this._rangee(def, i))
+    if (enRangees(this.W, this.H, cat.jeux.length)) cat.jeux.forEach((def, i) => this._rangee(def, i))
+    else cat.jeux.forEach((def, i) => this._tuile(def, i))
   }
 
   /** Tuile compacte, pour les catégories qui ont beaucoup de jeux. */
   _tuile(def, i) {
     const ctx = this.ctx
-    const t = tuile(i)
+    const t = tuile(i, dispoTuiles(this.W, this.H))
     const { k, dy } = this._entree(i)
     if (k <= 0) return
     const { x, w, h } = t
@@ -486,49 +641,46 @@ export class Moteur {
   /** Rangée détaillée, pour les catégories qui n'ont que deux ou trois jeux. */
   _rangee(def, i) {
     const ctx = this.ctx
+    const z = rangee(i, dispoRangees(this.W, this.H, this.cat.jeux.length))
     const { k, dy } = this._entree(i)
     if (k <= 0) return
-    const y = RANGEE.y + i * (RANGEE.h + RANGEE.ecart) + dy
+    const y = z.y + dy
     ctx.globalAlpha = k
 
-    ombre(ctx, RANGEE.x, y, RANGEE.w, RANGEE.h, 5)
-    rect(ctx, RANGEE.x, y, RANGEE.w, RANGEE.h, C.panneau)
-    rect(ctx, RANGEE.x, y, RANGEE.w, 3, ton(C.panneau, 0.5))
-    rect(ctx, RANGEE.x, y + RANGEE.h - 3, RANGEE.w, 3, ton(C.panneau, -0.5))
-    lueur(ctx, RANGEE.x, y + 8, 6, RANGEE.h - 16, def.couleur, 2, 0.9)
-    bloc(ctx, RANGEE.x, y + 8, 6, RANGEE.h - 16, def.couleur, 2)
+    ombre(ctx, z.x, y, z.w, z.h, 5)
+    rect(ctx, z.x, y, z.w, z.h, C.panneau)
+    rect(ctx, z.x, y, z.w, 3, ton(C.panneau, 0.5))
+    rect(ctx, z.x, y + z.h - 3, z.w, 3, ton(C.panneau, -0.5))
+    lueur(ctx, z.x, y + 8, 6, z.h - 16, def.couleur, 2, 0.9)
+    bloc(ctx, z.x, y + 8, 6, z.h - 16, def.couleur, 2)
 
     ctx.textAlign = 'left'
-    texte(ctx, def.nom, RANGEE.x + 18, y + 26, 21, C.texte, 700, 230)
-    texte(ctx, def.pitch, RANGEE.x + 18, y + 50, 13, C.faible, 700, 284)
+    texte(ctx, def.nom, z.x + 18, y + 26, 21, C.texte, 700, z.w - 40)
+    texte(ctx, def.pitch, z.x + 18, y + 50, 13, C.faible, 700, z.w - 36)
 
     const best = this.meilleur(def.id)
     const enCours = this.reprise(def)
     const bas = enCours ? 'PARTIE EN COURS' : best ? `record ${best} ${def.unite}`.trim() : 'jamais joué'
-    texte(ctx, bas, RANGEE.x + 18, y + 74, 13, enCours ? C.accent : best ? C.faible : C.bord, 700, 284)
+    texte(ctx, bas, z.x + 18, y + 74, 13, enCours ? C.accent : best ? C.faible : C.bord, 700, z.w - 36)
     ctx.textAlign = 'center'
     ctx.globalAlpha = 1
   }
 
   _indexJeu(p) {
-    if (this.cat.jeux.length > 6) {
-      const c = Math.floor((p.x - GRILLE.x) / (GRILLE.w + GRILLE.ecart))
-      const r = Math.floor((p.y - GRILLE.y) / (GRILLE.h + GRILLE.ecart))
-      if (c < 0 || c >= GRILLE.cols || r < 0 || p.x < GRILLE.x || p.y < GRILLE.y) return null
-      const i = r * GRILLE.cols + c
-      const t = tuile(i)
-      return dans(p, t.x, t.y, t.w, t.h) ? i : null
+    const jeux = this.cat.jeux
+    if (!enRangees(this.W, this.H, jeux.length)) {
+      const d = dispoTuiles(this.W, this.H)
+      const i = jeux.findIndex((_, k) => dans(p, tuile(k, d)))
+      return i >= 0 ? i : null
     }
-    const pas = RANGEE.h + RANGEE.ecart
-    const i = Math.floor((p.y - RANGEE.y) / pas)
-    if (i < 0 || p.y < RANGEE.y) return null
-    const y = RANGEE.y + i * pas
-    return dans(p, RANGEE.x, y, RANGEE.w, RANGEE.h) ? i : null
+    const d = dispoRangees(this.W, this.H, jeux.length)
+    const i = jeux.findIndex((_, k) => dans(p, rangee(k, d)))
+    return i >= 0 ? i : null
   }
 
   _boutonSon() {
     const ctx = this.ctx
-    const { x, y, w, h } = BTN_SON
+    const { x, y, w, h } = dispoSon(this.W)
     rect(ctx, x, y, w, h, C.panneau)
     cadre(ctx, x, y, w, h, son.muet ? C.bord : C.faible)
     texte(ctx, son.muet ? 'x' : '♪', x + w / 2, y + h / 2, 15, son.muet ? C.faible : C.accent, 700)
@@ -538,9 +690,9 @@ export class Moteur {
 
   _bandeau() {
     const ctx = this.ctx
-    rect(ctx, 0, 0, W, HUD, C.fond)
-    rect(ctx, 0, HUD - PX, W, PX, C.bord)
-    rect(ctx, 0, HUD, W, 3, 'rgba(0, 0, 0, 0.45)')
+    rect(ctx, 0, 0, this.W, HUD, C.fond)
+    rect(ctx, 0, HUD - PX, this.W, PX, C.bord)
+    rect(ctx, 0, HUD, this.W, 3, 'rgba(0, 0, 0, 0.45)')
 
     rect(ctx, 12, 14, 28, 26, C.panneau)
     cadre(ctx, 12, 14, 28, 26, C.faible)
@@ -548,14 +700,14 @@ export class Moteur {
     rect(ctx, 29, 20, 4, 14, C.texte)
 
     const titre = this.def.sansScore
-      ? this.def.titreHud?.(this.j) ?? this.def.nom
+      ? (this.def.titreHud?.(this.j) ?? this.def.nom)
       : `${Math.floor(this.j.score)} ${this.def.unite}`
-    texte(ctx, titre, W / 2, 26, 20, C.texte, 700, 200)
+    texte(ctx, titre, this.W / 2, 26, 20, C.texte, 700, this.W - 160)
 
     if (!this.def.sansScore) {
       ctx.textAlign = 'right'
       const best = Math.max(this.j.meilleur, Math.floor(this.j.score))
-      texte(ctx, `REC ${best}`, W - 12, 26, 12, C.faible, 700)
+      texte(ctx, `REC ${best}`, this.W - 12, 26, 12, C.faible, 700)
       ctx.textAlign = 'center'
     }
 
@@ -571,103 +723,162 @@ export class Moteur {
     this._voile(0.55)
     const reste = Math.max(0, DECOMPTE - this.phaseT)
     const n = Math.ceil(reste / DECOMPTE_PAS)
-    const dans = 1 - ((reste % DECOMPTE_PAS) / DECOMPTE_PAS)
+    const dedans = 1 - (reste % DECOMPTE_PAS) / DECOMPTE_PAS
     ctx.save()
-    ctx.translate(W / 2, H / 2)
-    ctx.scale(1.6 - dans * 0.6, 1.6 - dans * 0.6)
+    ctx.translate(this.W / 2, this.H / 2)
+    ctx.scale(1.6 - dedans * 0.6, 1.6 - dedans * 0.6)
     lueur(ctx, -40, -32, 80, 64, n === 1 ? C.accent : C.texte, 3, 0.8)
     texte(ctx, n > 0 ? String(n) : 'GO', 0, 0, 64, n === 1 ? C.accent : C.texte, 700)
     ctx.restore()
-    texte(ctx, this.def.pitch, W / 2, H / 2 + 90, 14, C.faible, 700, 320)
+    texte(ctx, this.def.pitch, this.W / 2, this.H / 2 + 90, 14, C.faible, 700, this.W - 40)
   }
 
   /** Le temps de comprendre ce qui vient d'arriver, et de se replacer. */
   _reprisEcran() {
     const ctx = this.ctx
     this._voile(0.5)
-    lueur(ctx, W / 2 - 80, H / 2 - 38, 160, 36, C.rouge, 3, 0.9)
-    texte(ctx, 'ENCORE', W / 2, H / 2 - 20, 34, C.rouge, 700, undefined, 3)
+    lueur(ctx, this.W / 2 - 80, this.H / 2 - 38, 160, 36, C.rouge, 3, 0.9)
+    texte(ctx, 'ENCORE', this.W / 2, this.H / 2 - 20, 34, C.rouge, 700, undefined, 3)
     const reste = this.j.vies
-    for (let i = 0; i < reste; i++) bloc(ctx, W / 2 - reste * 11 + i * 22, H / 2 + 20, 14, 14, C.accent, 2)
-    texte(ctx, reste > 1 ? `${reste} vies` : 'dernière vie', W / 2, H / 2 + 60, 14, C.faible, 700)
+    for (let i = 0; i < reste; i++) bloc(ctx, this.W / 2 - reste * 11 + i * 22, this.H / 2 + 20, 14, 14, C.accent, 2)
+    texte(ctx, reste > 1 ? `${reste} vies` : 'dernière vie', this.W / 2, this.H / 2 + 60, 14, C.faible, 700)
   }
 
   _voile(alpha = 0.86) {
     const ctx = this.ctx
     ctx.fillStyle = `rgba(11, 14, 13, ${alpha})`
-    ctx.fillRect(0, 0, W, H)
+    ctx.fillRect(0, 0, this.W, this.H)
   }
 
   _pause() {
     const ctx = this.ctx
     this._voile()
-    texte(ctx, '-- PAUSE --', W / 2, 174, 26, C.accent, 700, undefined, 3)
-    B_PAUSE.forEach((b, i) => {
-      let libelle = b.libelle
+    const d = dispoMenu(this.W, this.H, 4)
+    texte(ctx, '-- PAUSE --', this.W / 2, d.y - 46, 26, C.accent, 700, undefined, 3)
+    const libelles = ['REPRENDRE', 'RECOMMENCER', 'QUITTER', 'SON']
+    libelles.forEach((libelle, i) => {
+      let l = libelle
       let teinte
-      if (i === 3) libelle = son.muet ? 'SON : NON' : 'SON : OUI'
+      if (i === 3) l = son.muet ? 'SON : NON' : 'SON : OUI'
       // Sur un jeu long, « recommencer » efface une partie de plusieurs
       // heures : autant que le bouton le dise, et qu'il le demande deux fois.
       if (i === 1 && this.def.persistant) {
-        libelle = this.arme > 0 ? 'EFFACER ? CONFIRME' : 'NOUVELLE PARTIE'
+        l = this.arme > 0 ? 'EFFACER ? CONFIRME' : 'NOUVELLE PARTIE'
         if (this.arme > 0) teinte = C.rouge
       }
-      bouton(ctx, b.y, b.h, libelle, i === 0, teinte)
+      bouton(ctx, boutonMenu(i, d), l, i === 0, teinte)
     })
+  }
+
+  /**
+   * L'écran d'orientation.
+   *
+   * Il ne bloque rien et ne juge personne : il montre le sens dans lequel ce
+   * jeu-là est le plus confortable, et il s'efface au premier appui. Le
+   * bouton du bas le fait taire pour de bon — un conseil qu'on voit trois
+   * fois par jour n'est plus un conseil.
+   */
+  _tourne() {
+    const ctx = this.ctx
+    this._voile(0.9)
+    const vers = this.suggere
+    const large = vers === 'paysage'
+    const cx = this.W / 2
+    const cy = Math.round(this.H * 0.36)
+
+    // Deux silhouettes de téléphone : celle qu'on tient, éteinte, et celle
+    // qu'on conseille, allumée.
+    const dessineTel = (x, y, w, h, teinte, vif) => {
+      if (vif) lueur(ctx, x, y, w, h, teinte, 3, 0.8)
+      rect(ctx, x, y, w, h, C.panneau)
+      cadre(ctx, x, y, w, h, teinte, 3)
+      rect(ctx, x + 8, y + 10, w - 16, h - 20, ton(teinte, vif ? -0.55 : -0.78))
+    }
+    const balance = Math.sin(this.phaseT * 3) * 4
+    ctx.save()
+    ctx.translate(cx, cy)
+    ctx.rotate((balance * Math.PI) / 180)
+    if (large) {
+      dessineTel(-32, -56, 64, 112, C.bord, false)
+      dessineTel(-56 + 120, -32, 112, 64, C.accent, true)
+    } else {
+      dessineTel(-56 - 60, -32, 112, 64, C.bord, false)
+      dessineTel(-32 + 90, -56, 64, 112, C.accent, true)
+    }
+    ctx.restore()
+
+    // La flèche, en gros pixels : trois blocs qui montent vers la droite.
+    for (let i = 0; i < 3; i++) bloc(ctx, cx - 10 + i * 8, cy - 4 - i * 4, 6, 6, C.accent, 2)
+
+    texte(ctx, large ? 'TOURNE L’ÉCRAN' : 'REMETS-LE DROIT', cx, this.H * 0.62, 26, C.accent, 700, this.W - 60, 2)
+    texte(
+      ctx,
+      large ? `${this.def.nom} respire mieux couché` : `${this.def.nom} se joue debout`,
+      cx,
+      this.H * 0.62 + 30,
+      13,
+      C.faible,
+      700,
+      this.W - 60,
+    )
+    const d = dispoMenu(this.W, this.H, 1)
+    bouton(ctx, boutonMenu(0, { ...d, y: Math.round(this.H * 0.74) }), 'NE PLUS PROPOSER', false)
+    texte(ctx, 'appuie n’importe où pour continuer', cx, this.H * 0.74 + d.h + 22, 11, C.faible, 700, this.W - 60)
+  }
+
+  _dispoFin() {
+    const large = estLarge(this.W, this.H)
+    const d = dispoMenu(this.W, this.H, 2)
+    const y = large ? Math.round(this.H * 0.62) : 404
+    return [
+      { x: d.x, y, w: d.w, h: large ? 46 : 62 },
+      { x: d.x, y: y + (large ? 56 : 76), w: d.w, h: large ? 40 : 54 },
+    ]
   }
 
   _fin() {
     const ctx = this.ctx
     this._voile(0.9)
+    const large = estLarge(this.W, this.H)
+    const cx = this.W / 2
     // Un jeu peut décider de son titre de fin : « GAGNÉ » n'est pas
     // « GAME OVER », et certains le savent seulement au dernier moment.
     const brut = typeof this.def.finTitre === 'function' ? this.def.finTitre(this.j) : this.def.finTitre
     const fin = brut ?? { texte: 'GAME OVER', couleur: C.rouge }
     const titre = typeof fin === 'string' ? { texte: fin, couleur: C.rouge } : fin
     const teinte = titre.couleur ?? C.rouge
-    lueur(ctx, W / 2 - 110, 150, 220, 36, teinte, 3, 0.9)
-    texte(ctx, titre.texte, W / 2, 168, 30, teinte, 700, 330, 2)
+    const yT = large ? Math.round(this.H * 0.16) : 168
+    lueur(ctx, cx - 110, yT - 18, 220, 36, teinte, 3, 0.9)
+    texte(ctx, titre.texte, cx, yT, 30, teinte, 700, this.W - 30, 2)
 
     if (!this.def.sansScore) {
-      lueur(ctx, W / 2 - 90, 222, 180, 60, C.texte, 2, 0.5)
-      texte(ctx, `${Math.floor(this.j.score)}`, W / 2, 252, 60, C.texte, 700)
-      texte(ctx, this.def.unite, W / 2, 296, 14, C.faible, 700)
-      if (this.record) texte(ctx, '* NOUVEAU RECORD *', W / 2, 342, 15, C.accent, 700)
-      else texte(ctx, `record ${this.meilleur(this.def.id)}`, W / 2, 342, 13, C.faible, 700)
+      const yS = large ? Math.round(this.H * 0.34) : 252
+      lueur(ctx, cx - 90, yS - 30, 180, 60, C.texte, 2, 0.5)
+      texte(ctx, `${Math.floor(this.j.score)}`, cx, yS, large ? 48 : 60, C.texte, 700)
+      texte(ctx, this.def.unite, cx, yS + 44, 14, C.faible, 700)
+      const yR = large ? Math.round(this.H * 0.5) : 342
+      if (this.record) texte(ctx, '* NOUVEAU RECORD *', cx, yR, 15, C.accent, 700)
+      else texte(ctx, `record ${this.meilleur(this.def.id)}`, cx, yR, 13, C.faible, 700)
     }
 
-    B_FIN.forEach((b, i) => bouton(ctx, b.y, b.h, b.libelle, i === 0))
+    const b = this._dispoFin()
+    bouton(ctx, b[0], 'REJOUER', true)
+    bouton(ctx, b[1], 'QUITTER', false)
   }
 }
 
 // --- Petits blocs partagés ---------------------------------------------------
 
-function tuile(i) {
-  const c = i % GRILLE.cols
-  const r = Math.floor(i / GRILLE.cols)
-  return {
-    x: GRILLE.x + c * (GRILLE.w + GRILLE.ecart),
-    y: GRILLE.y + r * (GRILLE.h + GRILLE.ecart),
-    w: GRILLE.w,
-    h: GRILLE.h,
-  }
-}
-
-function bouton(ctx, y, h, libelle, primaire, teinte) {
+function bouton(ctx, z, libelle, primaire, teinte) {
   const vif = teinte ?? (primaire ? C.accent : null)
-  ombre(ctx, MENU_X, y, MENU_W, h, 5)
-  if (vif) lueur(ctx, MENU_X, y, MENU_W, h, vif, 3, 0.7)
-  rect(ctx, MENU_X, y, MENU_W, h, C.panneau)
-  rect(ctx, MENU_X, y, MENU_W, 3, ton(C.panneau, 0.55))
-  rect(ctx, MENU_X, y + h - 3, MENU_W, 3, ton(C.panneau, -0.55))
-  cadre(ctx, MENU_X, y, MENU_W, h, vif ?? C.faible)
-  texte(ctx, libelle, MENU_X + MENU_W / 2, y + h / 2, 19, vif ?? C.texte, 700, MENU_W - 24, 1)
+  ombre(ctx, z.x, z.y, z.w, z.h, 5)
+  if (vif) lueur(ctx, z.x, z.y, z.w, z.h, vif, 3, 0.7)
+  rect(ctx, z.x, z.y, z.w, z.h, C.panneau)
+  rect(ctx, z.x, z.y, z.w, 3, ton(C.panneau, 0.55))
+  rect(ctx, z.x, z.y + z.h - 3, z.w, 3, ton(C.panneau, -0.55))
+  cadre(ctx, z.x, z.y, z.w, z.h, vif ?? C.faible)
+  ctx.textAlign = 'center'
+  texte(ctx, libelle, z.x + z.w / 2, z.y + z.h / 2, 19, vif ?? C.texte, 700, z.w - 24, 1)
 }
 
-function index(p, boutons) {
-  return boutons.findIndex((b) => dans(p, MENU_X, b.y, MENU_W, b.h))
-}
-
-function dans(p, x, y, w, h) {
-  return p.x >= x && p.x <= x + w && p.y >= y && p.y <= y + h
-}
+export { dispoAccueil, carteAccueil, dispoTuiles, tuile, dispoRangees, rangee, dispoMenu, boutonMenu, dispoSon }

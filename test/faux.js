@@ -11,6 +11,9 @@ export const W = 360
 export const H = 640
 export const HUD = 56
 
+/** Les deux gabarits, pour éprouver un jeu dans les deux sens. */
+export const FORMATS = { portrait: { W: 360, H: 640 }, paysage: { W: 640, H: 360 } }
+
 /**
  * `bandeTramee` rend son tramage une fois dans une toile de côté. C'est le seul
  * endroit de la boîte à dessin qui touche au DOM ; un `document` de six lignes
@@ -101,16 +104,21 @@ const RIEN = new Proxy(() => RIEN, { get: () => RIEN, apply: () => RIEN })
 export function fauxJeu(def, options = {}) {
   const hasard = options.hasard ?? graine(options.graine ?? 1)
   const memoire = options.memoire ?? { valeur: null }
+  // Un jeu peut être éprouvé dans les deux gabarits : `format: 'paysage'` lui
+  // donne 640 × 360, exactement comme le moteur le ferait sur un téléphone
+  // couché.
+  const taille = FORMATS[options.format] ?? FORMATS.portrait
 
   const j = {
-    W,
-    H,
+    W: taille.W,
+    H: taille.H,
+    paysage: taille.W > taille.H,
     HUD,
     t: 0,
     score: 0,
     vies: def.vies ?? 1,
     meilleur: 0,
-    pointer: { x: W / 2, y: H / 2 },
+    pointer: { x: taille.W / 2, y: taille.H / 2 },
     son: RIEN,
     fx: RIEN,
     maintenu: false,
