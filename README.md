@@ -1,6 +1,6 @@
 # ARKAD
 
-Une borne d'arcade rangée par durée de partie : vingt-cinq jeux, de trois
+Une borne d'arcade rangée par durée de partie : vingt-six jeux, de trois
 minutes à sans fin. Une seule action pour jouer, et un seul code pour le web
 et pour Android.
 
@@ -61,8 +61,9 @@ projet. Un dossier par catégorie, sous `src/`.
 ### COURT — 2 à 3 minutes (18 jeux)
 
 *Adresse* — **ESQUIVE** survivre sous les blocs · **VOLTIGE** monter dans un
-tunnel · **GRIMPE** rebondir de plateforme en plateforme · **SLALOM** zigzaguer
-entre les portes · **FUSÉE** se poser en douceur · **BRIQUES** casse-brique
+tunnel (mieux couché) · **GRIMPE** rebondir de plateforme en plateforme ·
+**SLALOM** zigzaguer entre les portes · **FUSÉE** se poser en douceur ·
+**BRIQUES** casse-brique
 
 *Réflexe* — **SERPENT** · **ORBITE** inverser son sens · **BALANCE** redresser
 un mât · **PILE** empiler sans dépasser · **CORDE** sauter quand le sol s’allume ·
@@ -89,6 +90,8 @@ mémorisation.
 **DÉMINEUR** — appui court pour creuser, appui long pour marquer. Ce n'est pas
 une grille mais une **série** : chaque grille déminée en amène une plus lourde,
 trois mines de plus à chaque fois, et la partie ne s'arrête que sur une erreur.
+Couché, la grille passe de 9×12 à 16×7 — et les mines sont posées à *densité*
+égale, pas en nombre égal, sinon le format changerait la difficulté.
 
 **2048** — on glisse pour tout pousser · **TAQUIN** — remettre les nombres dans
 l'ordre, mélangé par coups légaux donc toujours résoluble.
@@ -96,7 +99,7 @@ l'ordre, mélangé par coups légaux donc toujours résoluble.
 Une grille, une solution, on y réfléchit. Rien ne se sauvegarde : une partie
 se termine dans la séance.
 
-### LONG — 20 minutes à 10 heures (3 jeux)
+### LONG — 20 minutes à 10 heures (4 jeux)
 
 **DONJON** — roguelike au tour par tour. Huit bêtes qui n'ont pas la même
 façon d'être pénibles : l'archer tire dans les lignes dégagées, donc les
@@ -120,8 +123,28 @@ journées. Trois objets se trouvent en route et ouvrent des options qui
 n'existent pas sans eux. Et quand une jauge tombe bas, ce ne sont plus les
 journées ordinaires qui sortent, mais les urgences.
 
-Ces trois-là **écrivent leur état à chaque tour**. On ferme l'application au
+**BRÈCHE** — trois pièces en main, une grille à remplir, des lignes qui
+partent. Pas de rotation : ce qu'on tire est ce qu'on pose, et toute la
+difficulté est de garder de la place pour trois pièces qu'on ne connaît pas
+encore. La partie s'arrête quand aucune des trois n'entre plus nulle part.
+
+**Dix mondes**, et chacun change une règle plutôt qu'un décor : la grille
+passe de 8×8 à 10×10, des roches indestructibles apparaissent, le fond monte
+d'une rangée quand on tarde, le gel fige les cases qu'on vient de libérer, un
+bassin de pièces différent se substitue au tirage normal. On les traverse en
+boucle, l'objectif de points étant multiplié par 1,55 à chaque tour complet —
+donc il n'y a pas de dernier monde, seulement un dernier essai.
+
+**Six transformations** tombent sur les pièces : le souffle vide les cases
+autour, le rayon nettoie une ligne entière, la teinte change la couleur d'une
+zone, la prime double les points, le dur pose une case qui résiste à un
+effacement. Plus deux outils qu'on économise, MARTEAU et ÉCHANGE.
+
+Ces quatre-là **écrivent leur état à chaque tour**. On ferme l'application au
 milieu d'un couloir, on la rouvre trois jours plus tard au même endroit.
+
+`node test/breche-banc.mjs 200` fait jouer un automate et imprime, monde par
+monde, la part de parties qui franchissent l'objectif.
 
 ### MASSIF — sans fin (1 jeu)
 
@@ -187,6 +210,40 @@ pilotées par la donnée, vingt-deux terrains, dix biomes, cinq objectifs.
 durée des batailles par niveau, le taux de victoire par objectif, ce que
 rapporte chaque classe, et la matrice des duels entre types.
 
+## Debout ou couché
+
+La borne connaît **deux formats logiques**, et deux seulement : **360 × 640**
+debout, **640 × 360** couché. Pas de mise à l'échelle continue, pas de
+disposition fluide — deux formats qu'on peut dessiner et tester exactement,
+plutôt qu'une infinité qu'on ne vérifie jamais.
+
+Un jeu déclare ce qu'il sait faire :
+
+```js
+paysage: true          // il accepte d'être couché
+confort: 'paysage'     // et il y est mieux : le moteur proposera de tourner
+redim(j) { … }         // appelé quand le format change en cours de partie
+```
+
+Sans `paysage`, un jeu reste debout même sur un écran couché, et le moteur
+propose de remettre le téléphone dans l'autre sens. Avec `confort`, c'est
+l'inverse : le jeu marche debout mais respire couché, et l'écran de
+suggestion le dit — avec un **NE PLUS PROPOSER** qui se retient, parce qu'une
+suggestion qu'on ne peut pas faire taire est une nuisance.
+
+Aujourd'hui : VOLTIGE, DÉMINEUR, DONJON, USINE et BRÈCHE sont mieux couchés ;
+SERPENT sait l'être sans y gagner, donc il ne le propose pas. Les autres
+restent debout — un jeu de chute ou d'empilement n'a rien à faire dans un
+écran large.
+
+Ce que ça demande à un jeu : ne jamais écrire 360 ni 640 en dur. `j.W` et
+`j.H` sont des **getters** sur le moteur, ils changent, et tout ce qui se
+dessine doit s'y indexer. La règle qui compte le plus : **le dessin et la
+zone tactile lisent la même fonction de disposition.** Deux calculs
+parallèles finissent toujours par diverger de quelques pixels, et un bouton
+qui n'est pas là où on le voit est le défaut qui a fait abandonner un jeu
+entier dans ce projet.
+
 ## Ajouter un mini-jeu
 
 Crée `src/court/monJeu.js` (ou le dossier qui correspond à sa durée) :
@@ -217,7 +274,8 @@ Range-le dans le dossier de sa durée (`src/court/`, `src/moyen/`, `src/long/`,
 
 | | |
 |---|---|
-| `j.W`, `j.H` | l'écran logique, 360 × 640 |
+| `j.W`, `j.H` | l'écran logique — 360 × 640 debout, 640 × 360 couché |
+| `j.paysage` | vrai quand le jeu est couché |
 | `j.HUD` | hauteur du bandeau du haut — ne dessine rien dessous |
 | `j.t` | temps écoulé depuis le début de la partie |
 | `j.score` | à toi de l'augmenter ; le moteur l'affiche et le sauvegarde |
@@ -228,6 +286,7 @@ Range-le dans le dossier de sa durée (`src/court/`, `src/moyen/`, `src/long/`,
 | `j.pointer` | position du dernier appui (suit la souris sur PC) |
 | `j.maintenu` | vrai tant que c'est appuyé |
 | `j.son` | les bruitages |
+| `j.musique(id)` | change de bande-son en cours de partie |
 | `j.fx` | les effets : gerbes, bulles de score, secousse |
 | `j.hasard()`, `j.entier(a, b)` | aléatoire |
 | `j.sauve(o)`, `j.charge()`, `j.efface()` | l'état d'une partie longue |
@@ -293,9 +352,46 @@ inventer un bruitage : `_note({type, de, a, duree, volume})` pour une note
 avec glissando, `_bruit({duree, coupe, type})` pour les impacts. Depuis la
 console du navigateur, `son.casse(3)` les essaie un par un.
 
-Le bouton ♪ de l'accueil coupe le son, et le choix est retenu. À savoir : sur
-iPhone le son ne démarre qu'après un vrai appui (le moteur s'en charge), et
-l'interrupteur latéral de silence coupe tout.
+Le bouton de l'accueil a **trois positions** — ♪ tout, · les bruitages seuls,
+× le silence — et le choix est retenu. Les bruitages sans la musique sont le
+réglage le plus utile en pratique : dans le métro, ou à côté de quelqu'un. À
+savoir : sur iPhone le son ne démarre qu'après un vrai appui (le moteur s'en
+charge), et l'interrupteur latéral de silence coupe tout.
+
+## Les bandes-son
+
+**Soixante-quinze morceaux, et pas un seul fichier audio.** Cinquante pour
+BRÈCHE — cinq par monde, on les entend au fil des cycles — et un par jeu pour
+le reste de la borne.
+
+Un morceau enregistré pèse deux mégaoctets. Cinquante en pèsent cent, dans
+une application qui en fait moins d'un et qui doit tourner hors-ligne. Donc
+on ne les enregistre pas : on les **écrit**, en huit champs.
+
+```js
+t('crue2', 'L’EAU MONTE', 138, 'phrygien', 3, 'course', 0x607182)
+//  id      nom            bpm  gamme       tonique  ambiance  graine
+```
+
+`musique/composition.js` en déduit seize mesures — quatre parties en A A' B A'',
+avec basse, nappe, accords, arpège, chant et trois percussions. La gamme donne
+la couleur, la marche d'accords donne le caractère, l'ambiance décide **qui
+joue et à quelle densité** (une veillée et une poursuite peuvent partager la
+même marche d'accords), et la graine fait tout le reste. Deux lignes qui ne
+diffèrent que par leur graine donnent deux morceaux qui n'ont rien à voir.
+
+`compose()` est une **fonction pure** : elle ne fait aucun son, elle rend une
+liste d'évènements. C'est ce qui permet de vérifier sous `node --test`
+qu'aucune des soixante-quinze bandes n'est muette, qu'aucune note ne sort de
+sa gamme, et qu'il n'y en a pas deux identiques — sans jamais ouvrir un
+navigateur ni tendre l'oreille. `musique/joueur.js` se contente de programmer
+ces évènements dans le contexte audio, avec une horloge d'avance de 220 ms :
+on ne déclenche jamais une note « maintenant », parce qu'un fil principal qui
+dessine soixante images par seconde ne tient pas le tempo, et la carte son
+si.
+
+Le moteur lance la bande du jeu au démarrage ; un jeu à paliers appelle
+`j.musique('crue2')` pour en changer. BRÈCHE le fait à chaque monde.
 
 ## Les règles qui font que ça marche
 
@@ -316,11 +412,18 @@ build.mjs           assemble www/ (aucune dépendance)
 capacitor.config.json
 src/
   engine.js         accueil, pause, fin, records — ne connaît aucun jeu
+  format.js         les deux formats, et quand proposer de tourner l'écran
   input.js          souris / doigt / espace -> appui + relâche
   dessin.js         la boîte à dessin, et le style pixel
   palette.js        les couleurs
+  hasard.js         un générateur à graine, partagé
   stockage.js       records, sourdine, progression — un seul préfixe
   son.js            les bruitages, synthétisés
+  musique.js        la façade des bandes-son
+  musique/
+    table.js        les 75 fiches, huit champs chacune
+    composition.js  fiche -> partition. Pure, donc testable sans navigateur
+    joueur.js       partition -> contexte audio, avec horloge d'avance
   effets.js         gerbes, bulles de score, secousse d'écran
   catalogue.js      les quatre catégories, et rien d'autre à toucher
   court/  moyen/  long/  massif/     les jeux, rangés par durée
@@ -329,6 +432,7 @@ test/
   *.test.js         `npm test` — aucune dépendance, `node --test` suffit
   usine-banc.mjs    dix heures d'USINE en une seconde
   front-banc.mjs    des campagnes entières sans rendu
+  breche-banc.mjs   un automate qui joue BRÈCHE, monde par monde
 .github/workflows/
   test.yml          le banc d'essai, à chaque poussée
   web.yml           déploie la version web, à la demande
@@ -360,6 +464,8 @@ d'un `.find()`, et trois combats qui ne se terminaient jamais.
 ## La suite
 
 - d'autres jeux massifs — la catégorie n'en a qu'un
+- des bandes-son pour les mondes de DONJON et les pays d'EXPÉDITION, sur le
+  modèle des cinquante de BRÈCHE
 - FRONT : des sièges et des objectifs à plusieurs étapes, et une campagne
   qui se souvient des compagnies adverses qu'on a croisées
 - une interface pour publier des jeux sans passer par git
