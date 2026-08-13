@@ -73,31 +73,53 @@ export function niveau(ctx, d, j, e, teinte) {
       if (q === '.') continue
       const Y = base - (RANGEES - cy) * CASE
       if (q === '#') bloc(ctx, X, Y, CASE, CASE, ton(teinte, -0.3), 3)
-      else if (q === '^') pic(ctx, X, Y, teinte)
-      else if (q === 'o') orbe(ctx, X + CASE / 2, Y + CASE / 2, e)
+      else if (q === '^') pic(ctx, X, Y, col[cy - 1] === '#')
+      else if (q === 'o') orbe(ctx, X + CASE / 2, Y + CASE / 2, e, C.vert)
+      else if (q === 'b') orbe(ctx, X + CASE / 2, Y + CASE / 2, e, C.cyan)
       else if (q === '_') tremplin(ctx, X, Y)
-      else if (q === 'S' || q === 'C') portail(ctx, X, Y, q === 'S' ? C.cyan : C.accent)
-      else if (q === '>' || q === '<') portail(ctx, X, Y, q === '>' ? C.vert : C.violet)
+      else if (PORTAILS[q]) {
+        // Un portail occupe toute sa colonne dans la donnée. On ne le peint
+        // qu'une fois, depuis le haut de sa colonne jusqu'en bas : neuf portes
+        // empilées ne font pas une porte, elles font un mur illisible.
+        if (col[cy - 1] === q) continue
+        let bas = cy
+        while (col[bas + 1] === q) bas++
+        portail(ctx, X, Y, base - (RANGEES - bas - 1) * CASE, PORTAILS[q])
+      }
     }
   }
   joueur(ctx, d, j, e, camera, teinte)
 }
 
-/** Un pic : un triangle en marches, parce qu'on ne lisse rien ici. */
-function pic(ctx, X, Y, teinte) {
+/**
+ * Un pic : un triangle en marches, parce qu'on ne lisse rien ici.
+ *
+ * Il pointe **à l'opposé de ce à quoi il tient**. Un pic accroché au plafond
+ * qui pointe vers le haut ne se lit pas comme un danger suspendu : il se lit
+ * comme un décor posé sur rien, et dans un jeu où l'on décide en un dixième de
+ * seconde, ça compte autant que la règle.
+ */
+function pic(ctx, X, Y, pendu) {
   const n = Math.floor(CASE / PX)
   ctx.fillStyle = C.rouge
   for (let i = 0; i < n; i++) {
     const larg = CASE * (1 - i / n)
-    ctx.fillRect(px(X + (CASE - larg) / 2), px(Y + CASE - (i + 1) * PX), px(larg), PX)
+    const y = pendu ? Y + i * PX : Y + CASE - (i + 1) * PX
+    ctx.fillRect(px(X + (CASE - larg) / 2), px(y), px(larg), PX)
   }
   ctx.fillStyle = ton(C.rouge, 0.4)
-  ctx.fillRect(px(X + CASE / 2 - PX), px(Y + 4), PX * 2, PX * 2)
+  ctx.fillRect(px(X + CASE / 2 - PX), px(pendu ? Y + CASE - 8 : Y + 4), PX * 2, PX * 2)
 }
 
-function orbe(ctx, cx, cy, e) {
+/**
+ * Une orbe. Sa couleur dit ce qu'elle fait — verte elle relance, cyan elle
+ * retourne le monde — et une orbe déjà prise s'éteint : dans un jeu qu'on
+ * apprend par cœur, savoir d'un coup d'œil ce qui reste utilisable compte
+ * autant que la voir.
+ */
+function orbe(ctx, cx, cy, e, vive) {
   const prise = e.orbesPrises.has(`${Math.floor(cx / CASE)}:${Math.floor(cy / CASE)}`)
-  const teinte = prise ? C.faible : C.vert
+  const teinte = prise ? C.faible : vive
   lueur(ctx, cx - 8, cy - 8, 16, 16, teinte, 3, 1.2)
   pastille(ctx, cx, cy, 9, teinte)
   pastille(ctx, cx, cy, 5, C.fond)
@@ -108,10 +130,18 @@ function tremplin(ctx, X, Y) {
   bloc(ctx, X + 3, Y + CASE - 10, CASE - 6, 8, C.violet, 2)
 }
 
-function portail(ctx, X, Y, teinte) {
-  lueur(ctx, X + 6, Y - CASE, CASE - 12, CASE * 2, teinte, 3, 1)
-  rect(ctx, X + 8, Y - CASE, CASE - 16, CASE * 2, teinte)
-  rect(ctx, X + 11, Y - CASE + 3, CASE - 22, CASE * 2 - 6, ton(teinte, -0.55))
+/**
+ * Les portails et leur couleur. Elle porte l'information : ce qu'on va
+ * devenir se lit à la teinte, avant d'y entrer, ce qui est la moitié du jeu.
+ */
+const PORTAILS = { S: C.cyan, C: C.accent, W: C.vert, G: C.rouge, '>': C.vert, '<': C.violet }
+
+/** Une porte, du haut de sa colonne au bas. */
+function portail(ctx, X, haut, bas, teinte) {
+  const h = bas - haut + CASE
+  lueur(ctx, X + 6, haut, CASE - 12, h, teinte, 3, 0.8)
+  rect(ctx, X + 8, haut, CASE - 16, h, teinte)
+  rect(ctx, X + 11, haut + 3, CASE - 22, h - 6, ton(teinte, -0.62))
 }
 
 /** Le joueur, tourné : la rotation dit d'un coup d'œil si on est en l'air. */
@@ -137,6 +167,10 @@ function joueur(ctx, d, j, e, camera, teinte) {
 /** La barre d'avancement — le score du jeu, montré en permanence. */
 export function barre(ctx, d, part, record, teinte) {
   const b = d.barre
+  // Un fond opaque un peu plus large que la barre : le niveau tient toute la
+  // hauteur disponible, donc dans un passage à plafond la barre se dessinerait
+  // à même les blocs et deviendrait illisible.
+  rect(ctx, b.x - 4, b.y - 4, b.w + 8, b.h + 8, C.fond)
   rect(ctx, b.x, b.y, b.w, b.h, C.panneau)
   if (record > 0) {
     // Le record est un repère, pas un remplissage : un trait, pour qu'on voie

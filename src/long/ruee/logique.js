@@ -43,6 +43,22 @@ export const POUSSEE = 3000
 export const VY_MAX_VOL = 420
 
 /**
+ * L'onde : le troisième véhicule. Elle ne subit aucune gravité — elle monte
+ * ou elle descend, à quarante-cinq degrés, et rien entre les deux. C'est ce
+ * qui la rend si différente du vaisseau : on ne corrige pas une trajectoire
+ * d'onde, on la trace. Et elle meurt au moindre contact, y compris par le
+ * dessus d'un bloc : il n'y a pas de sol pour elle.
+ *
+ * Sa pente est de 0,7 et non de 1. À quarante-cinq degrés pleins, tous les
+ * couloirs d'onde tombaient à une image de marge dès qu'un niveau accélérait :
+ * la décision se prend au soixantième, donc à 1,15× chaque décision couvre
+ * quinze pour cent de distance en plus et le contrôle se dégrade d'autant.
+ * Une pente plus douce redonne de la largeur là où on en a besoin, sans rien
+ * changer à la sensation.
+ */
+export const VITESSE_ONDE = 0.7 // en multiples de la vitesse horizontale
+
+/**
  * Assemble la grille d'un niveau : une colonne par case, chaque colonne étant
  * une chaîne de `RANGEES` lettres.
  */
@@ -53,7 +69,8 @@ export function construit(niveau) {
 
   for (const item of niveau.suite) {
     if (typeof item === 'object' && item.repos) {
-      for (let i = 0; i < item.repos; i++) pousse(vide)
+      const col = item.couvert ? '#' + '.'.repeat(SOL - 1) + '#' : vide
+      for (let i = 0; i < item.repos; i++) pousse(col)
       continue
     }
     const motif = PAR_ID[item]
@@ -88,6 +105,8 @@ export function nouvelle(niveauId, depart = 0) {
     y: (SOL - 1) * CASE,
     vy: 0,
     mode: 'cube',
+    // Le sens de la gravité : 1 vers le bas, -1 vers le haut.
+    sens: 1,
     sol: true,
     mort: false,
     fini: false,
@@ -143,17 +162,27 @@ export function pas(e, appui, dt = PAS) {
   e.t += dt
 
   // --- Vertical -----------------------------------------------------------------
-  if (e.mode === 'cube') {
+  //
+  // Tout est multiplié par `e.sens`. Une gravité inversée n'est pas un mode de
+  // plus à écrire : c'est le même code lu à l'envers, et c'est pour ça qu'elle
+  // se combine avec les trois véhicules sans un seul cas particulier.
+  const sens = e.sens
+  if (e.mode === 'onde') {
+    // Ni gravité ni inertie : la pente est celle qu'on tient.
+    e.vy = (appui ? -1 : 1) * sens * VITESSE_ONDE * v
+    e.sol = false
+  } else if (e.mode === 'cube') {
     if (appui && e.sol) {
-      e.vy = -SAUT
+      e.vy = -SAUT * sens
       e.sol = false
-    } else if (appui && e.orbe && !e.orbesPrises.has(e.orbe)) {
-      e.orbesPrises.add(e.orbe)
-      e.vy = -SAUT
+    } else if (appui && e.orbe && !e.orbesPrises.has(e.orbe.cle)) {
+      e.orbesPrises.add(e.orbe.cle)
+      if (e.orbe.type === 'inverse') e.sens = -sens
+      e.vy = -SAUT * e.sens
     }
-    e.vy += GRAVITE * dt
+    e.vy += GRAVITE * sens * dt
   } else {
-    e.vy += (appui ? GRAVITE_VOL - POUSSEE : GRAVITE_VOL) * dt
+    e.vy += (appui ? GRAVITE_VOL - POUSSEE : GRAVITE_VOL) * sens * dt
     e.vy = Math.max(-VY_MAX_VOL, Math.min(VY_MAX_VOL, e.vy))
   }
 
@@ -164,15 +193,22 @@ export function pas(e, appui, dt = PAS) {
   // son dessous. Le cube ne meurt pas d'un plafond — il s'y cogne.
   e.sol = false
   if (dansBloc(e, e.x, e.y)) {
+    // L'onde n'a pas de sol : toucher un bloc, par n'importe quelle face, la
+    // termine. C'est ce qui fait qu'un couloir d'onde se lit comme un fil et
+    // pas comme une pièce où l'on peut se poser.
+    if (e.mode === 'onde') return ((e.mort = true), e)
     const g = TAILLE / 2
-    if (e.vy > 0) {
+    const descend = e.vy > 0
+    if (descend) {
       const cy = Math.floor((e.y + g - 0.001) / CASE)
       e.y = cy * CASE - g
-      e.sol = true
     } else {
       const cy = Math.floor((e.y - g) / CASE)
       e.y = (cy + 1) * CASE + g
     }
+    // On est posé quand on s'appuie sur la surface vers laquelle on tombe —
+    // le plafond fait un très bon sol quand la gravité est inversée.
+    e.sol = descend === sens > 0
     e.vy = 0
     // Un bloc traversé d'un pas à l'autre alors qu'on montait vite : on
     // n'aurait pas dû passer. Sans ce garde, un vaisseau rapide franchit une
@@ -197,15 +233,26 @@ export function pas(e, appui, dt = PAS) {
     for (let cy = c.y0; cy <= c.y1; cy++) {
       const q = caseA(e.grille, cx, cy)
       if (q === '^') return ((e.mort = true), e)
-      if (q === 'o') e.orbe = cx + ':' + cy
+      if (q === 'o') e.orbe = { cle: cx + ':' + cy, type: 'saut' }
+      if (q === 'b') e.orbe = { cle: cx + ':' + cy, type: 'inverse' }
       if (q === '_') {
-        e.vy = -TREMPLIN
+        e.vy = -TREMPLIN * e.sens
         e.sol = false
       }
       if (q === 'S') e.mode = 'vaisseau'
+      if (q === 'W') e.mode = 'onde'
       if (q === 'C') {
         e.mode = 'cube'
-        e.vy = Math.max(e.vy, 0)
+        // On sort d'un portail sans vitesse acquise : garder celle du vaisseau
+        // ferait retomber le cube comme une pierre juste après.
+        e.vy = 0
+      }
+      // Le portail d'inversion ne se déclenche qu'une fois : le traverser sur
+      // plusieurs images le ferait basculer à chaque pas.
+      if (q === 'G' && e.portail !== cx) {
+        e.portail = cx
+        e.sens = -e.sens
+        e.sol = false
       }
       if (q === '>') e.vitesse = Math.min(2, e.vitesse * 1.3)
       if (q === '<') e.vitesse = Math.max(0.6, e.vitesse / 1.3)
@@ -217,7 +264,8 @@ export function pas(e, appui, dt = PAS) {
 
   // La rotation du cube n'est pas décorative : elle dit d'un coup d'œil si on
   // est en l'air, ce qu'on ne lit pas assez vite à la seule hauteur.
-  if (e.mode === 'cube') e.rotation = e.sol ? Math.round(e.rotation / 90) * 90 : e.rotation + 430 * dt
+  if (e.mode === 'cube') e.rotation = e.sol ? Math.round(e.rotation / 90) * 90 : e.rotation + 430 * sens * dt
+  else if (e.mode === 'onde') e.rotation = e.vy > 0 ? 45 : -45
   else e.rotation = Math.max(-28, Math.min(28, (e.vy / VY_MAX_VOL) * 28))
 
   if (e.x >= e.long * CASE) e.fini = true

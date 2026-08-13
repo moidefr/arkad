@@ -23,15 +23,26 @@
 export const RANGEES = 11
 export const SOL = RANGEES - 1
 
-/** Le vocabulaire d'une case. Une lettre, une chose, et rien d'implicite. */
+/**
+ * Le vocabulaire d'une case. Une lettre, une chose, et rien d'implicite.
+ *
+ * **Un portail occupe toute la hauteur de sa colonne**, et ce n'est pas un
+ * détail de dessin. Tant qu'il ne faisait que deux cases, le solveur sautait
+ * par-dessus et jouait la section suivante dans le mauvais véhicule — la
+ * gravité inversée était décorative, et personne ne l'aurait vu en relisant les
+ * motifs. Un portail est une porte : on la franchit, on ne la contourne pas.
+ */
 export const CASES = {
   '.': 'vide',
   '#': 'bloc',
   '^': 'pic', // tue au contact
   o: 'orbe', // un appui en l'air redonne un saut
   _: 'tremplin', // relance tout seul, plus haut qu'un saut
+  b: 'orbeInverse', // un appui en l'air retourne la gravité *et* relance
   S: 'portailVaisseau',
+  W: 'portailOnde',
   C: 'portailCube',
+  G: 'portailGravite', // retourne le monde, quel que soit le véhicule
   '>': 'portailRapide',
   '<': 'portailLent',
 }
@@ -270,16 +281,16 @@ export const MOTIFS = [
 
   // --- Le vaisseau --------------------------------------------------------------
   m('volEntree', 'ON DÉCOLLE', 1, 'cube', [
-    '........',
-    '........',
-    '........',
-    '........',
-    '........',
-    '........',
     '...S....',
-    '........',
-    '........',
-    '........',
+    '...S....',
+    '...S....',
+    '...S....',
+    '...S....',
+    '...S....',
+    '...S....',
+    '...S....',
+    '...S....',
+    '...S....',
     '########',
   ]),
 
@@ -312,17 +323,17 @@ export const MOTIFS = [
   ]),
 
   m('volVague', 'LA VAGUE', 4, 'vaisseau', [
-    '##########',
-    '####......',
-    '####......',
-    '......####',
-    '......####',
-    '..........',
-    '####......',
-    '####......',
-    '......####',
-    '......####',
-    '##########',
+    '############',
+    '#####.......',
+    '#####.......',
+    '............',
+    '.......#####',
+    '.......#####',
+    '............',
+    '#####.......',
+    '#####.......',
+    '............',
+    '############',
   ]),
 
   m('volPics', 'LES DENTS DU HAUT', 4, 'vaisseau', [
@@ -341,10 +352,44 @@ export const MOTIFS = [
 
   m('volSortie', 'ON REPOSE', 1, 'vaisseau', [
     '##########',
-    '..........',
-    '..........',
-    '..........',
     '...C......',
+    '...C......',
+    '...C......',
+    '...C......',
+    '...C......',
+    '...C......',
+    '...C......',
+    '...C......',
+    '...C......',
+    '##########',
+  ]),
+
+  // --- La gravité qui se retourne -------------------------------------------------
+  //
+  // Le plafond devient le sol. Ce n'est pas un véhicule de plus : c'est le même
+  // cube, le même saut, la même lecture — à l'envers. D'où le fait qu'on peut
+  // reprendre ici les motifs du sol sans les redessiner, simplement retournés.
+
+  m('gravEntree', 'LE MONDE BASCULE', 2, 'cube', [
+    '##########',
+    '....G.....',
+    '....G.....',
+    '....G.....',
+    '....G.....',
+    '....G.....',
+    '....G.....',
+    '....G.....',
+    '....G.....',
+    '....G.....',
+    '##########',
+  ]),
+
+  m('gravPics', 'AU PLAFOND', 3, 'cube', [
+    '##########',
+    '..^....^..',
+    '..........',
+    '..........',
+    '..........',
     '..........',
     '..........',
     '..........',
@@ -353,32 +398,153 @@ export const MOTIFS = [
     '##########',
   ]),
 
+  m('gravMarche', 'LA MARCHE À L’ENVERS', 3, 'cube', [
+    '##########',
+    '####......',
+    '####......',
+    '..........',
+    '..........',
+    '..........',
+    '..........',
+    '..........',
+    '..........',
+    '..........',
+    '##########',
+  ]),
+
+  m('gravRetour', 'ON REDESCEND', 2, 'cube', [
+    '##########',
+    '....G.....',
+    '....G.....',
+    '....G.....',
+    '....G.....',
+    '....G.....',
+    '....G.....',
+    '....G.....',
+    '....G.....',
+    '....G.....',
+    '##########',
+  ]),
+
+  m('orbeInverse', 'L’ORBE BLEUE', 4, 'cube', [
+    '##########',
+    '..........',
+    '..........',
+    '..........',
+    '..........',
+    '..........',
+    '..........',
+    '.....b....',
+    '..........',
+    '..........',
+    '###....###',
+  ]),
+
+  // --- L'onde ---------------------------------------------------------------------
+  //
+  // Le portail se prend en l'air, comme celui du vaisseau : entrer en onde au
+  // ras du sol ne laisse pas une image pour réagir, et un passage à une image
+  // près n'est pas un passage.
+
+  m('ondeEntree', 'LE FIL', 2, 'cube', [
+    '##########',
+    '....W.....',
+    '....W.....',
+    '....W.....',
+    '....W.....',
+    '....W.....',
+    '....W.....',
+    '....W.....',
+    '....W.....',
+    '....W.....',
+    '##########',
+  ]),
+
+  m('ondePlat', 'TIRER LE TRAIT', 1, 'onde', [
+    '##########',
+    '..........',
+    '..........',
+    '..........',
+    '..........',
+    '..........',
+    '..........',
+    '..........',
+    '..........',
+    '..........',
+    '##########',
+  ]),
+
+  m('ondeCouloir', 'LE COULOIR FIN', 4, 'onde', [
+    '##########',
+    '##########',
+    '..........',
+    '..........',
+    '..........',
+    '..........',
+    '..........',
+    '..........',
+    '##########',
+    '##########',
+    '##########',
+  ]),
+
+  // Trois cases de passage, pas deux. Une onde avance d'une case en hauteur
+  // pour une case en largeur : dans un couloir de deux, elle touche avant
+  // d'avoir fini de tourner, et le motif n'est pas dur — il est faux.
+  m('ondeEscalier', 'EN ESCALIER', 4, 'onde', [
+    '############',
+    '############',
+    '###.........',
+    '###.........',
+    '............',
+    '............',
+    '............',
+    '........####',
+    '############',
+    '############',
+    '############',
+  ]),
+
+  m('ondeSortie', 'ON SE REPOSE', 1, 'onde', [
+    '##########',
+    '....C.....',
+    '....C.....',
+    '....C.....',
+    '....C.....',
+    '....C.....',
+    '....C.....',
+    '....C.....',
+    '....C.....',
+    '....C.....',
+    '##########',
+  ]),
+
   // --- La vitesse ---------------------------------------------------------------
   m('accelere', 'PLUS VITE', 1, 'cube', [
-    '......',
-    '......',
-    '......',
-    '......',
-    '......',
-    '......',
     '...>..',
-    '......',
-    '......',
-    '......',
+    '...>..',
+    '...>..',
+    '...>..',
+    '...>..',
+    '...>..',
+    '...>..',
+    '...>..',
+    '...>..',
+    '...>..',
     '######',
   ]),
 
   m('ralentit', 'PLUS LENT', 1, 'cube', [
-    '......',
-    '......',
-    '......',
-    '......',
-    '......',
-    '......',
     '...<..',
-    '......',
-    '......',
-    '......',
+    '...<..',
+    '...<..',
+    '...<..',
+    '...<..',
+    '...<..',
+    '...<..',
+    '...<..',
+    '...<..',
+    '...<..',
     '######',
   ]),
 ]
@@ -387,6 +553,16 @@ export const PAR_ID = Object.fromEntries(MOTIFS.map((x) => [x.id, x]))
 
 /** Une pause entre deux motifs : du sol, et rien dessus. */
 export const repos = (n) => ({ repos: n })
+
+/**
+ * Une pause **couverte** : du sol *et* un plafond.
+ *
+ * Indispensable dans une section à gravité inversée. Un repos ordinaire n'a
+ * pas de plafond, donc une fois le monde retourné le joueur monte et sort de
+ * la grille — le niveau devient infranchissable au premier espace entre deux
+ * motifs, et le motif n'y est pour rien.
+ */
+export const reposCouvert = (n) => ({ repos: n, couvert: true })
 
 /**
  * Les niveaux. `bande` est l'identifiant du morceau qui l'accompagne, et il
@@ -524,6 +700,91 @@ export const NIVEAUX = [
       repos(3),
       'trouLarge',
       repos(2),
+      'pics3',
+      repos(6),
+    ],
+  },
+  {
+    id: 'renverse',
+    nom: 'À L’ENVERS',
+    bande: 'ruee6',
+    vitesse: 1,
+    suite: [
+      repos(6),
+      'pic2',
+      repos(3),
+      'gravEntree',
+      reposCouvert(3),
+      'gravPics',
+      reposCouvert(2),
+      'gravMarche',
+      reposCouvert(3),
+      'gravPics',
+      reposCouvert(3),
+      'gravRetour',
+      repos(4),
+      'pics3',
+      repos(3),
+      'plateforme',
+      repos(5),
+    ],
+  },
+  {
+    id: 'fil',
+    nom: 'LE FIL',
+    bande: 'ruee7',
+    vitesse: 1,
+    suite: [
+      repos(6),
+      'pic1',
+      repos(3),
+      'marche',
+      repos(4),
+      'ondeEntree',
+      'ondePlat',
+      'ondeCouloir',
+      'ondePlat',
+      'ondeEscalier',
+      'ondePlat',
+      'ondeSortie',
+      repos(4),
+      'orbe',
+      repos(3),
+      'pic2',
+      repos(5),
+    ],
+  },
+  {
+    id: 'tout',
+    nom: 'TOUT EN MÊME TEMPS',
+    bande: 'ruee8',
+    vitesse: 1.1,
+    suite: [
+      repos(6),
+      'pics3',
+      repos(3),
+      'gravEntree',
+      reposCouvert(2),
+      'gravPics',
+      reposCouvert(2),
+      'gravRetour',
+      repos(3),
+      'volEntree',
+      'volPlat',
+      'volVague',
+      'volPlat',
+      'volSortie',
+      repos(3),
+      'ondeEntree',
+      'ondePlat',
+      'ondeCouloir',
+      'ondePlat',
+      'ondeSortie',
+      repos(7),
+      'dents',
+      repos(2),
+      'orbeDouble',
+      repos(3),
       'pics3',
       repos(6),
     ],

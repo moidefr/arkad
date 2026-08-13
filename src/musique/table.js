@@ -137,6 +137,9 @@ export const RUEE = [
   t('ruee3', 'L’ENVOL', 146, 'dorien', 2, 'course', 0x3377cc),
   t('ruee4', 'LES ORBES', 158, 'mixolydien', 7, 'fete', 0x4488dd),
   t('ruee5', 'LA DERNIÈRE', 172, 'harmonique', 0, 'brasier', 0x5599ee),
+  t('ruee6', 'À L’ENVERS', 148, 'phrygien', 5, 'mecanique', 0x66aaff),
+  t('ruee7', 'LE FIL', 162, 'lydien', 11, 'course', 0x77bb11),
+  t('ruee8', 'TOUT EN MÊME TEMPS', 176, 'harmonique', 3, 'brasier', 0x88cc22),
 ]
 
 export const TOUTES = [...BRECHE, ...RUEE, ...JEUX]
