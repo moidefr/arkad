@@ -387,7 +387,16 @@ export function fiche(ctx, c, u) {
   // à travers le texte faible, et la moitié des lignes devient illisible.
   panneau(ctx, M, 98, LARGE, 156)
   texte(ctx, U.titre(u), M + 10, 116, 12, C.accent, 700, LARGE - 20)
-  texte(ctx, `${GRADES[u.grade].nom} · ${TYPE[f.type].nom} · ${CL[u.cl].nom}`, M + 10, 132, 11, C.faible, 700, LARGE - 20)
+  texte(
+    ctx,
+    `${GRADES[u.grade].nom} · ${TYPE[f.type].nom} · ${CL[u.cl].nom}`,
+    M + 10,
+    132,
+    11,
+    C.faible,
+    700,
+    LARGE - 20,
+  )
 
   const k = u.pv / f.pvMax
   barre(ctx, M + 10, 142, LARGE - 20, 10, k, teinteVie(k), C.bord)

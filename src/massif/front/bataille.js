@@ -339,8 +339,17 @@ export function porteeDe(bat, u) {
   return [f.portee[0], f.portee[1] + (t?.portee ?? 0)]
 }
 
+/**
+ * Une pièce d'artillerie tire **en batterie** : si elle a bougé, elle ne tire
+ * pas ce tour-ci. Sans cette règle, mesurée au banc, les engins gagnaient
+ * cent pour cent de leurs duels contre les six types — ils avançaient et
+ * tiraient dans le même tour, et rien ne pouvait les approcher.
+ */
+export const enBatterie = (u) => ficheBase(u).type !== 'ENG' || u.parcouru === 0
+
 export function peutAttaquer(bat, u, cible) {
   if (u.aAgi || u.pv <= 0 || cible.pv <= 0 || cible.camp === u.camp || enDeroute(u)) return false
+  if (!enBatterie(u)) return false
   const d = distance(u.q, u.r, cible.q, cible.r)
   const [min, max] = porteeDe(bat, u)
   if (d < min || d > max) return false

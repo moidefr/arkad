@@ -102,12 +102,12 @@ export const CLASSES = [
   c('chevalier', 'CHEVALIER', 'CHV', 'MON', 15, 46, 20, 14, [1, 1], 6, 4, 395, ['charge_lourde', 'zone_controle']),
 
   // --- Tir ------------------------------------------------------------------
-  c('frondeur', 'FRONDEUR', 'FRO', 'TIR', 1, 20, 8, 3, [1, 2], 5, 4, 42),
-  c('archer', 'ARCHER', 'ARC', 'TIR', 1, 22, 9, 4, [1, 3], 4, 4, 60),
+  c('frondeur', 'FRONDEUR', 'FRO', 'TIR', 1, 20, 9, 3, [1, 2], 5, 4, 42),
+  c('archer', 'ARCHER', 'ARC', 'TIR', 1, 22, 10, 4, [1, 3], 4, 4, 60),
   c('arbaletrier', 'ARBALÉTRIER', 'ARB', 'TIR', 3, 24, 13, 5, [1, 3], 4, 4, 100, ['perce_armure']),
-  c('tirailleur', 'TIRAILLEUR', 'TRA', 'TIR', 5, 24, 11, 4, [1, 3], 5, 4, 120, ['tirailleur']),
-  c('fusilier', 'FUSILIER', 'FUS', 'TIR', 8, 28, 15, 6, [1, 4], 4, 4, 200, ['perce_armure']),
-  c('marqueur', 'MARQUEUR', 'MRQ', 'TIR', 11, 26, 17, 5, [2, 5], 4, 5, 265, ['sniper', 'precision']),
+  c('tirailleur', 'TIRAILLEUR', 'TRA', 'TIR', 5, 24, 12, 4, [1, 3], 5, 4, 120, ['tirailleur']),
+  c('fusilier', 'FUSILIER', 'FUS', 'TIR', 8, 28, 16, 6, [1, 4], 4, 4, 200, ['perce_armure']),
+  c('marqueur', 'MARQUEUR', 'MRQ', 'TIR', 11, 26, 18, 5, [2, 5], 4, 5, 265, ['sniper', 'precision']),
 
   // --- Engins ---------------------------------------------------------------
   c('baliste', 'BALISTE', 'BAL', 'ENG', 4, 26, 16, 5, [2, 4], 2, 3, 140, ['volee']),

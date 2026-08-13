@@ -30,8 +30,15 @@ export const tailleEscouade = (n) => Math.ceil(places(n) / escouadesMax(n))
 /** Le dépôt, lui, est plus large que le champ : on garde des remplaçants. */
 export const depotMax = (n) => places(n) + 8
 
-/** Le renom qu'il faut pour passer au niveau suivant. */
-export const seuilRenom = (n) => 18 + 12 * n
+/**
+ * Le renom qu'il faut pour passer au niveau suivant.
+ *
+ * Réglé au banc : avec la courbe d'avant, trente engagements menaient au
+ * niveau 5, et **vingt-six classes sur trente-cinq** n'étaient jamais
+ * apparues à la caserne. Du contenu qu'on ne voit pas est du contenu qui
+ * n'existe pas.
+ */
+export const seuilRenom = (n) => 16 + 6 * n
 
 // --- Création et sauvegarde ------------------------------------------------------
 
@@ -231,6 +238,29 @@ export function soigne(c, id) {
 
 export const coutSoinTous = (c) => c.troupes.reduce((s, u) => s + coutSoin(c, u), 0)
 
+/**
+ * Le repos entre deux engagements : gratuit, et il ne remonte que jusqu'à un
+ * certain point.
+ *
+ * Sans lui, mesuré au banc, la compagnie entrait dans chaque bataille plus
+ * entamée que la précédente — l'or partait en pansements, on n'achetait plus
+ * personne, et le taux de victoire s'effondrait de moitié entre le deuxième et
+ * le troisième niveau **sans qu'aucune règle de combat n'ait changé**. Une
+ * spirale de ce genre ne se joue pas, elle se subit. L'infirmerie, elle, garde
+ * un sens : c'est elle qui rend le dernier tiers, tout de suite.
+ */
+export const PLAFOND_REPOS = 0.7
+export const REPOS = 0.3
+
+export function repos(c) {
+  for (const u of c.troupes) {
+    const max = U.fiche(u).pvMax
+    const rendu = Math.round(max * REPOS)
+    u.pv = Math.min(max, Math.max(u.pv, Math.min(Math.round(max * PLAFOND_REPOS), u.pv + rendu)))
+    if (u.pv >= max) u.blesse = 0
+  }
+}
+
 // --- La campagne -----------------------------------------------------------------
 
 const LIEUX = [
@@ -273,7 +303,7 @@ export function planifie(c) {
   const lieux = melange(rng, LIEUX)
   const plan = []
   for (let i = 0; i < combien; i++) {
-    const difficulte = 0.8 + i * 0.18 + (rng() - 0.5) * 0.1
+    const difficulte = 0.78 + i * 0.16 + (rng() - 0.5) * 0.1
     const obj = parmi(rng, objs)
     const biome = biomes[i % biomes.length]
     plan.push({
@@ -286,7 +316,7 @@ export function planifie(c) {
       difficulte: Math.round(difficulte * 100) / 100,
       penchant: rng() < 0.5 ? null : parmi(rng, ['INF', 'LEG', 'MON', 'TIR', 'ENG']),
       or: Math.round((110 + 58 * c.niveau) * difficulte),
-      renom: Math.round((10 + 2 * c.niveau) * difficulte),
+      renom: Math.round((18 + 4 * c.niveau) * difficulte),
       toursMax: toursMaxDe(c.niveau),
       graine: derive(c.graine, 303, c.engagements, i),
     })
@@ -305,10 +335,24 @@ export function prepare(c, k) {
   if (!troupes.length) return null
 
   const budget = A.budgetDe(A.forceDe(troupes), e.difficulte)
-  // Un champion adverse se paie sur le même budget : sinon il arrive en plus
-  // de l'armée, et l'engagement annoncé « équilibré » ne l'est pas.
-  const champion = e.difficulte >= 1 ? A.championAdverse(e.graine, c.niveau, c.uniquesVus) : null
-  const adverses = A.armee(e.graine, c.niveau, budget * (champion ? 0.68 : 1), e.penchant, Math.min(14, troupes.length))
+  // L'ennemi se règle sur **la troupe qu'on aligne vraiment**, pas sur le
+  // niveau de la compagnie. Mesuré au banc : indexé sur le niveau, il
+  // recrutait dans les classes du moment pendant qu'on montait au front avec
+  // des vétérans d'il y a dix batailles, et le budget « égal » ne l'était pas.
+  const rang = Math.max(1, Math.round(troupes.reduce((s, u) => s + u.niv, 0) / troupes.length))
+  const champion = e.difficulte >= 1 ? A.championAdverse(e.graine, rang, c.uniquesVus) : null
+  // « Tenir le choc » veut dire être en dessous, et pas seulement affronter un
+  // compteur : sur cet objectif l'adversaire a moitié plus de moyens et jusqu'à
+  // trois troupes de plus. En échange, le compte à rebours est nettement plus
+  // court que celui d'une bataille ordinaire.
+  const surnombre = e.objectif === 'survie'
+  const adverses = A.armee(
+    e.graine,
+    rang,
+    budget * (champion ? 0.68 : 1) * (surnombre ? 1.5 : 1),
+    e.penchant,
+    Math.min(16, troupes.length + (surnombre ? 3 : 0)),
+  )
   if (champion) adverses.push(champion)
 
   const occupe = new Set()
@@ -317,29 +361,15 @@ export function prepare(c, k) {
 
   const objectif = { id: e.objectif, besoin: 3 }
   if (OBJ[e.objectif]?.points) {
-    objectif.points = pointsCapture(e.graine, carte, c.niveau >= 8 ? 3 : 2)
+    objectif.points = pointsCapture(e.graine, carte, c.niveau >= 10 ? 5 : 3)
     objectif.besoin = 3
   }
   if (e.objectif === 'decapitation') {
     const chef = sien.reduce((a, b) => (b.grade > a.grade || (b.grade === a.grade && b.niv > a.niv) ? b : a))
     objectif.chef = chef.ref
   }
-  if (e.objectif === 'survie') {
-    // Tenir le choc, ça veut dire être en dessous en nombre. Sinon ce n'est
-    // qu'une bataille rangée avec un compteur.
-    for (const extra of A.armee(e.graine + 7, c.niveau, budget * 0.5, e.penchant, 4)) {
-      const u = B.engage(extra, 1, 0, 0)
-      const place = placeLibre(carte, zoneDeploiement(carte, 1, 3)[0], occupe)
-      if (!place) break
-      u.q = place.q
-      u.r = place.r
-      u.depart = { q: u.q, r: u.r, pm: u.pm }
-      occupe.add(cle(u.q, u.r))
-      sien.push(u)
-    }
-  }
-
-  const bat = B.commence(carte, objectif, mien, sien, { toursMax: e.toursMax })
+  const tours = surnombre ? Math.round(e.toursMax * 0.62) : e.toursMax
+  const bat = B.commence(carte, objectif, mien, sien, { toursMax: tours })
   bat.titre = e.nom
   bat.banniere = parmi(melange32(e.graine), A.BANNIERES)
   bat.niveau = c.niveau
@@ -411,6 +441,8 @@ export function bilan(c, bat) {
     c.troupes = c.troupes.filter((t) => t.id !== u.id)
     c.pertes++
   }
+
+  repos(c)
 
   rapport.or = Math.round((bat.recompense?.or ?? 60) * (gagne ? 1 : rompu ? 0.3 : 0.45))
   rapport.renom = gagne ? (bat.recompense?.renom ?? 10) : 0

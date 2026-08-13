@@ -125,50 +125,67 @@ milieu d'un couloir, on la rouvre trois jours plus tard au même endroit.
 
 ### MASSIF — sans fin (1 jeu)
 
-**ANOMALIE** — un RPG tactique au tour par tour. Trois opérateurs plongent
-dans un système corrompu ; les ennemis sont des processus, les boss des
-noyaux, les compétences des exploits.
+**FRONT** — un jeu de stratégie militaire au tour par tour sur **grille
+hexagonale**. On lève une compagnie, on l'emmène d'engagement en engagement, et
+on la garde : les troupes sont persistantes. Le milicien du premier combat peut
+finir lieutenant vingt batailles plus tard, avec ses cicatrices et son nom.
 
-**Aucun aléatoire dans la résolution** : les dégâts sont exactement
-prévisibles. Le hasard vit dans la génération — quels nœuds, quelles offres,
-quels processus — et dans les choix pondérés de l'adversaire, jamais dans le
-résultat d'un coup. C'est ce qui rend le combat lisible sur 360 px, et
-surtout vérifiable à l'unité près par un test.
+**Le terrain décide.** Vingt-deux terrains, et chacun n'est qu'un petit paquet
+de nombres lus à trois endroits : coût de déplacement, couvert, opacité,
+hauteur — plus la portée de vue, la portée de tir, le soin, la furtivité. Une
+forêt coupe la vue *et* cache qui s'y tient ; on ne l'y voit qu'à un pas. Une
+colline voit par-dessus les bois et frappe de haut. Une rivière coûte trois
+points de mouvement à qui n'est pas pontonnier. Dix biomes composent les
+champs de bataille, rivières et routes comprises.
 
-La file d'initiative se calcule à l'avance et s'affiche sur sept coups ; les
-processus annoncent leur intention en y entrant. Les **cycles sont partagés
-par l'équipe** — un tour bon marché en finance un cher, trois classes
-gourmandes s'étouffent. Le **traçage** monte quand on joue, son plancher monte
-avec la durée du combat, et à cent le système frappe en ignorant tout : rester
-est impossible, et aucune stratégie ne gagne en durant.
+**Deux recrutements, et ils ne se ressemblent pas.** La **CASERNE** vend du
+générique — trente-cinq classes réparties en six types, avec une table
+d'efficacité franche : la cavalerie fait ×1,5 sur les tireurs et ×0,7 sur les
+piques. L'**ÉTAT-MAJOR** fait passer des gens qui ont un nom : quarante-deux
+uniques avec leur titre, leur phrase, leur grade et leur aptitude signée, tirés
+selon un **taux d'apparition indexé sur le niveau** — affiché sur la fiche,
+parce que c'est une information de jeu et pas un secret de conception. Le prix
+de recrutement suit le même niveau, dans les deux boutiques.
 
-Cinq actes à cartes ramifiées, chacun avec son bassin de processus et son
-noyau. Le dernier change deux fois de peau : ce qui l'a entamé ne l'entame
-plus. Le purger ouvre le mode **INFINI**, où la pression monte sans fin et où
-l'on choisit tous les trois actes *comment* ça devient dur, un fardeau parmi
-trois.
+**Des grades qui commandent.** Six grades, du soldat au commandant. Un gradé
+porte une aura qui déborde sur ses voisins, et elle ne s'empile pas : deux
+sergents côte à côte ne valent pas un commandant. Abattre l'officier d'en face
+casse le moral de tout ce qu'il commandait — c'est une manœuvre, pas un dégât
+de plus. Les escouades décident qui monte au front, et leur chef tient les
+siens avant même le premier coup.
 
-On peut aussi **plonger seul**. Ce n'est pas une difficulté de plus mais un
-autre jeu : la classe prise décide de toute la partie, personne ne couvre ni ne
-répare, et huit emplacements se remplissent d'une seule main. La correction qui
-compte est structurelle — face à deux processus, un opérateur seul joue une
-action quand l'adversaire en joue deux, alors il agit presque deux fois plus
-vite et reçoit trois fois plus de cycles par tour. Aucune quantité d'intégrité
-ne rattrape un rapport d'actions.
+**Ça grandit.** Du niveau 1 au niveau 20 : 9×7 → 19×15 hexagones, 3 → 12
+troupes par camp, 7 → 17 tours par bataille, un objectif → cinq (anéantir,
+tenir des points, décapiter, percer, tenir le choc). L'armée adverse n'est pas
+posée sur une courbe : elle est **bâtie sur un budget calé sur ce qu'on aligne
+vraiment**, ce qui évite de punir deux fois celui qui vient de perdre ses
+vétérans.
 
-Huit classes, cinquante-quatre compétences, vingt-sept processus, cinq noyaux,
-trente-neuf modules, onze fardeaux.
+**Ce qu'on risque.** Une défaite coûte les tombés — définitivement, pour le
+générique. Une victoire les ramasse, mal en point. C'est pour ça qu'il existe
+un bouton **ROMPRE** : renoncer à la prime pour ramener ceux qui tiennent
+encore est une décision, et c'est elle qui rend la persistance supportable.
 
-Ce qui empêche une combinaison de tout casser, et qui manquait au jeu
-précédent : six emplacements de compétence dont deux verrouillés avec **rejet
-forcé** au-delà, trois emplacements de module, quatre **paires antagonistes**
-qui s'excluent pour la partie entière, un **surcoût d'axe** écrit en clair sur
-l'écran ÉQUIPE, un plafond sur chaque état, et des multiplicateurs à rendement
-décroissant — trois bonus de +30 % donnent ×1.64, pas ×2.20. Une défaite
-termine la partie : sans prix à l'échec, la progression n'en a aucun.
+**Aucun aléatoire dans la résolution.** Les dégâts qu'annonce la prévision sont
+exactement ceux qui tombent, riposte comprise, avec le détail du calcul —
+AVANTAGE +35 %, HAUTEUR +15 %, PRIS À REVERS +24 %, COUVERT −35 %. Sur un
+téléphone, un coup dont on ne sait pas ce qu'il va faire n'est pas une
+décision. Le hasard vit dans la génération du terrain, de l'armée adverse et
+des offres de recrutement — jamais dans le résultat d'un coup.
 
-`node test/anomalie-banc.mjs` joue des milliers de combats sans rendu et
-imprime qui gagne, contre quoi, en combien de tours et à quel prix.
+**L'ergonomie**, qui est ce qui a fait abandonner le jeu massif précédent :
+on fait glisser la carte au doigt, et au-delà de dix pixels ce n'est plus un
+appui mais un déplacement de caméra ; la caméra suit toute seule la troupe
+qu'on choisit et la troupe adverse qui joue ; le panneau du bas ne montre
+jamais que ce qui est jouable tout de suite ; et le tour se passe depuis
+n'importe quel état, sans avoir à lâcher la troupe en main.
+
+Trente-cinq classes, quarante-deux uniques, cinquante et une aptitudes toutes
+pilotées par la donnée, vingt-deux terrains, dix biomes, cinq objectifs.
+
+`node test/front-banc.mjs` joue des campagnes entières sans rendu et imprime la
+durée des batailles par niveau, le taux de victoire par objectif, ce que
+rapporte chaque classe, et la matrice des duels entre types.
 
 ## Ajouter un mini-jeu
 
@@ -311,7 +328,7 @@ test/
   faux.js           un canvas qui enregistre, un moteur qui ne dessine pas
   *.test.js         `npm test` — aucune dépendance, `node --test` suffit
   usine-banc.mjs    dix heures d'USINE en une seconde
-  anomalie-banc.mjs des milliers de combats sans rendu
+  front-banc.mjs    des campagnes entières sans rendu
 .github/workflows/
   test.yml          le banc d'essai, à chaque poussée
   web.yml           déploie la version web, à la demande
@@ -328,7 +345,7 @@ fichiers qui n'importent ni canvas ni stockage.
 Ce ne sont pas des tests de politesse. Ceux de CORDE **ne lisent pas l'état du
 jeu** pour décider quand appuyer : ils lisent ce qui est dessiné, comme le
 ferait un joueur — la seule façon d'attraper un mensonge entre l'image et la
-règle. Ceux d'ANOMALIE vérifient chaque dégât à l'unité près et vérifient sur
+règle. Ceux de FRONT vérifient chaque dégât à l'unité près et vérifient sur
 des centaines de graines qu'aucune carte n'enferme le joueur. Ils ont trouvé,
 entre autres, un pare-feu plein qui laissait passer un point, un type de dégât
 entier inoffensif contre le joueur, un tirage au hasard écrit à l'intérieur
@@ -343,8 +360,8 @@ d'un `.find()`, et trois combats qui ne se terminaient jamais.
 ## La suite
 
 - d'autres jeux massifs — la catégorie n'en a qu'un
-- ANOMALIE : trois classes de plus, et des déblocages entre parties qui
-  ajoutent de la variété sans jamais ajouter de puissance
+- FRONT : des sièges et des objectifs à plusieurs étapes, et une campagne
+  qui se souvient des compagnies adverses qu'on a croisées
 - une interface pour publier des jeux sans passer par git
 - des scores en ligne
 

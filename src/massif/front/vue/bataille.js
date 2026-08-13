@@ -281,7 +281,7 @@ function previsionPanneau(ctx, bat, sel) {
     ctx.textAlign = 'left'
   })
   if (p.couvert)
-    texte(ctx, `COUVERT DE LA CIBLE −${Math.round(p.couvert * 100)} %`, M, PANNEAU.y + 140, 10, C.cyan, 700, LARGE)
+    texte(ctx, `COUVERT DE LA CIBLE −${Math.round(p.couvert * 100)} %`, M, PANNEAU.y + 136, 10, C.cyan, 700, LARGE)
 
   const y = PANNEAU.y + 148
   const demi = Math.floor((LARGE - 6) / 2)

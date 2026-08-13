@@ -373,3 +373,65 @@ test('les uniques croisés au fil d’une campagne restent variés', () => {
   assert.ok(vus.size >= 12, `seulement ${vus.size} uniques différents proposés en 25 offres`)
   assert.ok(vus.size < UNIQUES.length, 'toute la table passe : plus rien à découvrir')
 })
+
+// --- Ce que le banc a trouvé --------------------------------------------------------
+
+test('le repos entre deux engagements sort de la spirale, sans tout rendre', () => {
+  const c = neuve(77)
+  const u = c.troupes[0]
+  const max = U.fiche(u).pvMax
+  u.pv = 4
+  C.repos(c)
+  assert.ok(u.pv > 4, 'le repos ne rend rien')
+  assert.ok(u.pv <= Math.round(max * C.PLAFOND_REPOS), 'le repos rend trop')
+  // Deux repos de suite plafonnent : le dernier tiers se paie à l’infirmerie.
+  C.repos(c)
+  C.repos(c)
+  assert.ok(u.pv <= Math.round(max * C.PLAFOND_REPOS))
+  assert.ok(C.coutSoin(c, u) > 0, 'l’infirmerie n’a plus rien à vendre')
+})
+
+test('une compagnie qui enchaîne les engagements ne s’étiole pas', () => {
+  const c = C.nouvelle(31415)
+  const sante = []
+  for (let n = 0; n < 8; n++) {
+    for (const t of c.troupes) if (C.coutSoin(c, t) <= c.or * 0.3) C.soigne(c, t.id)
+    const bat = C.prepare(c, n % c.plan.length)
+    if (!bat) break
+    let garde = 0
+    while (!B.fini(bat) && garde++ < 400) {
+      IA.joueCamp(bat, bat.camp)
+      if (!B.fini(bat)) B.finTour(bat)
+    }
+    C.bilan(c, bat)
+    if (c.troupes.length) sante.push(c.troupes.reduce((s, t) => s + t.pv / U.fiche(t).pvMax, 0) / c.troupes.length)
+  }
+  // Sans le repos gratuit, cette moyenne s'effondrait d'engagement en
+  // engagement et la campagne mourait de ses pansements impayables.
+  const fin = sante.slice(-4).reduce((s, x) => s + x, 0) / Math.max(1, sante.slice(-4).length)
+  assert.ok(fin > 0.5, `la compagnie finit à ${(fin * 100).toFixed(0)} % de sa santé`)
+})
+
+test('tenir le choc se joue plus vite qu’une bataille ordinaire', () => {
+  const c = neuve(99)
+  c.niveau = 12
+  c.or = 999999
+  while (c.troupes.length < C.places(c.niveau)) {
+    if (!c.offre.caserne.length) {
+      c.engagements++
+      C.rafraichit(c)
+    }
+    const u = C.recruteGenerique(c, c.offre.caserne[0].cl)
+    if (!u) break
+    C.enrole(c, u.id)
+  }
+  C.planifie(c)
+  c.plan[0].objectif = 'survie'
+  const bat = C.prepare(c, 0)
+  assert.ok(bat.toursMax < C.toursMaxDe(c.niveau), 'le compte à rebours n’est pas raccourci')
+  // Et l'ennemi est en force, sinon ce n'est qu'une bataille avec un compteur.
+  assert.ok(
+    B.forceRestante(bat, 1) > B.forceRestante(bat, 0) * 1.1,
+    `l’ennemi n’est pas en force : ${B.forceRestante(bat, 1)} contre ${B.forceRestante(bat, 0)}`,
+  )
+})

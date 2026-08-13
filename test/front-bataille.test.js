@@ -15,8 +15,8 @@ import * as C from '../src/massif/front/compagnie.js'
 import { INDICE, TERRAINS } from '../src/massif/front/terrain.js'
 import { APTITUDES, APT } from '../src/massif/front/donnees/aptitudes.js'
 import { CLASSES } from '../src/massif/front/donnees/classes.js'
-import { versAxial, distance, cle } from '../src/massif/front/hex.js'
-import { indice } from '../src/massif/front/carte.js'
+import { versAxial, versOffset, distance, cle } from '../src/massif/front/hex.js'
+import { indice, genereCarte, pointsCapture } from '../src/massif/front/carte.js'
 
 // --- Le banc d'essai ----------------------------------------------------------
 
@@ -625,4 +625,39 @@ test('la bataille se sérialise et se relit à l’identique', () => {
   // Et on peut continuer à jouer dessus : c'est tout l'intérêt.
   IA.joueCamp(copie, copie.camp)
   assert.ok(copie.journal.length >= bat.journal.length)
+})
+
+// --- Ce que le banc a trouvé -----------------------------------------------------------
+
+test('un engin qui a bougé ne tire pas : il faut le mettre en batterie', () => {
+  const carte = plat(13, 5)
+  const eng = troupe('baliste', 0, 2, 2, 6)
+  const cible = troupe('fantassin', 1, 6, 2, 6)
+  const bat = monte(carte, [eng], [cible])
+  assert.ok(B.peutAttaquer(bat, eng, cible), 'immobile, l’engin devrait tirer')
+  const d = versAxial(3, 2)
+  B.deplace(bat, eng, d.q, d.r)
+  assert.equal(B.peutAttaquer(bat, eng, cible), false, 'l’engin tire après avoir avancé')
+  assert.equal(B.enBatterie(eng), false)
+  B.finTour(bat)
+  B.finTour(bat)
+  assert.ok(B.enBatterie(eng), 'l’engin ne se remet jamais en batterie')
+})
+
+test('les points à tenir sont toujours en nombre impair et loin des lignes de départ', () => {
+  for (let g = 0; g < 40; g++) {
+    for (const [cols, rows] of [
+      [9, 7],
+      [13, 10],
+      [19, 15],
+    ]) {
+      const carte = genereCarte(g * 31 + 5, cols, rows, 'plaine')
+      const points = pointsCapture(g * 31 + 5, carte, 3)
+      assert.ok(points.length % 2 === 1, `${points.length} points : la majorité serait ambiguë`)
+      for (const p of points) {
+        const { col } = versOffset(p.q, p.r)
+        assert.ok(col >= 2 && col <= cols - 3, `un point à tenir en colonne ${col} sur ${cols}`)
+      }
+    }
+  }
 })

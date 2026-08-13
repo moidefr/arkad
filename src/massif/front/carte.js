@@ -171,25 +171,40 @@ export const OBJECTIFS = [
     id: 'survie',
     nom: 'TENIR LE CHOC',
     court: 'TENIR BON',
-    texte: 'Tenir jusqu’au dernier tour. L’ennemi a le nombre.',
+    texte: 'Tenir jusqu’au dernier tour. L’ennemi est en force.',
     rang: 9,
   },
 ]
 
 export const OBJ = Object.fromEntries(OBJECTIFS.map((o) => [o.id, o]))
 
-/** Les points à tenir, semés au milieu de la carte et jamais sur un obstacle. */
+/**
+ * Les points à tenir, semés dans **le tiers central** et jamais sur un
+ * obstacle.
+ *
+ * Mesuré au banc : semés n'importe où entre les deux zones de déploiement,
+ * ils tombaient régulièrement du côté adverse, l'ennemi les occupait dès le
+ * premier tour et la bataille était perdue au troisième — 10 % de victoires
+ * sur cet objectif contre 24 % pour les autres. Un point à tenir doit être à
+ * conquérir par les deux camps, pas offert à l'un d'eux.
+ *
+ * Leur nombre est **toujours impair** : avec deux points, « la majorité »
+ * voulait dire les deux, et l'objectif devenait un tout-ou-rien.
+ */
 export function pointsCapture(graine, carte, combien) {
   const rng = melange32(derive(graine, 77))
+  const impair = combien % 2 ? combien : combien + 1
+  const gauche = Math.max(2, Math.floor(carte.cols * 0.32))
+  const droite = Math.min(carte.cols - 3, Math.ceil(carte.cols * 0.68))
   const t = []
   const vus = new Set()
-  for (let essai = 0; essai < 200 && t.length < combien; essai++) {
-    const col = entre(rng, 2, carte.cols - 3)
+  for (let essai = 0; essai < 400 && t.length < impair; essai++) {
+    const col = entre(rng, Math.min(gauche, droite), Math.max(gauche, droite))
     const lig = entre(rng, 0, carte.rows - 1)
     const terr = terrainDe(carte.cases[indice(carte, col, lig)])
     if (terr.bloque) continue
     const a = versAxial(col, lig)
-    if (t.some((p) => distance(p.q, p.r, a.q, a.r) < 3)) continue
+    if (t.some((p) => distance(p.q, p.r, a.q, a.r) < 2)) continue
     const k = col + ':' + lig
     if (vus.has(k)) continue
     vus.add(k)
