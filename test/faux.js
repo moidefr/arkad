@@ -34,10 +34,19 @@ if (typeof globalThis.document === 'undefined') {
  * Un contexte 2D qui enregistre au lieu de peindre. Les coordonnées sont
  * rendues absolues (les translations sont appliquées), donc une assertion sur
  * une position est une assertion sur ce que le joueur voit.
+ *
+ * Il tient trois choses de plus que ce qu'un `fillText` rend visible, et les
+ * trois servent à prouver l'accord entre ce qu'on voit et ce qu'on touche :
+ * l'étendue horizontale d'un texte (`gauche`, `larg`), calée sur son
+ * alignement, sans quoi deux lignes superposées passent inaperçues ; sa taille,
+ * pour en déduire la bande qu'il occupe ; et le découpage en cours (`coupe`),
+ * sans quoi une carte peinte hors de sa fenêtre compte comme visible.
  */
 export function fauxCtx() {
   let dx = 0
   let dy = 0
+  let coupe = null
+  let chemin = null
   const pile = []
   const ops = []
 
@@ -51,11 +60,11 @@ export function fauxCtx() {
     letterSpacing: '0px',
 
     save() {
-      pile.push([dx, dy, this.globalAlpha])
+      pile.push([dx, dy, this.globalAlpha, coupe])
     },
     restore() {
       const p = pile.pop()
-      if (p) [dx, dy, this.globalAlpha] = p
+      if (p) [dx, dy, this.globalAlpha, coupe] = p
     },
     translate(x, y) {
       dx += x
@@ -63,6 +72,15 @@ export function fauxCtx() {
     },
     scale() {},
     setTransform() {},
+    beginPath() {
+      chemin = null
+    },
+    rect(x, y, w, h) {
+      chemin = { x: x + dx, y: y + dy, w, h }
+    },
+    clip() {
+      if (chemin) coupe = coupe ? croise(coupe, chemin) : chemin
+    },
     measureText(s) {
       // Approximation monospace, suffisante : on ne teste pas la typo, on
       // teste que rien ne déborde. La police s'écrit « 700 11px … » — un
@@ -72,15 +90,52 @@ export function fauxCtx() {
       return { width: String(s).length * taille * 0.6 }
     },
     fillRect(x, y, w, h) {
-      ops.push({ type: 'rect', x: x + dx, y: y + dy, w, h, couleur: this.fillStyle, alpha: this.globalAlpha })
+      ops.push({ type: 'rect', x: x + dx, y: y + dy, w, h, couleur: this.fillStyle, alpha: this.globalAlpha, coupe })
     },
-    fillText(s, x, y) {
-      ops.push({ type: 'texte', s: String(s), x: x + dx, y: y + dy, couleur: this.fillStyle, alpha: this.globalAlpha })
+    fillText(s, x, y, max) {
+      const t = String(s)
+      const taille = parseFloat(/(\d+(?:\.\d+)?)px/.exec(this.font)?.[1] ?? '') || 12
+      // `fillText` condense au lieu de couper : une largeur maximale borne
+      // l'étendue, elle ne retire aucune lettre.
+      const larg = Math.min(t.length * taille * 0.6, max ?? Infinity)
+      const bord = this.textAlign === 'right' ? larg : this.textAlign === 'center' ? larg / 2 : 0
+      ops.push({
+        type: 'texte',
+        s: t,
+        x: x + dx,
+        y: y + dy,
+        gauche: x + dx - bord,
+        larg,
+        taille,
+        couleur: this.fillStyle,
+        alpha: this.globalAlpha,
+        coupe,
+      })
     },
     drawImage(_img, x = 0, y = 0, w = 0, h = 0) {
-      ops.push({ type: 'image', x: x + dx, y: y + dy, w, h })
+      ops.push({ type: 'image', x: x + dx, y: y + dy, w, h, coupe })
     },
   }
+}
+
+const croise = (a, b) => {
+  const x = Math.max(a.x, b.x)
+  const y = Math.max(a.y, b.y)
+  return { x, y, w: Math.min(a.x + a.w, b.x + b.w) - x, h: Math.min(a.y + a.h, b.y + b.h) - y }
+}
+
+/**
+ * Le rectangle qu'une op laisse réellement à l'écran, découpage compris —
+ * `null` si elle ne laisse rien. Un texte occupe la bande de sa taille autour
+ * de sa ligne de base, le moteur écrivant en `textBaseline: 'middle'`.
+ */
+export function peint(o) {
+  const b =
+    o.type === 'texte'
+      ? { x: o.gauche, y: o.y - o.taille * 0.55, w: o.larg, h: o.taille * 1.1 }
+      : { x: o.x, y: o.y, w: o.w, h: o.h }
+  const r = o.coupe ? croise(b, o.coupe) : b
+  return r.w > 0 && r.h > 0 && o.alpha !== 0 ? r : null
 }
 
 /** Une source de hasard reproductible : un test qui échoue doit réechouer. */

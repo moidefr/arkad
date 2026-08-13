@@ -22,31 +22,46 @@ import * as D from './dispo.js'
 
 // --- Liste défilante ------------------------------------------------------------------
 
+/** Le plancher du doigt : sous cette hauteur visible, une ligne n'existe pas. */
+const PLANCHER = 30
+
 /**
  * Une liste qui défile au doigt, sur une ou deux colonnes. Les zones renvoyées
  * portent la position **réellement dessinée** : c'est la leçon du bug de
  * l'usine, où l'appui reconstruisait la liste et ne retrouvait donc jamais la
  * ligne touchée.
  *
- * Elles sont en plus **rognées au cadre**. Rien ici ne découpe le dessin : une
- * ligne à cheval sur le bord déborde, le bouton dessiné après la recouvre, et
- * sa zone restait touchable dessous. On voyait RETOUR, on touchait la recrue,
- * et l'or partait.
+ * Une ligne à cheval sur le bord est **découpée à la fenêtre**, et sa zone
+ * s'arrête au même endroit. C'est le seul découpage du jeu, et il paie deux
+ * fois : sans lui, la ligne débordante restait peinte en entier — le bouton
+ * dessiné ensuite la traversait, et couché c'étaient quatre-vingt-six pixels
+ * de carte visible dont pas un ne répondait au doigt.
+ *
+ * En dessous du plancher tactile, elle n'est ni peinte ni proposée : une
+ * lisière qu'on voit sans pouvoir la toucher est la même faute, en plus petit.
  */
 export function liste(ctx, cadreListe, elements, hauteur, defile, dessineLigne, cols = 1) {
   const zones = []
   const ecart = 4
   const w = Math.floor((cadreListe.w - (cols - 1) * ecart) / cols)
   const bas = cadreListe.y + cadreListe.h
+  ctx.save()
+  ctx.beginPath()
+  ctx.rect(cadreListe.x, cadreListe.y, cadreListe.w, cadreListe.h)
+  ctx.clip()
   elements.forEach((el, i) => {
-    const y = cadreListe.y + Math.floor(i / cols) * (hauteur + ecart) - defile
-    if (y + hauteur <= cadreListe.y - 2 || y >= bas + 2) return
-    const z = { x: cadreListe.x + (i % cols) * (w + ecart), y, w, h: hauteur }
-    dessineLigne(ctx, z, el)
+    // Sur la grille de deux pixels, comme tout le reste : sinon la ligne est
+    // peinte arrondie et sa zone ne l'est pas, et les deux se décalent d'un
+    // pixel à chaque défilement impair.
+    const y = px(cadreListe.y + Math.floor(i / cols) * (hauteur + ecart) - defile)
     const haut = Math.max(y, cadreListe.y)
     const fin = Math.min(y + hauteur, bas)
-    if (fin - haut >= 24) zones.push({ ...z, y: haut, h: fin - haut, el })
+    if (fin - haut < PLANCHER) return
+    const z = { x: cadreListe.x + (i % cols) * (w + ecart), y, w, h: hauteur }
+    dessineLigne(ctx, z, el)
+    zones.push({ ...z, y: haut, h: fin - haut, el })
   })
+  ctx.restore()
   const rangs = Math.ceil(elements.length / cols)
   const total = rangs * (hauteur + ecart) - ecart
   return { zones, max: Math.max(0, total - cadreListe.h) }
@@ -578,11 +593,13 @@ export function bilan(ctx, j, c, r) {
 
   // Debout les trois listes se suivent dans la même colonne ; couché chacune
   // tient la sienne, ce qui les empêche de descendre sur le bouton AU CAMP.
-  const curseurs = d.colonnes.map(() => d.debut)
+  // Le curseur se range donc par **abscisse** et non par rang de section :
+  // indexé par rang, debout où les trois abscisses sont la même, chaque section
+  // repartait du haut et écrivait sur la précédente.
+  const curseurs = new Map()
   sections.forEach((s, i) => {
-    const k = Math.min(i, d.colonnes.length - 1)
-    const x = d.colonnes[k]
-    let y = curseurs[k]
+    const x = d.colonnes[Math.min(i, d.colonnes.length - 1)]
+    let y = curseurs.get(x) ?? d.debut
     if (y > d.max) return
     texte(ctx, s.nom, x, y, 11, s.teinte, 700, d.largeur)
     y += 18
@@ -591,7 +608,7 @@ export function bilan(ctx, j, c, r) {
       texte(ctx, tronque(ctx, l, 11, d.largeur), x + 8, y, 11, s.couleur, 700)
       y += 16
     }
-    curseurs[k] = y + 8
+    curseurs.set(x, y + 8)
   })
 
   bouton(ctx, d.suite, 'AU CAMP', { primaire: true })

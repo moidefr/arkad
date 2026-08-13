@@ -219,8 +219,8 @@ export function uniques(j) {
       // La légende remonte de quatre pixels : les dossiers sont les plus hauts
       // du jeu, et c'est la seule liste dont la première ligne monte à 104.
       legende: { x: c.M, y: 98 },
-      // 104 et 126 ne sont pas décoratifs : au repos la seconde rangée tombe
-      // pile sur le bas de l'écran au lieu d'écrire six pixels dessous.
+      // 170 pour une rangée entière et le tiers de la suivante, découpée au
+      // cadre : c'est ce bout de dossier qui dit qu'il y a autre chose dessous.
       zone: { x: c.M, y: 104, w: c.L, h: 170 },
       cols: 2,
       ligne: 126,
@@ -369,6 +369,10 @@ export function bataille(j) {
     // interstice de quatre pixels aurait laissé voir des bouts de nid d'abeille.
     const coupe = 392
     const panneau = { x: coupe, y: 56, w: j.W - coupe, h: j.H - 56 }
+    // La largeur utile du panneau. Couché elle tombe à 232 px : toute largeur
+    // de texte taillée pour les 344 du portrait s'y recouvre, et deux lignes
+    // opaques l'une sur l'autre ne lèvent aucune erreur.
+    const pw = panneau.w - 16
     return {
       large: true,
       bandeau: { x: 0, y: 56, w: coupe, h: 36 },
@@ -379,9 +383,12 @@ export function bataille(j) {
       champ: { x: 0, y: 92, w: coupe, h: j.H - 92 },
       panneau,
       px: panneau.x + 8,
-      pw: panneau.w - 16,
+      pw,
       tourAdverse: { x: 0, y: j.H - 22, w: coupe, h: 22 },
       vignettes: { cols: 4, h: 42 },
+      // Les deux compteurs ne tiennent plus côte à côte : ils s'empilent, et la
+      // colonne a de quoi les loger sans rien pousser sous l'écran.
+      repos: { compte: 16, reste: 34, maxCompte: pw, maxReste: pw, vignettes: 44 },
       // Le panneau a 304 px de haut pour 184 de contenu debout : plutôt que de
       // laisser cent vingt pixels vides, les trois rangées de boutons passent
       // de 36/34/34 à 48/46/46. C'est le pouce qui y gagne.
@@ -398,6 +405,12 @@ export function bataille(j) {
         h1: 48,
         h2: 46,
         h3: 46,
+        // Chaque ligne porte un texte à gauche et un à droite : ce qu'on donne
+        // à l'un, on le retire à l'autre, huit pixels de jour compris.
+        maxNom: pw - 98,
+        maxPm: 90,
+        maxSous: pw - 102,
+        maxCouvert: 94,
       },
       prevision: {
         nom: 20,
@@ -416,7 +429,22 @@ export function bataille(j) {
         boutons: 206,
         hBouton: 40,
       },
-      inspect: { nom: 22, sous: 40, barre: 52, stats: 74, terrain: 92, apt: 112, fermer: 250, hFermer: 36 },
+      // Le compte de points de vie descend sous la jauge au lieu de partager sa
+      // ligne avec les statistiques : à 232 px, les deux s'écrivaient l'un sur
+      // l'autre sur une trentaine de pixels.
+      inspect: {
+        nom: 22,
+        sous: 40,
+        barre: 52,
+        pv: 74,
+        stats: 94,
+        terrain: 114,
+        apt: 134,
+        maxStats: pw,
+        maxPv: pw,
+        fermer: 250,
+        hFermer: 36,
+      },
     }
   }
   const champ = { x: 0, y: 88, w: 360, h: 364 }
@@ -434,6 +462,9 @@ export function bataille(j) {
     pw: panneau.w - 16,
     tourAdverse: { x: 0, y: panneau.y - 22, w: 360, h: 22 },
     vignettes: { cols: 6, h: 42 },
+    // Debout, les deux compteurs tiennent sur la même ligne : 210 + 130 font
+    // les 344 px du panneau, au pixel près.
+    repos: { compte: 16, reste: 16, maxCompte: 210, maxReste: 130, vignettes: 26 },
     unite: {
       nom: 18,
       sous: 34,
@@ -447,6 +478,10 @@ export function bataille(j) {
       h1: 36,
       h2: 34,
       h3: 34,
+      maxNom: 210,
+      maxPm: 90,
+      maxSous: 230,
+      maxCouvert: 110,
     },
     prevision: {
       nom: 16,
@@ -465,6 +500,18 @@ export function bataille(j) {
       boutons: 148,
       hBouton: 36,
     },
-    inspect: { nom: 18, sous: 34, barre: 42, stats: 62, terrain: 78, apt: 96, fermer: 148, hFermer: 34 },
+    inspect: {
+      nom: 18,
+      sous: 34,
+      barre: 42,
+      pv: 62,
+      stats: 62,
+      terrain: 78,
+      apt: 96,
+      maxStats: 250,
+      maxPv: 80,
+      fermer: 148,
+      hFermer: 34,
+    },
   }
 }

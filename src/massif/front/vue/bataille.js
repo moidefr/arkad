@@ -74,11 +74,22 @@ function reposPanneau(ctx, d, bat, sel) {
   const droite = M + LARGE
   const miennes = B.vivantes(bat, 0)
   const reste = B.restantes(bat, 0).length
+  const g = d.repos
 
   ctx.textAlign = 'left'
-  texte(ctx, `${miennes.length} EN LIGNE · ${B.vivantes(bat, 1).length} EN FACE`, M, y0 + 16, 12, C.faible, 700, 210)
+  const compte = `${miennes.length} EN LIGNE · ${B.vivantes(bat, 1).length} EN FACE`
+  texte(ctx, compte, M, y0 + g.compte, 12, C.faible, 700, g.maxCompte)
   ctx.textAlign = 'right'
-  texte(ctx, reste ? `${reste} À JOUER` : 'TOUT A JOUÉ', droite, y0 + 16, 12, reste ? C.accent : C.vert, 700, 130)
+  texte(
+    ctx,
+    reste ? `${reste} À JOUER` : 'TOUT A JOUÉ',
+    droite,
+    y0 + g.reste,
+    12,
+    reste ? C.accent : C.vert,
+    700,
+    g.maxReste,
+  )
   ctx.textAlign = 'left'
 
   // Les vignettes : un appui choisit la troupe **et** recentre la caméra
@@ -90,7 +101,7 @@ function reposPanneau(ctx, d, bat, sel) {
   miennes.slice(0, 12).forEach((u, i) => {
     const z = {
       x: M + (i % cols) * (w + 4),
-      y: y0 + 26 + Math.floor(i / cols) * (h + 4),
+      y: y0 + g.vignettes + Math.floor(i / cols) * (h + 4),
       w,
       h,
       quoi: 'troupe',
@@ -103,7 +114,7 @@ function reposPanneau(ctx, d, bat, sel) {
   // Les boutons suivent les vignettes au lieu d'attendre à une hauteur fixe :
   // à trois troupes en ligne, le panneau était vide au milieu.
   const rangs = Math.max(1, Math.ceil(Math.min(miennes.length, 12) / cols))
-  const yb = y0 + 26 + rangs * (h + 4) + 4
+  const yb = y0 + g.vignettes + rangs * (h + 4) + 4
   const fin = { x: M, y: yb, w: LARGE - 126, h: 40, quoi: 'finTour' }
   bouton(ctx, fin, reste ? `FIN DE TOUR (${reste})` : 'FIN DE TOUR', { primaire: true })
   const rompre = { x: droite - 118, y: yb, w: 118, h: 40, quoi: 'retraite' }
@@ -146,14 +157,23 @@ function unitePanneau(ctx, d, bat, sel) {
   const t = terrainA(bat.carte, u.q, u.r)
 
   ctx.textAlign = 'left'
-  texte(ctx, tronque(ctx, nomComplet(u), 16, 210), M, y0 + g.nom, 16, C.texte, 700)
+  texte(ctx, tronque(ctx, nomComplet(u), 16, g.maxNom), M, y0 + g.nom, 16, C.texte, 700)
   ctx.textAlign = 'right'
-  texte(ctx, `PM ${arrondi(u.pm)}/${arrondi(f.mvt)}`, droite, y0 + g.nom, 13, u.pm > 0 ? C.cyan : C.faible, 700, 90)
+  texte(
+    ctx,
+    `PM ${arrondi(u.pm)}/${arrondi(f.mvt)}`,
+    droite,
+    y0 + g.nom,
+    13,
+    u.pm > 0 ? C.cyan : C.faible,
+    700,
+    g.maxPm,
+  )
 
   ctx.textAlign = 'left'
   const gr = GRADES[u.grade]
   const sous = `${gr.id ? gr.nom + ' · ' : ''}${CL[u.cl].nom} ${u.niv} · ${t?.nom ?? ''}`
-  texte(ctx, tronque(ctx, sous, 11, 230), M, y0 + g.sous, 11, C.faible, 700)
+  texte(ctx, tronque(ctx, sous, 11, g.maxSous), M, y0 + g.sous, 11, C.faible, 700)
   ctx.textAlign = 'right'
   const cv = B.couvertDeUnite(bat, u)
   texte(
@@ -164,7 +184,7 @@ function unitePanneau(ctx, d, bat, sel) {
     11,
     cv > 0 ? C.vert : C.rouge,
     700,
-    110,
+    g.maxCouvert,
   )
 
   const k = u.pv / u.pvMax
@@ -326,7 +346,7 @@ function inspectPanneau(ctx, d, bat, sel) {
   const k = u.pv / u.pvMax
   barre(ctx, M, y0 + g.barre, LARGE, 8, k, teinteVie(k), C.bord)
   ctx.textAlign = 'right'
-  texte(ctx, `${u.pv}/${u.pvMax}`, droite, y0 + g.stats, 11, C.faible, 700, 80)
+  texte(ctx, `${u.pv}/${u.pvMax}`, droite, y0 + g.pv, 11, C.faible, 700, g.maxPv)
   ctx.textAlign = 'left'
   texte(
     ctx,
@@ -336,7 +356,7 @@ function inspectPanneau(ctx, d, bat, sel) {
     11,
     C.texte,
     700,
-    250,
+    g.maxStats,
   )
   texte(
     ctx,

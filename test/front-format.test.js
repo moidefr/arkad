@@ -22,9 +22,14 @@ import front from '../src/massif/front.js'
 import * as B from '../src/massif/front/bataille.js'
 import * as Cie from '../src/massif/front/compagnie.js'
 import * as VC from '../src/massif/front/vue/champ.js'
+import * as VB from '../src/massif/front/vue/bataille.js'
 import * as VD from '../src/massif/front/vue/dispo.js'
+import * as VM from '../src/massif/front/vue/menus.js'
 import { liste } from '../src/massif/front/vue/menus.js'
-import { fauxJeu, fauxCtx, FORMATS, PAS } from './faux.js'
+import { tronque } from '../src/massif/front/vue/pieces.js'
+import * as U from '../src/massif/front/unites.js'
+import { rect, texte } from '../src/dessin.js'
+import { fauxJeu, fauxCtx, peint, FORMATS, PAS } from './faux.js'
 
 const dessine = (j) => {
   const ctx = fauxCtx()
@@ -267,6 +272,325 @@ test('une ligne de liste n’est jamais touchable en dehors de son cadre', () =>
       assert.ok(z.y + z.h <= cadre.y + cadre.h, `à defile=${defile}, une ligne est touchable à ${z.y + z.h}`)
       assert.ok(z.h >= 24, 'une ligne rognée trop fine reste proposée au doigt')
     }
+  }
+})
+
+// --- Ce qui est peint est ce qui se touche --------------------------------------------
+
+const dedans = (cadre, r) =>
+  r.x >= cadre.x - 0.01 &&
+  r.y >= cadre.y - 0.01 &&
+  r.x + r.w <= cadre.x + cadre.w + 0.01 &&
+  r.y + r.h <= cadre.y + cadre.h + 0.01
+
+/** Une ligne de liste comme les vraies : un panneau plein, et du texte dessus. */
+const carteFactice = (ctx, z, el) => {
+  ctx.textAlign = 'left'
+  rect(ctx, z.x, z.y, z.w, z.h, '#141a18')
+  texte(ctx, `LIGNE ${el}`, z.x + 12, z.y + 17, 13)
+  texte(ctx, 'CLASSE 8 · SERGENT', z.x + 12, z.y + 33, 10)
+}
+
+/**
+ * Les trois fenêtres défilantes du jeu, dans les deux gabarits — c'est là que
+ * l'écart entre le dessin et le doigt se paie, une carte entière à la fois.
+ */
+const FENETRES = [
+  ['caserne debout', VD.caserne({ W: 360, H: 640 })],
+  ['caserne couché', VD.caserne({ W: 640, H: 360 })],
+  ['état-major debout', VD.uniques({ W: 360, H: 640 })],
+  ['état-major couché', VD.uniques({ W: 640, H: 360 })],
+  ['compagnie debout', VD.compagnie({ W: 360, H: 640 }, 2, true)],
+  ['compagnie couché', VD.compagnie({ W: 640, H: 360 }, 2, true)],
+]
+
+test('une liste ne peint rien hors de sa fenêtre, à aucun défilement', () => {
+  const elements = Array.from({ length: 20 }, (_, i) => i)
+  for (const [nom, d] of FENETRES) {
+    const rangs = Math.ceil(elements.length / d.cols)
+    const max = rangs * (d.ligne + 4) - 4 - d.zone.h
+    for (let defile = 0; defile <= max; defile++) {
+      const ctx = fauxCtx()
+      liste(ctx, d.zone, elements, d.ligne, defile, carteFactice, d.cols)
+      for (const o of ctx.ops) {
+        const p = peint(o)
+        if (!p) continue
+        assert.ok(dedans(d.zone, p), `${nom} à defile=${defile} : « ${o.s ?? o.couleur} » déborde de la fenêtre`)
+      }
+    }
+  }
+})
+
+test('une ligne de liste peinte est touchable, et sur toute sa part visible', () => {
+  const elements = Array.from({ length: 20 }, (_, i) => i)
+  for (const [nom, d] of FENETRES) {
+    const rangs = Math.ceil(elements.length / d.cols)
+    const max = rangs * (d.ligne + 4) - 4 - d.zone.h
+    for (let defile = 0; defile <= max; defile++) {
+      const ctx = fauxCtx()
+      const traces = []
+      const r = liste(
+        ctx,
+        d.zone,
+        elements,
+        d.ligne,
+        defile,
+        (c, z, el) => {
+          const debut = c.ops.length
+          carteFactice(c, z, el)
+          traces.push({ el, debut, fin: c.ops.length })
+        },
+        d.cols,
+      )
+      assert.deepEqual(
+        r.zones.map((z) => z.el),
+        traces.map((t) => t.el),
+        `${nom} à defile=${defile} : une ligne est peinte sans être touchable, ou l’inverse`,
+      )
+      for (const t of traces) {
+        const z = r.zones.find((z) => z.el === t.el)
+        assert.ok(
+          z.w >= 44 && z.h >= 30,
+          `${nom} à defile=${defile} : zone de ${z.w}×${z.h}, sous le plancher du doigt`,
+        )
+        for (let i = t.debut; i < t.fin; i++) {
+          const p = peint(ctx.ops[i])
+          if (!p) continue
+          assert.ok(dedans(z, p), `${nom} à defile=${defile} : la ligne ${t.el} se voit là où le doigt ne trouve rien`)
+        }
+      }
+    }
+  }
+})
+
+/** Une compagnie assez fournie pour que la liste déborde de sa fenêtre. */
+function compagnieFournie(format, combien) {
+  const j = fauxJeu(front, { graine: 31, neuve: true, format })
+  tape(j, 'nouvelle')
+  j.e.c.or = 999999
+  j.e.c.niveau = 8
+  Cie.rafraichit(j.e.c)
+  let garde = 0
+  while (j.e.c.troupes.length < combien && garde++ < 80) {
+    j.e.vue = 'caserne'
+    dessine(j)
+    // L'étal se vide : on le regarnit comme le ferait un engagement de plus.
+    if (j.e.zones.some((x) => x.quoi === 'recrute')) tape(j, 'recrute')
+    else Cie.rafraichit(j.e.c)
+  }
+  assert.ok(j.e.c.troupes.length >= combien, `seulement ${j.e.c.troupes.length} troupes recrutées`)
+  j.e.vue = 'compagnie'
+  j.e.selTroupe = null
+  j.e.defile = 0
+  return j
+}
+
+for (const format of ['portrait', 'paysage']) {
+  test(`${format} : aucune fiche de troupe ne se peint hors de la fenêtre de la compagnie`, () => {
+    const j = compagnieFournie(format, 10)
+    const c = j.e.c
+    const mesure = fauxCtx()
+    // Le libellé exact que la fiche écrit : c'est lui qui trahit une carte
+    // peinte hors du cadre. Deux troupes peuvent porter le même, d'où la liste.
+    const noms = new Map()
+    for (const u of c.troupes) {
+      const l = tronque(mesure, U.nomComplet(u), 13, 168)
+      noms.set(l, [...(noms.get(l) ?? []), u.id])
+    }
+    for (let defile = 0; defile <= j.e.defileMax; defile += 3) {
+      j.e.defile = defile
+      const ctx = dessine(j)
+      const cadre = j.e.listeRect
+      for (const o of ctx.ops) {
+        const ids = o.type === 'texte' ? noms.get(o.s) : null
+        if (!ids) continue
+        const p = peint(o)
+        if (!p) continue
+        assert.ok(dedans(cadre, p), `à defile=${defile}, « ${o.s} » est peint hors de la fenêtre`)
+        const z = j.e.zones.find((x) => x.quoi === 'troupe' && ids.includes(x.id) && dedans(x, p))
+        assert.ok(z, `à defile=${defile}, la fiche « ${o.s} » se voit là où le doigt ne trouve rien`)
+      }
+    }
+  })
+}
+
+test('couché, l’état-major ne peint aucun dossier sous sa fenêtre', () => {
+  const j = fauxJeu(front, { graine: 31, neuve: true, format: 'paysage' })
+  tape(j, 'nouvelle')
+  j.e.c.or = 999999
+  j.e.c.niveau = 8
+  Cie.rafraichit(j.e.c)
+  j.e.vue = 'uniques'
+  j.e.defile = 0
+  const ctx = dessine(j)
+  const cadre = j.e.listeRect
+  assert.ok(j.e.c.offre.uniques.length >= 3, 'l’état-major n’offre pas assez de dossiers pour déborder')
+  // « APPARITION … % » est écrit par la dernière ligne de chaque dossier : si
+  // elle sort du cadre, c'est toute une carte qui pend sous la fenêtre.
+  for (const o of ctx.ops) {
+    if (o.type !== 'texte' || !o.s.startsWith('APPARITION')) continue
+    const p = peint(o)
+    assert.ok(
+      !p || dedans(cadre, p),
+      `« ${o.s} » est peint à y=${o.y}, sous la fenêtre qui s’arrête à ${cadre.y + cadre.h}`,
+    )
+  }
+})
+
+// --- Le bilan --------------------------------------------------------------------------
+
+const SECTIONS = ['PROMOTIONS ET NIVEAUX', 'RAMASSÉS SUR LE TERRAIN', 'NE SONT PAS RENTRÉS']
+
+/**
+ * Le cas courant d'une victoire : des promotions, du butin ramassé, et des
+ * disparus. `parSection` monte jusqu'aux six lignes que le bilan accepte.
+ */
+function bilanTroisSections(format, parSection = 1) {
+  const j = fauxJeu(front, { graine: 31, neuve: true, format })
+  tape(j, 'nouvelle')
+  const c = j.e.c
+  assert.ok(c.troupes.length >= 3, 'la compagnie de départ n’a pas trois troupes')
+  const prend = (k) => Array.from({ length: parSection }, (_, i) => c.troupes[(i + k) % c.troupes.length])
+  const r = {
+    gagne: true,
+    rompu: false,
+    titre: 'LE GUÉ DE BAZAS',
+    or: 120,
+    renom: 8,
+    niveaux: 0,
+    montees: prend(0).map((u) => ({ u, niveaux: 1, grade: null })),
+    lignes: prend(1).map((u) => ({ u, texte: 'RAMASSÉ' })),
+    perdus: prend(2),
+  }
+  const ctx = fauxCtx()
+  ctx.zones = VM.bilan(ctx, j, c, r)
+  return ctx
+}
+
+const titresDeSection = (ctx) => ctx.ops.filter((o) => o.type === 'texte' && SECTIONS.includes(o.s))
+
+test('debout, les sections du bilan se suivent au lieu de s’empiler', () => {
+  const ctx = bilanTroisSections('portrait')
+  const titres = titresDeSection(ctx)
+  assert.equal(titres.length, 3, 'les trois sections ne sont pas toutes écrites')
+  assert.deepEqual([...new Set(titres.map((o) => o.x))], [20], 'debout, une section quitte la colonne unique')
+  const y = titres.map((o) => o.y)
+  assert.equal(new Set(y).size, 3, `les sections s’écrivent l’une sur l’autre : ${y.join(', ')}`)
+  assert.ok(y[0] < y[1] && y[1] < y[2], `les sections ne descendent pas dans l’ordre : ${y.join(', ')}`)
+})
+
+test('couché, chaque section du bilan tient sa colonne', () => {
+  const ctx = bilanTroisSections('paysage')
+  const titres = titresDeSection(ctx)
+  assert.equal(titres.length, 3)
+  assert.equal(new Set(titres.map((o) => o.x)).size, 3, 'deux sections partagent la même colonne')
+  assert.equal(new Set(titres.map((o) => o.y)).size, 1, 'les colonnes ne démarrent pas à la même hauteur')
+})
+
+for (const format of ['portrait', 'paysage']) {
+  test(`${format} : un bilan chargé ne s’écrit ni sur lui-même ni sur le bouton`, () => {
+    // Six lignes par section : le plus que le bilan accepte de montrer.
+    const ctx = bilanTroisSections(format, 6)
+    const ops = ctx.ops.filter((o) => o.type === 'texte')
+    for (let i = 0; i < ops.length; i++) {
+      for (let k = i + 1; k < ops.length; k++) {
+        assert.ok(!seChevauchent(ops[i], ops[k]), `« ${ops[i].s} » et « ${ops[k].s} » se recouvrent à y=${ops[i].y}`)
+      }
+    }
+    const suite = ctx.zones[0]
+    for (const o of ops) {
+      const p = peint(o)
+      if (!p || o.s === 'AU CAMP') continue
+      assert.ok(p.y + p.h <= suite.y || p.y >= suite.y + suite.h, `« ${o.s} » descend sur le bouton AU CAMP`)
+    }
+  })
+}
+
+// --- Le panneau d'ordres, couché --------------------------------------------------------
+
+function seChevauchent(a, b) {
+  const pa = peint(a)
+  const pb = peint(b)
+  return !!pa && !!pb && pa.x < pb.x + pb.w && pb.x < pa.x + pa.w && pa.y < pb.y + pb.h && pb.y < pa.y + pa.h
+}
+
+/**
+ * Les textes du panneau d'ordres — ceux écrits **après** son fond opaque, sans
+ * quoi on compterait les étiquettes du champ qu'il vient de recouvrir.
+ */
+function textesDuPanneau(ctx, d) {
+  const fond = ctx.ops.findIndex(
+    (o) => o.type === 'rect' && o.x === d.panneau.x && o.y === d.panneau.y && o.w === d.panneau.w,
+  )
+  assert.ok(fond >= 0, 'le fond du panneau n’a pas été trouvé')
+  return ctx.ops.slice(fond).filter((o) => o.type === 'texte' && o.gauche >= d.panneau.x)
+}
+
+test('couché, deux textes du panneau d’ordres ne se recouvrent jamais', () => {
+  const d = VD.bataille({ W: 640, H: 360 })
+  for (const [nom, ctx] of tousLesEcrans('paysage')) {
+    if (!nom.startsWith('bataille')) continue
+    const ops = textesDuPanneau(ctx, d)
+    for (let i = 0; i < ops.length; i++) {
+      for (let k = i + 1; k < ops.length; k++) {
+        assert.ok(
+          !seChevauchent(ops[i], ops[k]),
+          `${nom} : « ${ops[i].s} » et « ${ops[k].s} » se recouvrent dans le panneau`,
+        )
+      }
+    }
+  }
+})
+
+test('couché, une fiche de troupe bavarde ne mord pas sur ses compteurs', () => {
+  const j = jusquAuFeu(37, 'paysage')
+  const u = B.vivantes(j.e.bat, 0)[0]
+  tape(j, 'troupe', (z) => z.ref === u.ref)
+  // Le pire cas que la campagne puisse produire : le grade et la classe les
+  // plus longs, sur une case qui a un nom.
+  u.cl = 'hallebardier'
+  u.grade = 5
+  u.niv = 20
+  const d = VD.bataille(j)
+  const ops = textesDuPanneau(dessine(j), d)
+  for (let i = 0; i < ops.length; i++) {
+    for (let k = i + 1; k < ops.length; k++) {
+      assert.ok(!seChevauchent(ops[i], ops[k]), `« ${ops[i].s} » et « ${ops[k].s} » se recouvrent dans le panneau`)
+    }
+  }
+})
+
+test('couché, le compte des troupes et celui des tours ne se marchent pas dessus', () => {
+  const j = compagnieFournie('paysage', 12)
+  const c = j.e.c
+  c.niveau = 12
+  while (c.escouades.length < Cie.escouadesMax(c.niveau)) Cie.creeEscouade(c)
+  for (const u of c.troupes) if (!Cie.escouadeDe(c, u.id)) Cie.enrole(c, u.id)
+  assert.ok(Cie.alignees(c).length >= 10, `seulement ${Cie.alignees(c).length} troupes en ligne`)
+  Cie.planifie(c)
+  const bat = Cie.prepare(c, 0)
+  const d = VD.bataille({ W: 640, H: 360 })
+
+  for (const fini of [false, true]) {
+    // Fin de tour : la ligne de droite devient « TOUT A JOUÉ », la plus longue.
+    if (fini) {
+      for (const u of bat.unites) {
+        if (u.camp !== 0) continue
+        u.aAgi = true
+        u.aBouge = true
+        u.pm = 0
+      }
+    }
+    const ctx = fauxCtx()
+    VB.panneauBas(ctx, d, bat, {})
+    const gauche = ctx.ops.find((o) => o.type === 'texte' && o.s.includes('EN LIGNE'))
+    const droite = ctx.ops.find((o) => o.type === 'texte' && (o.s.includes('JOUER') || o.s.includes('JOUÉ')))
+    assert.ok(gauche && droite)
+    assert.ok(
+      !seChevauchent(gauche, droite),
+      `« ${gauche.s} » [${gauche.gauche}..${gauche.gauche + gauche.larg}] recouvre « ${droite.s} » [${droite.gauche}..${droite.gauche + droite.larg}]`,
+    )
+    assert.ok(gauche.gauche + gauche.larg <= d.px + d.pw, 'le compte des troupes sort du panneau')
   }
 })
 
