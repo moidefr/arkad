@@ -33,7 +33,7 @@ import donjon from './long/donjon.js'
 import usine from './long/usine/index.js'
 import expedition from './long/expedition.js'
 
-import anomalie from './massif/anomalie.js'
+import front from './massif/front.js'
 
 export const CATEGORIES = [
   {
@@ -86,9 +86,9 @@ export const CATEGORIES = [
     id: 'massif',
     nom: 'MASSIF',
     duree: 'sans fin',
-    detail: 'une campagne, puis plus rien pour t’arrêter',
+    detail: 'une compagnie qu’on garde, des batailles qui grandissent',
     couleur: C.accent,
-    jeux: [anomalie],
+    jeux: [front],
   },
 ]
 
