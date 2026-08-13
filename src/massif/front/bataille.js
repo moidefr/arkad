@@ -825,7 +825,8 @@ export function etatObjectif(bat) {
     return `${nom} ${pris}/${(o.points ?? []).length} · ${bat.tenus[0]}/${o.besoin ?? 3}`
   }
   if (o.id === 'percee') return `${nom} ${bat.perces}/${o.besoin ?? 2}`
-  if (o.id === 'survie') return `${nom} ${bat.tour}/${bat.toursMax}`
+  // Le tour courant est déjà juste en dessous : ici on dit ce qui reste à tenir.
+  if (o.id === 'survie') return `${nom} · ${Math.max(0, bat.toursMax - bat.tour + 1)} TOURS`
   if (o.id === 'decapitation') {
     const chef = vivantes(bat, 1).find((u) => u.ref === o.chef)
     return `${nom} ${chef ? nomComplet(chef) : '—'}`

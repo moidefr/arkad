@@ -364,12 +364,15 @@ export function compagnie(ctx, c, sel, defile) {
   }
 
   const zones2 = []
-  if (c.escouades.length < Cie.escouadesMax(c.niveau)) {
+  const peutOuvrir = c.escouades.length < Cie.escouadesMax(c.niveau)
+  if (peutOuvrir) {
     const z = { x: M, y: 556, w: 150, h: 34, quoi: 'nouvelleEscouade' }
     bouton(ctx, z, '+ ESCOUADE', { teinte: C.vert, petit: true })
     zones2.push(z)
   }
-  const zRet = { x: M + 158, y: 556, w: LARGE - 158, h: 34, quoi: 'retour' }
+  // Sans escouade à ouvrir, RETOUR prend toute la largeur au lieu de flotter
+  // à droite d'un vide.
+  const zRet = { x: peutOuvrir ? M + 158 : M, y: 556, w: peutOuvrir ? LARGE - 158 : LARGE, h: 34, quoi: 'retour' }
   bouton(ctx, zRet, 'RETOUR', { petit: true })
   zones2.push(zRet)
 
