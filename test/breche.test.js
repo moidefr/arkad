@@ -13,16 +13,16 @@ import * as L from '../src/long/breche/logique.js'
 import {
   PIECES,
   PIECE,
-  MONDES,
   TRANSFOS,
   TRANSFO,
-  REGLES,
   EFFETS,
   encombrement,
-  bassinDe,
+  palierDe,
+  PAR_PALIER,
 } from '../src/long/breche/donnees.js'
+import * as Dir from '../src/long/breche/directeur.js'
 
-/** Un plateau vide, à la taille voulue, sans passer par la génération d'un monde. */
+/** Un plateau vide, à la taille voulue. */
 function plateau(taille = 8) {
   const p = L.nouvelle(1)
   p.taille = taille
@@ -67,42 +67,6 @@ test('chaque pièce est cohérente, et aucune n’est en double', () => {
     formes.add(forme)
   }
 })
-
-test('chaque monde ne parle que le vocabulaire de règles admis', () => {
-  const vus = new Set()
-  for (const m of MONDES) {
-    assert.ok(!vus.has(m.id), 'monde en double : ' + m.id)
-    vus.add(m.id)
-    assert.ok(m.nom && m.texte?.length > 20 && m.objectif > 0, m.id)
-    for (const cle of Object.keys(m.regles)) assert.ok(REGLES.includes(cle), `${m.id} : règle inconnue « ${cle} »`)
-    for (const id of Object.keys(m.regles.semis ?? {}))
-      assert.ok(TRANSFO[id], `${m.id} : semis d’une transformation inconnue`)
-    const t = m.regles.taille ?? 8
-    assert.ok(t >= 8 && t <= 10, `${m.id} : grille de ${t}`)
-    assert.ok(bassinDe(m.regles).length >= 10, `${m.id} : vivier de pièces trop maigre`)
-  }
-})
-
-test('aucune règle de monde n’est décorative', async () => {
-  const { readFile } = await import('node:fs/promises')
-  const lus = await Promise.all(
-    ['logique.js', 'donnees.js'].map((f) => readFile(new URL('../src/long/breche/' + f, import.meta.url), 'utf8')),
-  )
-  const src = lus.join('\n')
-  for (const cle of REGLES) {
-    assert.ok(src.includes(`.${cle}`), `la règle « ${cle} » n’est lue nulle part`)
-    assert.ok(
-      MONDES.some((m) => m.regles[cle] != null),
-      `la règle « ${cle} » n’est utilisée par aucun monde`,
-    )
-  }
-  for (const t of TRANSFOS) {
-    assert.ok(EFFETS.includes(t.effet), `${t.id} : effet hors vocabulaire`)
-    assert.ok(src.includes(`'${t.effet}'`), `${t.id} : l’effet « ${t.effet} » n’est appliqué nulle part`)
-  }
-})
-
-// --- Poser -------------------------------------------------------------------
 
 test('une pièce ne rentre ni sur une case prise ni hors de la grille', () => {
   const p = plateau(8)
@@ -281,55 +245,6 @@ test('l’échange change la main sans avancer la crue', () => {
   assert.equal(L.echange(p), false)
 })
 
-test('la crue pousse tout vers le haut, et un doublé la repousse', () => {
-  const p = L.nouvelle(3)
-  L.entreMonde(
-    p,
-    MONDES.findIndex((m) => m.regles.montee),
-  )
-  const pas = L.regles(p).montee
-  assert.ok(pas > 0)
-  // On pose jusqu'à la montée, sans jamais éclater.
-  let garde = 0
-  while ((p.depuisMontee ?? 0) < pas - 1 && garde++ < 400) {
-    const k = p.main.findIndex((id) => id && L.placeExiste(p, id))
-    if (k < 0) break
-    const id = p.main[k]
-    let pose = false
-    for (let l = 0; l < p.taille && !pose; l++) {
-      for (let c = 0; c < p.taille && !pose; c++) if (L.peutPoser(p, id, c, l)) pose = !!L.pose(p, k, c, l)
-    }
-    if (!pose) break
-  }
-  const avant = p.montees ?? 0
-  assert.ok(p.depuisMontee >= 0)
-  // Et le compteur retombe sur un doublé : c'est la seule prise du joueur sur
-  // ce monde.
-  p.depuisMontee = pas - 1
-  assert.equal(L.REPOUSSE, 2)
-})
-
-test('franchir un objectif remet le score à zéro mais pas le total', () => {
-  const p = L.nouvelle(5)
-  p.score = L.objectif(p) + 10
-  const total = p.total
-  assert.ok(L.atteint(p))
-  assert.ok(L.suivant(p))
-  assert.equal(p.n, 1)
-  assert.equal(p.score, 0)
-  assert.equal(p.total, total, 'le total a été remis à zéro avec le score')
-  assert.equal(L.suivant(p), false, 'on passe un monde sans avoir atteint l’objectif')
-})
-
-test('les mondes se suivent, puis recommencent un cran plus haut', () => {
-  const premier = L.mondeDe(0)
-  const cycle = L.mondeDe(MONDES.length)
-  assert.equal(cycle.id, premier.id)
-  assert.ok(cycle.objectif > premier.objectif, 'le second cycle n’est pas plus dur')
-  assert.ok(cycle.nom !== premier.nom, 'rien ne distingue le second cycle du premier')
-  assert.ok((cycle.regles.prerempli ?? 0) > (premier.regles.prerempli ?? 0))
-})
-
 // --- Sauvegarde et parties entières ---------------------------------------------------
 
 test('la sauvegarde se relit à l’identique', () => {
@@ -340,7 +255,6 @@ test('la sauvegarde se relit à l’identique', () => {
   assert.ok(relu)
   assert.deepEqual(relu.cases, p.cases)
   assert.deepEqual(relu.main, p.main)
-  assert.equal(relu.total, p.total)
   assert.equal(L.migre({ v: 999 }), null)
   assert.equal(L.migre(null), null)
 })
@@ -357,7 +271,7 @@ test('le tirage est reproductible : fermer l’application ne change pas la main
 
 test('deux cents parties automatiques : aucune ne casse un invariant', () => {
   let finies = 0
-  let mondes = 0
+  let plusHaut = 0
   for (let g = 0; g < 200; g++) {
     const p = L.nouvelle(g * 5081 + 3)
     let coups = 0
@@ -371,12 +285,9 @@ test('deux cents parties automatiques : aucune ne casse un invariant', () => {
       }
       if (!pose) break
       coups++
-      if (L.atteint(p)) {
-        mondes++
-        L.suivant(p)
-      }
+      plusHaut = Math.max(plusHaut, L.palier(p))
       assert.equal(p.cases.length, p.taille * p.taille, 'la grille a changé de taille toute seule')
-      assert.ok(p.score >= 0 && p.total >= 0)
+      assert.ok(p.score >= 0)
       assert.ok(p.main.length === L.EN_MAIN)
       for (const i of p.cases) assert.ok(i >= 0 && i <= 5, 'teinte de bloc hors palette')
       for (const s of p.spec) assert.ok(s === '' || TRANSFO[s], 'transformation inconnue sur la grille')
@@ -384,5 +295,116 @@ test('deux cents parties automatiques : aucune ne casse un invariant', () => {
     if (p.fini) finies++
   }
   assert.ok(finies > 150, `seulement ${finies} parties sur 200 se terminent`)
-  assert.ok(mondes > 0, 'aucun monde franchi en deux cents parties')
+  // L'automate le plus bête qui soit — première pièce, première place — ne
+  // doit pas aller loin dans les paliers de musique. Il en franchit un de temps
+  // en temps sur deux cents parties, et c'est très bien : ce qu'on interdit,
+  // c'est qu'il en enchaîne, ce qui voudrait dire que les cinquante bandes sont
+  // à portée de n'importe quoi.
+  assert.ok(plusHaut <= 2, `l’automate le plus bête atteint le palier ${plusHaut}`)
+})
+
+// --- Le directeur de difficulté ----------------------------------------------------
+
+test('le directeur ne donne jamais une main dont rien n’entre', () => {
+  // La promesse la plus importante du jeu : perdre doit venir du plateau qu'on
+  // a construit, jamais du tirage. On remplit des plateaux jusqu'au bord et on
+  // vérifie que tant qu'une pièce peut entrer, la main en contient une.
+  for (let g = 0; g < 300; g++) {
+    const p = L.nouvelle(g * 7717 + 11)
+    let coups = 0
+    while (!p.fini && coups++ < 300) {
+      const jouable = PIECES.some((x) => L.placeExiste(p, x.id))
+      if (jouable) {
+        assert.ok(
+          p.main.some((id) => id && L.placeExiste(p, id)),
+          `graine ${g}, coup ${coups} : une pièce entrait, la main n’en proposait aucune`,
+        )
+      }
+      const k = p.main.findIndex((id) => id && L.placeExiste(p, id))
+      if (k < 0) break
+      const id = p.main[k]
+      let pose = false
+      for (let l = 0; l < p.taille && !pose; l++) {
+        for (let c = 0; c < p.taille && !pose; c++) if (L.peutPoser(p, id, c, l)) pose = !!L.pose(p, k, c, l)
+      }
+      if (!pose) break
+    }
+  }
+})
+
+test('l’aisance monte quand on dégage, et baisse quand on s’enlise', () => {
+  const vide = plateau(8)
+  vide.main = ['unite', 'unite', 'unite']
+  const large = Dir.lecture(vide, 2, 30)
+
+  const charge = plateau(8)
+  for (let i = 0; i < 52; i++) charge.cases[i] = 1
+  charge.main = ['unite', 'unite', 'unite']
+  const serre = Dir.lecture(charge, 0, 1)
+
+  assert.ok(large > serre + 0.3, `plateau dégagé ${large.toFixed(2)} contre encombré ${serre.toFixed(2)}`)
+})
+
+test('la difficulté ne redescend jamais sous le plancher de la partie', () => {
+  const p = L.nouvelle(1)
+  p.aisance = 0
+  p.poses = 0
+  const debut = Dir.difficulte(p)
+  p.poses = 400
+  assert.ok(Dir.difficulte(p) > debut, 'une longue partie ne durcit pas le jeu')
+  assert.ok(Dir.difficulte(p) >= 0.6 - 1e-9, 'le plancher ne monte pas jusqu’à 0,6')
+})
+
+test('à difficulté haute les grosses pièces sortent plus, sans que rien disparaisse', () => {
+  const facile = L.nouvelle(1)
+  facile.aisance = 0
+  facile.poses = 0
+  const dur = L.nouvelle(1)
+  dur.aisance = 1
+  dur.poses = 0
+
+  const part = (p) => {
+    const v = Dir.vivier(p)
+    const total = v.reduce((s, e) => s + e.poids, 0)
+    const gros = v.filter((e) => e.piece.cases.length >= 4).reduce((s, e) => s + e.poids, 0)
+    return gros / total
+  }
+  assert.ok(part(dur) > part(facile) * 1.3, `${part(dur).toFixed(3)} contre ${part(facile).toFixed(3)}`)
+  // Et aucune pièce n'est jamais exclue : un contenu qui ne sort plus est un
+  // contenu perdu.
+  for (const p of [facile, dur]) for (const e of Dir.vivier(p)) assert.ok(e.poids > 0, `${e.piece.id} : poids nul`)
+})
+
+test('le directeur reste reproductible depuis la graine', () => {
+  const joue = (g) => {
+    const p = L.nouvelle(g)
+    for (let i = 0; i < 40; i++) {
+      const k = p.main.findIndex((id) => id && L.placeExiste(p, id))
+      if (k < 0) break
+      const id = p.main[k]
+      let pose = false
+      for (let l = 0; l < p.taille && !pose; l++) {
+        for (let c = 0; c < p.taille && !pose; c++) if (L.peutPoser(p, id, c, l)) pose = !!L.pose(p, k, c, l)
+      }
+      if (!pose) break
+    }
+    return [p.score, p.aisance.toFixed(9), p.main.join(',')]
+  }
+  assert.deepEqual(joue(4242), joue(4242))
+})
+
+test('l’aisance survit à la sauvegarde', () => {
+  const p = L.nouvelle(9)
+  p.aisance = 0.813
+  const relu = L.migre(JSON.parse(JSON.stringify(L.sauvegarde(p))))
+  assert.equal(relu.aisance, 0.813, 'reprendre une partie repart au mauvais niveau de jeu')
+})
+
+test('la partie n’a plus ni objectif ni monde', () => {
+  assert.equal(L.objectif, undefined)
+  assert.equal(L.suivant, undefined)
+  assert.equal(L.monde, undefined)
+  const p = L.nouvelle(1)
+  assert.equal(p.n, undefined, 'un numéro de monde traîne encore dans l’état')
+  assert.equal(p.taille, 8)
 })

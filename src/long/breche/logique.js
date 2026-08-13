@@ -14,7 +14,8 @@
  * ne permet pas de retirer une main qui ne plaît pas.
  */
 import { melange32, derive, pondere } from '../../hasard.js'
-import { PIECES, PIECE, TRANSFO, TRANSFOS, MONDES, mondeDe, bassinDe, encombrement, TEINTES } from './donnees.js'
+import { PIECES, PIECE, TRANSFO, TRANSFOS, encombrement, TEINTES, palierDe, PAR_PALIER } from './donnees.js'
+import * as Dir from './directeur.js'
 
 export const VERSION = 1
 export const EN_MAIN = 3
@@ -25,86 +26,48 @@ export const indice = (p, c, l) => l * p.taille + c
 export const dans = (p, c, l) => c >= 0 && l >= 0 && c < p.taille && l < p.taille
 export const pleine = (p, c, l) => dans(p, c, l) && p.cases[indice(p, c, l)] > 0
 
-const rngDe = (p, ...sel) => melange32(derive(p.graine, p.n, p.poses, ...sel))
+const rngDe = (p, ...sel) => melange32(derive(p.graine, p.poses, ...sel))
 
 /** Le tirage a son propre compteur : l'échange ne doit pas décaler la crue. */
-const rngTirage = (p, k) => melange32(derive(p.graine, p.n, p.tirages ?? 0, k, 77))
+const rngTirage = (p, k) => melange32(derive(p.graine, p.tirages ?? 0, k, 77))
 
 // --- Création et mondes ------------------------------------------------------------
 
+export const TAILLE = 8
+
+/**
+ * Une partie neuve. Un plateau vide, trois pièces, et rien devant : pas
+ * d'objectif, pas de monde suivant, pas de fin prévue. On joue jusqu'à ne
+ * plus pouvoir poser.
+ */
 export function nouvelle(graine) {
+  const total = TAILLE * TAILLE
   const p = {
     v: VERSION,
     graine: graine >>> 0,
-    n: 0,
     score: 0,
-    total: 0,
     poses: 0,
     tirages: 0,
     combo: 0,
     meilleurCombo: 0,
     lignes: 0,
-    taille: 8,
-    cases: [],
-    spec: [],
-    gel: [],
+    taille: TAILLE,
+    cases: new Array(total).fill(0),
+    spec: new Array(total).fill(''),
+    gel: new Array(total).fill(0),
     main: [],
     outils: { marteau: 1, echange: 1 },
+    // L'estimation du directeur. Elle vit dans la sauvegarde : reprendre une
+    // partie trois jours plus tard doit reprendre au même niveau de jeu.
+    aisance: Dir.AISANCE_INITIALE,
     fini: false,
-  }
-  entreMonde(p, 0)
-  return p
-}
-
-/** Installe le plateau d'un monde : taille, blocs de départ, roches, main neuve. */
-export function entreMonde(p, n) {
-  const monde = mondeDe(n)
-  const r = monde.regles
-  p.n = n
-  p.score = 0
-  p.combo = 0
-  p.poses = 0
-  p.tirages = 0
-  p.montees = 0
-  p.depuisMontee = 0
-  p.taille = r.taille ?? 8
-  const total = p.taille * p.taille
-  p.cases = new Array(total).fill(0)
-  p.spec = new Array(total).fill('')
-  p.gel = new Array(total).fill(0)
-  p.outils.marteau++
-  p.outils.echange++
-
-  const rng = melange32(derive(p.graine, n, 7))
-  const libres = () => {
-    const t = []
-    for (let i = 0; i < total; i++) if (!p.cases[i]) t.push(i)
-    return t
-  }
-  // Les blocs de départ ne touchent jamais la dernière rangée : commencer avec
-  // une ligne à moitié faite ferait éclater au premier coup, ce qui donne un
-  // cadeau au lieu d'un problème.
-  const hautSeulement = (t) => t.filter((i) => Math.floor(i / p.taille) < p.taille - 1)
-  for (let k = 0; k < (r.prerempli ?? 0); k++) {
-    const t = hautSeulement(libres())
-    if (!t.length) break
-    const i = t[Math.floor(rng() * t.length)]
-    p.cases[i] = 1 + Math.floor(rng() * TEINTES.length)
-  }
-  for (let k = 0; k < (r.roche ?? 0); k++) {
-    const t = hautSeulement(libres())
-    if (!t.length) break
-    const i = t[Math.floor(rng() * t.length)]
-    p.cases[i] = 1 + Math.floor(rng() * TEINTES.length)
-    p.spec[i] = 'roche'
-    p.gel[i] = TRANSFO.roche.valeur - 1
   }
   tireMain(p)
   return p
 }
 
-export const monde = (p) => mondeDe(p.n)
-export const regles = (p) => monde(p).regles
+/** Le palier courant : il ne sert qu'à choisir la bande-son. */
+export const palier = (p) => palierDe(p.score)
 
 // --- La main -------------------------------------------------------------------------
 
@@ -116,20 +79,29 @@ export const regles = (p) => monde(p).regles
 export function tireMain(p) {
   p.tirages = (p.tirages ?? 0) + 1
   const rng = rngTirage(p, 999)
-  const bassin = bassinDe(regles(p))
-  p.main = Array.from({ length: EN_MAIN }, (_, k) => {
-    const piece = pondere(rngTirage(p, k), bassin, (x) => x.poids)
-    return piece ? piece.id : PIECES[0].id
-  })
-  // Une main dont aucune pièce ne rentre est une mort qu'on n'a pas méritée :
-  // si le plateau a encore de la place pour la plus petite pièce, on redonne
-  // au moins une pièce jouable.
+  // Le vivier n'est plus fixe : le directeur l'incline vers les grosses pièces
+  // quand on joue bien, vers les maniables quand on s'enlise. Il ne retire
+  // jamais rien du vivier, il ne change que les proportions.
+  const entrees = Dir.vivier(p)
+  p.main = Array.from({ length: EN_MAIN }, (_, k) => Dir.tire(entrees, rngTirage(p, k)).id)
+
+  // La garantie d'honnêteté : une main dont aucune pièce n'entre est une mort
+  // qu'on n'a pas méritée. Perdre doit venir du plateau qu'on a construit.
   if (!p.main.some((id) => id && placeExiste(p, id))) {
-    const secours = bassin.filter((x) => placeExiste(p, x.id))
+    const secours = PIECES.filter((x) => placeExiste(p, x.id))
     if (secours.length) p.main[0] = secours[Math.floor(rng() * secours.length)].id
   }
   return p.main
 }
+
+/**
+ * Combien de placements la main offre en tout — le signal que lit le directeur.
+ *
+ * `placesPossibles` rend un **nombre**, pas un tableau : lui demander sa
+ * `.length` donnait `undefined`, et l'aisance entière finissait à `NaN` sans
+ * que rien ne plante. C'est le banc qui l'a montré, pas les tests.
+ */
+export const placesEnMain = (p) => p.main.reduce((n, id) => n + (id ? placesPossibles(p, id) : 0), 0)
 
 export const mainVide = (p) => p.main.every((x) => !x)
 
@@ -200,7 +172,6 @@ export function pose(p, k, c, l) {
     monte: false,
   }
   p.score += cellules.length
-  p.total += cellules.length
 
   const pris = lignesPleines(p)
   if (pris.cases.size) {
@@ -214,27 +185,30 @@ export function pose(p, k, c, l) {
     const gagnes = points(pris.lignes + pris.colonnes, p.taille, r.combo) + bilan.prime
     r.points += gagnes
     p.score += gagnes
-    p.total += gagnes
     // Un quadruplé rapporte un outil : c'est la seule façon d'en gagner, et
     // ça récompense la préparation plutôt que la chance.
     if (pris.lignes + pris.colonnes >= 3) p.outils.marteau++
-    // Et un doublé repousse la crue. Voir `monteSiBesoin`.
-    if (pris.lignes + pris.colonnes >= REPOUSSE && regles(p).montee) {
-      p.depuisMontee = 0
-      r.repousse = true
-    }
   } else p.combo = 0
 
+  // Le directeur lit le coup avant qu'on retire : c'est l'état du plateau
+  // qu'on vient de laisser qui dit si le joueur est à l'aise.
+  Dir.apprend(p, pris.lignes + pris.colonnes, placesEnMain(p))
   if (mainVide(p)) tireMain(p)
-  r.monte = monteSiBesoin(p)
   p.fini = bloque(p)
   r.fini = p.fini
   return r
 }
 
-/** Le semis de transformations du monde : quelques blocs marqués, pas plus. */
+/**
+ * Le semis de transformations. C'était une règle de monde ; c'est maintenant
+ * une table du jeu, la même du début à la fin. Les proportions sont celles du
+ * milieu des anciens mondes — assez pour qu'une transformation soit une bonne
+ * surprise, assez rare pour qu'on ne compte pas dessus.
+ */
+const SEMIS = { bombe: 2, rayon: 2, prime: 2, lingot: 1 }
+
 function semeTransfo(p, rng) {
-  const semis = regles(p).semis
+  const semis = SEMIS
   if (!semis) return ''
   const total = Object.values(semis).reduce((s, x) => s + x, 0)
   // Les poids sont en pour-cent : à 3, trois blocs sur cent portent la marque.
@@ -323,7 +297,7 @@ export function eclate(p, depart) {
   // On applique. Une roche encaisse au lieu de partir ; le givre du monde du
   // gel se pose sur ce qui vient d'éclater, ce qui rend chaque ligne deux fois
   // plus chère à faire.
-  const givre = regles(p).gel ?? 0
+  const givre = 0
   let poses = 0
   for (const i of traites) {
     if (!p.cases[i]) continue
@@ -358,56 +332,6 @@ export function eclate(p, depart) {
 export const points = (n, taille, combo) =>
   n <= 0 ? 0 : Math.round(taille * n * (1 + (n - 1) * 0.7) * (1 + Math.min(8, combo) * 0.35) * 4)
 
-/**
- * La crue : une rangée sort du bas et pousse tout vers le haut. Ce qui déborde
- * par le haut termine la partie — c'est la seule façon de perdre autrement
- * qu'en n'ayant plus de place.
- *
- * **Le compteur retombe à zéro dès qu'on fait deux lignes d'un coup.** C'est
- * la seule chose qui rend ce monde jouable, et elle a été trouvée au banc :
- * avec une montée à intervalle fixe, l'automate débordait vingt fois sur vingt
- * quel que soit le rythme, et le monde n'était pas difficile — il était
- * arithmétique. En laissant un doublé repousser l'eau, la survie redevient une
- * question de jeu.
- */
-export const REPOUSSE = 2
-
-function monteSiBesoin(p) {
-  const pas = regles(p).montee
-  if (!pas) return false
-  p.depuisMontee = (p.depuisMontee ?? 0) + 1
-  if (p.depuisMontee < pas) return false
-  p.depuisMontee = 0
-  const t = p.taille
-  for (let c = 0; c < t; c++) if (p.cases[indice(p, c, 0)] > 0) return ((p.fini = true), true)
-  for (let l = 0; l < t - 1; l++) {
-    for (let c = 0; c < t; c++) {
-      const haut = indice(p, c, l)
-      const bas = indice(p, c, l + 1)
-      p.cases[haut] = p.cases[bas]
-      p.spec[haut] = p.spec[bas]
-      p.gel[haut] = p.gel[bas]
-    }
-  }
-  const rng = melange32(derive(p.graine, p.n, p.poses, 991))
-  p.montees = (p.montees ?? 0) + 1
-  for (let c = 0; c < t; c++) {
-    const i = indice(p, c, t - 1)
-    // La rangée qui monte est franchement trouée. Mesuré au banc : à 28 % de
-    // trous, aucune partie ne franchissait LA CRUE — la rangée arrivait presque
-    // pleine et ne laissait aucune prise pour la faire éclater ensuite. À 45 %,
-    // le monde reste le plus dur des cinq premiers sans être un mur.
-    const troue = rng() < 0.45
-    p.cases[i] = troue ? 0 : 1 + Math.floor(rng() * TEINTES.length)
-    p.spec[i] = ''
-    p.gel[i] = 0
-  }
-  const pris = lignesPleines(p)
-  if (pris.cases.size) eclate(p, pris.cases)
-  p.fini = bloque(p)
-  return true
-}
-
 // --- Les outils ---------------------------------------------------------------------
 
 /** Le marteau : une case, n'importe laquelle, disparaît. */
@@ -434,17 +358,6 @@ export function echange(p) {
 
 // --- Progression et sauvegarde ---------------------------------------------------------
 
-export const objectif = (p) => monde(p).objectif
-export const atteint = (p) => p.score >= objectif(p)
-
-/** Passe au monde suivant. Le score du monde repart à zéro, le total non. */
-export function suivant(p) {
-  if (!atteint(p)) return false
-  entreMonde(p, p.n + 1)
-  p.fini = false
-  return true
-}
-
 export const sauvegarde = (p) => ({ v: VERSION, p })
 
 export function migre(brut) {
@@ -459,4 +372,4 @@ export function migre(brut) {
   return p
 }
 
-export { MONDES, TRANSFOS, TRANSFO, PIECE, PIECES, encombrement, TEINTES, mondeDe }
+export { TRANSFOS, TRANSFO, PIECE, PIECES, encombrement, TEINTES, palierDe, PAR_PALIER }

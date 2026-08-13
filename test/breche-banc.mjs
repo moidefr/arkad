@@ -1,16 +1,17 @@
 /**
  * Le banc d'équilibrage de BRÈCHE.
  *
- * Il fait jouer un automate correct — pas parfait, correct — et imprime
- * jusqu'où il va : quel monde il atteint, combien de coups il tient, où il
- * meurt. C'est le seul moyen de savoir si un objectif est atteignable sans
- * jouer soi-même trois heures, et si un monde est infranchissable plutôt que
- * difficile.
+ * Il fait jouer deux automates de niveaux différents et imprime jusqu'où
+ * chacun va. Depuis que la partie est sans fin, ce n'est plus un objectif
+ * qu'on vérifie mais **le directeur de difficulté** : un bon automate doit
+ * aller plus loin qu'un mauvais, sinon l'adaptation ne sert à rien — et il ne
+ * doit pas aller *indéfiniment* plus loin, sinon elle ne mord pas.
  *
  *   node test/breche-banc.mjs [parties]
  */
 import * as L from '../src/long/breche/logique.js'
-import { PIECE, MONDES, encombrement } from '../src/long/breche/donnees.js'
+import { PIECE, encombrement, PAR_PALIER } from '../src/long/breche/donnees.js'
+import * as Dir from '../src/long/breche/directeur.js'
 
 const PARTIES = Number(process.argv[2] ?? 40)
 
@@ -93,77 +94,83 @@ function note(p, id, c, l) {
   // Quand une rangée monte du bas, un joueur garde le haut dégagé — c'est la
   // stratégie évidente du monde, et une heuristique qui l'ignore mesure son
   // propre angle mort plutôt que la difficulté du jeu.
-  let bas = 0
-  if (L.regles(p).montee) {
-    for (const e of cases) bas += e.l
-    bas = (bas / cases.length) * 6
-  }
+  const bas = 0
   // Superlinéaire sur le nombre de lignes : un joueur prépare un doublé au
   // lieu de prendre deux fois une ligne seule, et dans les mondes de crue c'est
   // exactement la compétence que le jeu demande.
   return lignes * lignes * 90 + lignes * 40 + contacts * 3 - trous * 25 + restants * 0.5 + bas
 }
 
-function partie(graine) {
+/**
+ * Deux automates. Le « moyen » prend ce qui se présente ; le « distrait » pose
+ * la première pièce à la première place. L'écart entre les deux est ce que le
+ * banc mesure vraiment.
+ */
+function partie(graine, distrait = false) {
   const p = L.nouvelle(graine)
   let coups = 0
-  const mondes = []
-  while (!p.fini && coups < 5000) {
-    const coup = meilleurCoup(p)
+  while (!p.fini && coups < 20000) {
+    const coup = distrait ? premierCoup(p) : meilleurCoup(p)
     if (!coup) break
     L.pose(p, coup.k, coup.c, coup.l)
     coups++
-    if (L.atteint(p)) {
-      mondes.push({ n: p.n, coups })
-      L.suivant(p)
+  }
+  return { p, coups }
+}
+
+function premierCoup(p) {
+  for (let k = 0; k < p.main.length; k++) {
+    const id = p.main[k]
+    if (!id) continue
+    for (let l = 0; l < p.taille; l++) {
+      for (let c = 0; c < p.taille; c++) if (L.peutPoser(p, id, c, l)) return { k, c, l }
     }
   }
-  return { p, coups, mondes }
+  return null
 }
 
 // --- Le balayage ---------------------------------------------------------------
 
-console.log(`${PARTIES} parties, automate « joueur moyen »\n`)
+console.log(`${PARTIES} parties par automate\n`)
 
-const atteints = new Map()
-const morts = new Map()
-let coupsTotal = 0
-let totalPoints = 0
-let plusLoin = 0
-
-for (let n = 0; n < PARTIES; n++) {
-  const { p, coups } = partie(1000 + n * 7919)
-  coupsTotal += coups
-  totalPoints += p.total
-  plusLoin = Math.max(plusLoin, p.n)
-  for (let k = 0; k <= p.n; k++) atteints.set(k, (atteints.get(k) ?? 0) + 1)
-  morts.set(p.n, (morts.get(p.n) ?? 0) + 1)
-}
-
-console.log('  monde par monde —')
-for (let k = 0; k <= plusLoin; k++) {
-  const m = L.mondeDe(k)
-  const a = atteints.get(k) ?? 0
-  const mo = morts.get(k) ?? 0
-  const franchis = a - mo
+for (const [nom, distrait] of [
+  ['distrait', true],
+  ['moyen', false],
+]) {
+  let coupsTotal = 0
+  let pointsTotal = 0
+  let meilleur = 0
+  let paliers = 0
+  let aisance = 0
+  for (let n = 0; n < PARTIES; n++) {
+    const { p, coups } = partie(1000 + n * 7919, distrait)
+    coupsTotal += coups
+    pointsTotal += p.score
+    meilleur = Math.max(meilleur, p.score)
+    paliers += L.palier(p)
+    aisance += p.aisance
+  }
   console.log(
-    `    ${String(k + 1).padStart(2)}. ${m.nom.padEnd(18)} ` +
-      `objectif ${String(m.objectif).padStart(5)} · ` +
-      `atteint par ${String(a).padStart(3)}/${PARTIES} · ` +
-      `franchi par ${String(franchis).padStart(3)} (${((franchis / Math.max(1, a)) * 100).toFixed(0)} %)`,
+    `  ${nom.padEnd(9)} ${(coupsTotal / PARTIES).toFixed(0).padStart(4)} poses · ` +
+      `${(pointsTotal / PARTIES).toFixed(0).padStart(6)} points en moyenne · ` +
+      `record ${String(meilleur).padStart(6)} · ` +
+      `${(paliers / PARTIES).toFixed(1)} palier(s) de musique · ` +
+      `aisance finale ${(aisance / PARTIES).toFixed(2)}`,
   )
 }
+console.log(`\n  un palier de musique tous les ${PAR_PALIER} points ; il y en a 50 à traverser.`)
 
-console.log('\n  ensemble —')
-// Les mondes où une rangée monte se jouent en préparant des doublés, qui la
-// repoussent. L'automate ne regarde pas le coup suivant : il prend les lignes
-// qui se présentent et ne prépare rien. Son plafond dans ces mondes-là mesure
-// donc sa myopie autant que leur difficulté — c'est le seul endroit du banc où
-// il faut lire les chiffres avec cette réserve en tête.
-console.log(
-  `    ${(coupsTotal / PARTIES).toFixed(0)} poses par partie · ${(totalPoints / PARTIES).toFixed(0)} points en moyenne`,
-)
-console.log(`    monde le plus loin : ${plusLoin + 1} sur ${MONDES.length}`)
+// --- Le vivier selon la difficulté ------------------------------------------------
+
+console.log('\n  ce que donne le directeur, part des pièces de 4 cases et plus —')
+for (const d of [0, 0.25, 0.5, 0.75, 1]) {
+  const faux = { ...L.nouvelle(1), aisance: d, poses: 0 }
+  const v = Dir.vivier(faux)
+  const total = v.reduce((s, e) => s + e.poids, 0)
+  const gros = v.filter((e) => e.piece.cases.length >= 4).reduce((s, e) => s + e.poids, 0)
+  const barre = '█'.repeat(Math.round((gros / total) * 40))
+  console.log(`    difficulté ${d.toFixed(2)}  ${((gros / total) * 100).toFixed(0).padStart(3)} %  ${barre}`)
+}
 
 // --- Les pièces ------------------------------------------------------------------
 //

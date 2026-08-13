@@ -1,10 +1,15 @@
 /**
- * Les tables de BRÈCHE : les pièces, les mondes, les transformations.
+ * Les tables de BRÈCHE : les pièces et les transformations.
  *
- * Tout est de la donnée. Une règle de monde est une clé prise dans `REGLES`,
- * lue à **un seul endroit** de `logique.js` ; une transformation est une clé
- * prise dans `EFFETS`, appliquée par un unique résolveur. Un test refuse toute
- * clé qui n'est lue nulle part — c'est ce qui empêche un monde décoratif.
+ * Tout est de la donnée. Une transformation est une clé prise dans `EFFETS`,
+ * appliquée par un unique résolveur, et un test refuse toute clé qui n'est lue
+ * nulle part — c'est ce qui empêche un contenu décoratif.
+ *
+ * **Il n'y a plus de mondes.** La partie est sans fin : un seul plateau de
+ * huit sur huit, aucun objectif, aucun palier à franchir. Ce qui monte, c'est
+ * ce que le directeur (`directeur.js`) décide de donner. Les dix mondes et
+ * leurs sept règles ont été retirés d'un bloc plutôt que désactivés : une
+ * mécanique qu'on garde « au cas où » finit par être lue par quelque chose.
  */
 import { C } from '../../palette.js'
 
@@ -528,132 +533,16 @@ export const TRANSFO = Object.fromEntries(TRANSFOS.map((x) => [x.id, x]))
 // Les clés de `regles` sont lues une par une par `logique.js` ; en ajouter une
 // demande d'écrire son effet, ce qu'un test vérifie.
 
-/** Le vocabulaire des règles de monde. Rien d'autre n'est admis. */
-export const REGLES = ['taille', 'prerempli', 'roche', 'montee', 'gel', 'bassin', 'semis']
-
-const m = (id, nom, teinte, objectif, regles, texte) => ({ id, nom, teinte, objectif, regles, texte })
-
-export const MONDES = [
-  m(
-    'cour',
-    'LA COUR',
-    C.cyan,
-    800,
-    { taille: 8, bassin: 'normal' },
-    'Huit sur huit, rien d’autre. C’est là qu’on apprend à ne pas boucher ses coins.',
-  ),
-  m(
-    'forge',
-    'LA FORGE',
-    C.accent,
-    1100,
-    { taille: 8, prerempli: 6, bassin: 'normal', semis: { lingot: 3 } },
-    'Six blocs sont déjà là, et des lingots passent dans le tas.',
-  ),
-  m(
-    'carriere',
-    'LA CARRIÈRE',
-    C.faible,
-    1500,
-    { taille: 8, roche: 5, bassin: 'normal', semis: { bombe: 3 } },
-    'Cinq roches qu’il faut prendre deux fois. Les bombes servent à ça.',
-  ),
-  m(
-    'atelier',
-    'L’ATELIER',
-    C.vert,
-    1950,
-    { taille: 9, bassin: 'normal', semis: { rayon: 3 } },
-    'Neuf sur neuf : une case de plus, et tout ce qu’on savait se décale.',
-  ),
-  m(
-    'crue',
-    'LA CRUE',
-    C.cyan,
-    700,
-    { taille: 8, montee: 9, bassin: 'normal', semis: { bombe: 2, rayon: 2 } },
-    'Une rangée monte du bas toutes les neuf poses — mais un doublé la repousse. On ne joue plus pour marquer, on joue pour tenir.',
-  ),
-  m(
-    'gel',
-    'LE GEL',
-    C.violet,
-    3100,
-    { taille: 8, gel: 3, bassin: 'normal', semis: { rayon: 3, prisme: 2 } },
-    'Ce qui éclate laisse du givre. Une case gelée se reprend une seconde fois.',
-  ),
-  m(
-    'orage',
-    'L’ORAGE',
-    C.rouge,
-    3800,
-    { taille: 8, bassin: 'gros', semis: { bombe: 3, mine: 2 } },
-    'Que des grosses pièces. Il n’y a plus de place pour se rattraper.',
-  ),
-  m(
-    'faille',
-    'LA FAILLE',
-    C.violet,
-    900,
-    { taille: 9, roche: 8, montee: 12, bassin: 'normal', semis: { mine: 3, prisme: 2 } },
-    'Neuf sur neuf, huit roches, et l’eau qui monte. C’est le monde où l’on apprend à sacrifier une ligne.',
-  ),
-  m(
-    'fournaise',
-    'LA FOURNAISE',
-    C.accent,
-    1000,
-    { taille: 8, prerempli: 10, montee: 10, gel: 2, bassin: 'gros', semis: { mine: 3, rayon: 3, lingot: 2 } },
-    'Tout à la fois, et la moitié du plateau déjà pris.',
-  ),
-  m(
-    'vide',
-    'LE VIDE',
-    C.texte,
-    6600,
-    { taille: 10, bassin: 'gros', semis: { prisme: 3, rayon: 2, lingot: 2 } },
-    'Dix sur dix. Assez grand pour respirer, assez grand pour s’y perdre.',
-  ),
-]
-
-export const MONDE = Object.fromEntries(MONDES.map((x) => [x.id, x]))
-
 /**
- * Les mondes où une rangée monte ont un objectif **court**, et c'est mesuré.
+ * Les cinquante bandes-son ne suivent plus des mondes — il n'y en a plus.
+ * Elles suivent le score : un palier tous les `PAR_PALIER` points, et la
+ * musique change sous les doigts sans qu'aucun écran ne s'interpose.
  *
- * Au banc, une partie de crue plafonne autour de sept cents points avant de
- * déborder, quel que soit le rythme de la montée : leur difficulté n'est pas
- * d'atteindre un chiffre, c'est de rester en vie assez longtemps pour
- * l'atteindre. Un objectif calé sur les mondes calmes en aurait fait des murs
- * infranchissables plutôt que des mondes courts et tendus — c'est exactement
- * ce qui arrivait avec 2 200, franchi zéro fois sur quarante parties.
+ * Le pas est calé au banc. À 2 200 points, l'automate moyen finissait à 0,7
+ * palier : la musique ne changeait jamais, et quarante-neuf des cinquante
+ * bandes étaient injouables en pratique. À 900, il en traverse deux ou trois,
+ * un bon joueur une dizaine, et les cinquante restent l'affaire d'une partie
+ * exceptionnelle — ce qui est le but.
  */
-
-/**
- * Après le dernier monde, on recommence — mais un cran plus haut.
- *
- * Le cycle ne change aucune règle : il multiplie l'objectif et ajoute des
- * blocs de départ. C'est le seul endroit du jeu où la difficulté monte sans
- * qu'une idée neuve apparaisse, et c'est assumé : à ce stade on ne joue plus
- * pour découvrir, on joue pour le record.
- */
-export const mondeDe = (n) => {
-  const cycle = Math.floor(n / MONDES.length)
-  const base = MONDES[n % MONDES.length]
-  if (cycle === 0) return { ...base, cycle }
-  return {
-    ...base,
-    cycle,
-    nom: `${base.nom} · ${'II III IV V VI VII VIII IX X'.split(' ')[Math.min(8, cycle - 1)]}`,
-    objectif: Math.round(base.objectif * Math.pow(1.55, cycle)),
-    regles: { ...base.regles, prerempli: (base.regles.prerempli ?? 0) + cycle * 3 },
-  }
-}
-
-/** Le vivier de pièces d'un monde : c'est lui qui donne son grain à chaque plateau. */
-export function bassinDe(regles) {
-  const nom = regles.bassin ?? 'normal'
-  if (nom === 'gros') return PIECES.filter((x) => x.famille !== 'petit')
-  if (nom === 'petit') return PIECES.filter((x) => x.famille !== 'gros')
-  return PIECES
-}
+export const PAR_PALIER = 900
+export const palierDe = (score) => Math.floor(Math.max(0, score) / PAR_PALIER)

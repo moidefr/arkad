@@ -21,9 +21,9 @@ import {
   accord,
   frequence,
 } from '../src/musique/composition.js'
-import { BRECHE, RUEE, JEUX, TOUTES, PAR_ID, pourMonde, pourJeu } from '../src/musique/table.js'
+import { BRECHE, RUEE, JEUX, TOUTES, PAR_ID, pourPalier, pourJeu } from '../src/musique/table.js'
 import { NIVEAUX } from '../src/long/ruee/donnees.js'
-import { MONDES } from '../src/long/breche/donnees.js'
+import { PAR_PALIER } from '../src/long/breche/donnees.js'
 import { TOUS } from '../src/catalogue.js'
 import { MODES } from '../src/son.js'
 
@@ -71,13 +71,15 @@ test('chaque jeu du catalogue a sa bande', () => {
 })
 
 test('les cinquante bandes de BRÈCHE sont toutes atteignables en jouant', () => {
+  // Il n'y a plus de mondes : les paliers de score se succèdent, un tous les
+  // PAR_PALIER points, et une partie assez longue les traverse tous.
   const vues = new Set()
-  for (let cycle = 0; cycle < 5; cycle++) {
-    for (let n = 0; n < MONDES.length; n++) vues.add(pourMonde(n, cycle).id)
-  }
-  assert.equal(vues.size, 50, `seulement ${vues.size} bandes sur 50 sont jouées en cinq cycles`)
-  // Et deux mondes voisins ne partagent jamais leur bande.
-  for (let n = 0; n < MONDES.length - 1; n++) assert.notEqual(pourMonde(n, 0).id, pourMonde(n + 1, 0).id)
+  for (let palier = 0; palier < 50; palier++) vues.add(pourPalier(palier).id)
+  assert.equal(vues.size, 50, `seulement ${vues.size} bandes sur 50 sont jouées en cinquante paliers`)
+  // Deux paliers voisins ne partagent jamais leur bande : le changement doit
+  // s'entendre, puisque c'est le seul repère de progression qui reste.
+  for (let n = 0; n < 49; n++) assert.notEqual(pourPalier(n).id, pourPalier(n + 1).id)
+  assert.ok(PAR_PALIER > 0)
 })
 
 test('les ambiances et les gammes servent vraiment', () => {

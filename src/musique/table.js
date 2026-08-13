@@ -143,15 +143,16 @@ export const TOUTES = [...BRECHE, ...RUEE, ...JEUX]
 export const PAR_ID = Object.fromEntries(TOUTES.map((x) => [x.id, x]))
 
 /**
- * La bande d'un monde de BRÈCHE. Le monde donne la famille, le cycle donne
- * laquelle des cinq — on refait le tour des dix mondes quatre fois avant de
- * réentendre le premier morceau.
+ * La bande d'un palier de BRÈCHE.
+ *
+ * Le jeu n'a plus de mondes : la partie est sans fin et les cinquante morceaux
+ * se succèdent au score, un palier tous les 2 200 points. On les entend donc
+ * tous dans une seule très longue partie — c'est plus exigeant que l'ancienne
+ * répartition par monde, où il fallait cinq cycles pour en faire le tour, et
+ * ça donne à la musique le rôle de repère de progression que les écrans de
+ * passage tenaient avant.
  */
-export const pourMonde = (n, cycle = 0) => {
-  const famille = ((n % 10) + 10) % 10
-  const k = ((cycle % 5) + 5) % 5
-  return BRECHE[famille * 5 + k]
-}
+export const pourPalier = (n) => BRECHE[(((n | 0) % BRECHE.length) + BRECHE.length) % BRECHE.length]
 
 /** La bande d'un jeu, par son identifiant de catalogue. */
 export const pourJeu = (id) => JEUX.find((x) => x.id === id) ?? null

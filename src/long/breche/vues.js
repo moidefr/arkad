@@ -218,21 +218,19 @@ export function ancre(d, p, prise, pointer) {
 
 export function entete(ctx, j, p, d) {
   const z = d.entete
-  const monde = L.monde(p)
-  const but = L.objectif(p)
-  const k = Math.min(1, p.score / but)
+  // Plus de nom de monde ni de barre d'objectif : il n'y a plus rien à
+  // atteindre. Ce qui monte, c'est le score, et à côté de lui le seul chiffre
+  // qui dit vraiment comment on joue — la chaîne en cours.
   ctx.textAlign = 'left'
-  texte(ctx, monde.nom, z.x, z.y + 12, 15, monde.teinte, 700, z.w - 90, 1)
+  texte(ctx, `${p.score}`, z.x, z.y + 14, 22, C.accent, 700, z.w - 120, 1)
   ctx.textAlign = 'right'
-  texte(ctx, `${p.score} / ${but}`, z.x + z.w, z.y + 12, 13, k >= 1 ? C.vert : C.faible, 700, 130)
+  texte(ctx, `RECORD ${Math.max(p.record ?? 0, p.score)}`, z.x + z.w, z.y + 12, 12, C.faible, 700, 150)
   ctx.textAlign = 'left'
-  rect(ctx, z.x, z.y + 22, z.w, 8, C.bord)
-  if (k > 0) rect(ctx, z.x, z.y + 22, Math.max(PX, z.w * k), 8, k >= 1 ? C.vert : monde.teinte)
 
   const gauche = []
   if (p.combo > 1) gauche.push(`CHAÎNE ×${p.combo}`)
-  if (p.montees > 0) gauche.push(`CRUE ${p.montees}`)
-  texte(ctx, gauche.join(' · '), z.x, z.y + 40, 11, p.combo > 1 ? C.accent : C.faible, 700, z.w)
+  if (p.meilleurCombo > 1) gauche.push(`MEILLEURE ×${p.meilleurCombo}`)
+  texte(ctx, gauche.join(' · '), z.x, z.y + 36, 11, p.combo > 1 ? C.accent : C.faible, 700, z.w)
 }
 
 export function outils(ctx, j, p, d, arme) {
@@ -264,48 +262,4 @@ export function outils(ctx, j, p, d, arme) {
 }
 
 /** Le bandeau du haut : ce que le moteur affiche à la place du score. */
-export const titreHud = (p) => `${p.total}`
-
-// --- L'écran de passage de monde --------------------------------------------------------
-
-export function passage(ctx, j, p) {
-  const monde = L.mondeDe(p.n + 1)
-  ctx.fillStyle = 'rgba(11, 14, 13, 0.93)'
-  ctx.fillRect(0, 0, j.W, j.H)
-  ctx.textAlign = 'center'
-  const cy = j.H * 0.3
-  lueur(ctx, j.W / 2 - 120, cy - 20, 240, 40, C.vert, 3, 0.8)
-  texte(ctx, 'MONDE FRANCHI', j.W / 2, cy, 26, C.vert, 700, j.W - 40, 2)
-  texte(ctx, monde.nom, j.W / 2, cy + 40, 22, monde.teinte, 700, j.W - 40, 1)
-
-  const lignes = decoupe(ctx, monde.texte, 12, j.W - 80)
-  lignes.forEach((l, i) => texte(ctx, l, j.W / 2, cy + 74 + i * 16, 12, C.faible, 700))
-
-  texte(ctx, `OBJECTIF ${monde.objectif}`, j.W / 2, j.H * 0.62, 15, C.accent, 700, j.W - 40)
-  ctx.textAlign = 'left'
-
-  const z = { x: j.W / 2 - 110, y: Math.round(j.H * 0.72), w: 220, h: 46, quoi: 'suite' }
-  ombre(ctx, z.x, z.y, z.w, z.h, 4)
-  lueur(ctx, z.x, z.y, z.w, z.h, C.accent, 2, 0.6)
-  rect(ctx, z.x, z.y, z.w, z.h, C.panneau)
-  cadre(ctx, z.x, z.y, z.w, z.h, C.accent)
-  ctx.textAlign = 'center'
-  texte(ctx, 'ENTRER', z.x + z.w / 2, z.y + z.h / 2, 18, C.accent, 700, z.w - 20, 1)
-  ctx.textAlign = 'left'
-  return [z]
-}
-
-function decoupe(ctx, s, taille, largeur) {
-  const mots = String(s).split(' ')
-  const sortie = []
-  let ligne = ''
-  for (const m of mots) {
-    const essai = ligne ? ligne + ' ' + m : m
-    if (largeurTexte(ctx, essai, taille) > largeur && ligne) {
-      sortie.push(ligne)
-      ligne = m
-    } else ligne = essai
-  }
-  if (ligne) sortie.push(ligne)
-  return sortie
-}
+export const titreHud = (p) => `${p.score}`

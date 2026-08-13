@@ -20,8 +20,8 @@ import { texte } from '../../dessin.js'
 import { lis, ecris } from '../../stockage.js'
 import * as L from './logique.js'
 import * as V from './vues.js'
-import { PIECE, encombrement, MONDES } from './donnees.js'
-import { pourMonde } from '../../musique.js'
+import { PIECE, encombrement } from './donnees.js'
+import { pourPalier } from '../../musique.js'
 
 const CLE_META = 'breche.meta'
 const metaVide = { meilleurMonde: 0, parties: 0, meilleurCombo: 0 }
@@ -41,7 +41,7 @@ const SEUIL = 8
 export default {
   id: 'breche',
   nom: 'BRÈCHE',
-  pitch: 'Trois pièces, une grille, des lignes qui éclatent. Dix mondes',
+  pitch: 'Trois pièces, une grille, des lignes qui éclatent. Sans fin',
   couleur: C.cyan,
   unite: 'points',
   persistant: true,
@@ -60,7 +60,7 @@ export default {
 
     const brut = L.migre(j.charge())
     j.e.p = brut ?? L.nouvelle((j.hasard() * 4294967296) >>> 0)
-    j.score = j.e.p.total
+    j.score = j.e.p.score
     accorde(j)
     if (!brut) sauve(j)
   },
@@ -74,7 +74,7 @@ export default {
 
   maj(j, dt) {
     const e = j.e
-    j.score = e.p.total
+    j.score = e.p.score
     if (e.avis) e.avis.vie -= dt
     if (e.avis?.vie <= 0) e.avis = null
     if (e.geste && j.maintenu) {
@@ -105,14 +105,12 @@ export default {
       texte(ctx, e.avis.texte, d.grille.x + d.grille.w / 2, y, 13, C.accent, 700, d.grille.w)
       ctx.textAlign = 'left'
     }
-    if (e.vue === 'passage') e.zones = V.passage(ctx, j, p)
     ctx.textAlign = 'center'
   },
 
   appui(j, p0) {
     const e = j.e
     e.geste = { x: p0.x, y: p0.y, bouge: 0 }
-    if (e.vue === 'passage') return
 
     const d = V.dispo(j, e.p)
     const z = e.zones.find((x) => p0.x >= x.x && p0.x <= x.x + x.w && p0.y >= x.y && p0.y <= x.y + x.h)
@@ -143,18 +141,6 @@ export default {
     const e = j.e
     const geste = e.geste
     e.geste = null
-
-    if (e.vue === 'passage') {
-      const z = e.zones.find((x) => p0.x >= x.x && p0.x <= x.x + x.w && p0.y >= x.y && p0.y <= x.y + x.h)
-      if (z?.quoi === 'suite') {
-        L.suivant(e.p)
-        e.vue = 'jeu'
-        j.son.niveau()
-        accorde(j)
-        sauve(j)
-      }
-      return
-    }
 
     if (!e.prise) return
     const d = V.dispo(j, e.p)
@@ -244,7 +230,7 @@ function poseIci(j, d, pointer) {
   e.prise = null
   if (!r) return j.son.rate()
 
-  j.score = p.total
+  j.score = p.score
   const n = r.lignes + r.colonnes
   if (n > 0) {
     j.son.record()
@@ -261,19 +247,10 @@ function poseIci(j, d, pointer) {
     const mot = n >= 4 ? 'FRACAS' : n === 3 ? 'TRIPLÉ' : n === 2 ? 'DOUBLÉ' : 'BRÈCHE'
     e.avis = { texte: `${mot} +${r.points}${r.combo > 0 ? ` · CHAÎNE ×${r.combo + 1}` : ''}`, vie: 1.4 }
   } else j.son.touche(4)
-  if (r.monte) {
-    j.son.rate()
-    j.fx.secoue(6)
-  }
-
-  if (L.atteint(p) && !p.fini) {
-    e.vue = 'passage'
-    j.son.niveau()
-    if (p.n + 1 > (e.meta.meilleurMonde ?? 0)) {
-      e.meta.meilleurMonde = p.n + 1
-      ecritMeta(e.meta)
-    }
-  }
+  // La bande-son change de palier toute seule, sans écran qui s'interpose :
+  // c'est le seul repère de progression qui reste, et il vaut mieux qu'il se
+  // remarque à l'oreille qu'en coupant la partie.
+  accorde(j)
   sauve(j)
 }
 
@@ -296,9 +273,8 @@ function finit(j) {
   const e = j.e
   e.meta.parties = (e.meta.parties ?? 0) + 1
   e.meta.meilleurCombo = Math.max(e.meta.meilleurCombo ?? 0, e.p.meilleurCombo)
-  if (e.p.n + 1 > (e.meta.meilleurMonde ?? 0)) e.meta.meilleurMonde = e.p.n + 1
   ecritMeta(e.meta)
-  j.score = e.p.total
+  j.score = e.p.score
   j.efface()
   j.perdu()
 }
@@ -308,10 +284,14 @@ function sauve(j) {
 }
 
 /**
- * La bande du monde courant. Cinq par famille de monde : on refait quatre fois
- * le tour des dix mondes avant de réentendre le premier morceau.
+ * La bande du palier courant. Il n'y a plus de mondes : les cinquante morceaux
+ * se succèdent au score, un palier tous les 2 200 points. On les traverse donc
+ * tous dans une seule très longue partie, au lieu d'un par monde.
  */
 function accorde(j) {
-  const n = j.e.p.n
-  j.musique(pourMonde(n % MONDES.length, Math.floor(n / MONDES.length)))
+  const bande = pourPalier(L.palier(j.e.p))
+  if (bande && bande.id !== j.e.bande) {
+    j.e.bande = bande.id
+    j.musique(bande)
+  }
 }
