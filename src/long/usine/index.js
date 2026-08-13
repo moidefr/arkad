@@ -25,7 +25,11 @@ export default {
   // Pas de `ciel` : la scène peint le sien, et il change avec l'heure. Deux
   // dégradés tramés l'un sur l'autre ne font pas un ciel, ils font du bruit.
 
-  titreHud: (j) => L.nombre(j.e.minerai),
+  // Le bandeau porte le compteur **depuis toujours** : celui qui ne retombe
+  // jamais, pas même à la refonte. C'est le seul chiffre qui dise ce qu'on a
+  // fait de cette usine en entier, et il n'a rien à faire au milieu de l'écran
+  // où l'on regarde ce qu'on peut dépenser tout de suite.
+  titreHud: (j) => `${L.nombre(j.e.jamais ?? j.e.total)} EN TOUT`,
 
   init(j) {
     const etat = L.migre(j.charge()) ?? L.neuve()
@@ -96,6 +100,11 @@ export default {
     const e = j.e
     const d = D.dispo(j)
     const en = d.entete
+    // Et la scène porte la caisse : ce qu'on a là, maintenant, à dépenser.
+    // Les deux affichaient le même nombre, ce qui donnait deux compteurs pour
+    // une seule information. Pas de libellé ici : la ligne sous le chiffre est
+    // déjà prise par le débit, et le bandeau dit « EN TOUT », ce qui suffit à
+    // distinguer les deux.
     texte(ctx, L.nombre(e.minerai), en.cx, en.y, 30, C.texte, 700, en.max)
     ctx.textAlign = 'left'
     const rythme = `${L.nombre(L.production(e))} / s`

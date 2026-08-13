@@ -402,3 +402,45 @@ test('le jeu tourne, se dessine et se sauve', () => {
   const relu = L.migre(JSON.parse(memoire.valeur))
   assert.ok(relu && Number.isFinite(relu.minerai), 'la sauvegarde ne se relit pas')
 })
+
+test('les deux compteurs disent deux choses différentes', () => {
+  // Le bandeau et la scène affichaient tous deux `minerai` : deux compteurs
+  // pour une seule information. Le bandeau porte maintenant « depuis
+  // toujours », qui ne retombe pas à la refonte — sans quoi il redirait la
+  // même chose que le total de la fonte en cours.
+  const e = L.neuve()
+  L.extrait(e, 500)
+  assert.equal(e.minerai, 500)
+  assert.equal(e.total, 500)
+  assert.equal(e.jamais, 500)
+
+  e.total = 1e9
+  assert.ok(L.refond(e) > 0, 'la refonte n’a rien rendu, le test ne prouve rien')
+  assert.equal(e.minerai, 0, 'la caisse doit repartir de zéro')
+  assert.equal(e.total, 0, 'le total de la fonte doit repartir de zéro')
+  assert.equal(e.jamais, 500, '« depuis toujours » a été remis à zéro par la refonte')
+})
+
+test('toute extraction passe par un seul point d’entrée', async () => {
+  // Le jour où une cinquième source de minerai est ajoutée sans passer par
+  // `extrait()`, « depuis toujours » se met à mentir sans que rien ne plante.
+  const { readFileSync } = await import('node:fs')
+  const src = readFileSync(new URL('../src/long/usine/logique.js', import.meta.url), 'utf8')
+  // Deux, et non trois : `jamais` s'écrit avec un `??` de garde plutôt qu'un
+  // `+=`, pour survivre à un état venu d'une sauvegarde qui l'ignorait.
+  const directes = src.split('\n').filter((l) => /\be\.(minerai|total)\s*\+=/.test(l))
+  assert.equal(
+    directes.length,
+    2,
+    'seules les trois lignes de `extrait()` doivent créditer directement :\n  ' + directes.join('\n  '),
+  )
+})
+
+test('une sauvegarde d’avant le compteur ne le laisse pas vide', () => {
+  const e = L.neuve()
+  L.extrait(e, 1200)
+  const vieille = JSON.parse(JSON.stringify(L.sauvegarde(e)))
+  delete vieille.jamais
+  const relu = L.migre(vieille)
+  assert.equal(relu.jamais, 1200, 'le total de la fonte en cours en est le meilleur minorant')
+})

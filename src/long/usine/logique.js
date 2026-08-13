@@ -37,6 +37,8 @@ export function neuve() {
     enCours: [],
     ouvriers: 0,
     total: 0,
+    // Ce qui ne retombe jamais, pas même à la refonte.
+    jamais: 0,
     lingots: 0,
     fontes: 0,
     pannes: [],
@@ -73,6 +75,9 @@ export function migre(s) {
     const e = neuve()
     e.minerai = nombreSur(s.minerai)
     e.total = nombreSur(s.total)
+    // Une sauvegarde d'avant ce compteur n'a pas de « depuis toujours » : on
+    // repart du total de la fonte en cours, qui en est le meilleur minorant.
+    e.jamais = nombreSur(s.jamais, nombreSur(s.total))
     e.lingots = Math.floor(nombreSur(s.lingots))
     e.fontes = Math.floor(nombreSur(s.fontes))
     if (Array.isArray(s.n)) s.n.forEach((v, i) => (e.n[V1_MACHINE[i] ?? i] = Math.max(0, Math.floor(nombreSur(v)))))
@@ -89,6 +94,11 @@ export function migre(s) {
 function sain(s) {
   const e = neuve()
   for (const cle of ['minerai', 'total', 'boost', 'usure', 'quand']) e[cle] = nombreSur(s[cle], e[cle])
+  // « Depuis toujours » est arrivé après la version 2 : une sauvegarde qui ne
+  // le porte pas repart du total de la fonte en cours, qui en est le meilleur
+  // minorant. Le laisser tomber à zéro ferait reculer un compteur dont toute
+  // la promesse est de ne jamais reculer.
+  e.jamais = nombreSur(s.jamais, nombreSur(s.total, 0))
   for (const cle of ['ouvriers', 'lingots', 'fontes']) e[cle] = Math.max(0, Math.floor(nombreSur(s[cle])))
   if (Array.isArray(s.n)) MACHINES.forEach((_, i) => (e.n[i] = Math.max(0, Math.floor(nombreSur(s.n[i])))))
   if (Array.isArray(s.ame)) e.ame = s.ame.filter((id) => AMELIORATIONS.some((a) => a.id === id))
@@ -127,6 +137,7 @@ export const sauvegarde = (e) => ({
   enCours: e.enCours,
   ouvriers: e.ouvriers,
   total: e.total,
+  jamais: e.jamais,
   lingots: e.lingots,
   fontes: e.fontes,
   pannes: e.pannes,
@@ -263,8 +274,7 @@ export function repare(e, i) {
   e.pannes.splice(k, 1)
   if (!su(e, 'p2')) return 0
   const prime = productionMachine(e, i) * 30
-  e.minerai += prime
-  e.total += prime
+  extrait(e, prime)
   return prime
 }
 
@@ -287,6 +297,24 @@ export const lingotsSi = (e) =>
 
 export const coutProchainLingot = (e) =>
   Math.pow((lingotsSi(e) + 1) / (su(e, 'f0') ? 1.25 : 1), 1 / PENTE) * SEUIL_LINGOT
+
+/**
+ * Tout ce qui est extrait passe par ici, et par nulle part ailleurs.
+ *
+ * Trois compteurs à tenir d'un coup, et ils ne veulent pas dire la même chose :
+ * `minerai` est ce qu'on a en caisse et qu'on dépense, `total` ce qu'on a
+ * extrait **depuis la dernière refonte** (c'est lui qui donne les lingots, donc
+ * il retombe à zéro avec elle), et `jamais` ce qu'on a extrait depuis le
+ * premier jour, qui ne retombe pas. Les tenir à quatre endroits séparés, c'est
+ * les voir diverger le jour où on ajoute une cinquième source.
+ */
+export function extrait(e, n) {
+  if (!(n > 0)) return 0
+  e.minerai += n
+  e.total += n
+  e.jamais = (e.jamais ?? 0) + n
+  return n
+}
 
 export function refond(e) {
   const gain = lingotsSi(e)
@@ -312,8 +340,7 @@ export function refond(e) {
 /** Une image de jeu. `hasard` vient du moteur, jamais de `Math.random`. */
 export function avance(e, dt, hasard, evenements = {}) {
   const p = production(e) * dt
-  e.minerai += p
-  e.total += p
+  extrait(e, p)
   e.contrats.forEach((c) => (c.fait += p))
 
   if (e.boost > 0) e.boost = Math.max(0, e.boost - dt)
@@ -405,8 +432,7 @@ function encaisse(e, c) {
   const x2 = su(e, 'c2') ? 2 : 1
   if (modele.prime === 'minerai') {
     const gain = c.cible * 1.5 * x2
-    e.minerai += gain
-    e.total += gain
+    extrait(e, gain)
   } else if (modele.prime === 'lingot') {
     e.lingots += (1 + Math.floor(modele.delai / 3600)) * x2
   } else {
@@ -427,8 +453,7 @@ export function credite(e, maintenant = Date.now()) {
   const rendement = su(e, 'p1') ? 0.92 : 0.78
   const gagne = production(e) * ecoule * rendement
   if (gagne <= 1) return 0
-  e.minerai += gagne
-  e.total += gagne
+  extrait(e, gagne)
   e.contrats.forEach((c) => {
     c.fait += gagne
     c.reste -= ecoule
