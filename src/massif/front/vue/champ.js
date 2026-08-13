@@ -23,83 +23,100 @@ import { CL } from '../donnees/classes.js'
 import { GRADES } from '../donnees/classes.js'
 import { hexagone, contour, barre, teinteVie } from './pieces.js'
 
-export const CHAMP = { x: 0, y: 88, w: 360, h: 364 }
-
 const R_MIN = 19
 const R_CONFORT = 27
 
 /** Le rayon d'un hexagone : « tout voir » cadre la carte, « voir gros » ne bouge pas. */
-export function rayonPour(carte, zoom) {
+export function rayonPour(ch, carte, zoom) {
   if (zoom) return R_CONFORT
-  const parLargeur = CHAMP.w / (RACINE3 * (carte.cols + 0.5))
-  const parHauteur = CHAMP.h / (1.5 * (carte.rows - 1) + 2)
+  const parLargeur = ch.w / (RACINE3 * (carte.cols + 0.5))
+  const parHauteur = ch.h / (1.5 * (carte.rows - 1) + 2)
   return Math.max(R_MIN, Math.min(R_CONFORT, Math.floor(Math.min(parLargeur, parHauteur))))
 }
 
-const centreEcran = () => ({ x: CHAMP.x + CHAMP.w / 2, y: CHAMP.y + CHAMP.h / 2 })
+const centreEcran = (ch) => ({ x: ch.x + ch.w / 2, y: ch.y + ch.h / 2 })
+
+/**
+ * Le doigt est-il dans la fenêtre de carte ?
+ *
+ * Ce prédicat est lu par `hexSous` **et** par le geste de glissement de
+ * `front.js` : debout la fenêtre prend toute la largeur et le test en x ne
+ * coûte rien, couché elle s'arrête au panneau et c'est lui qui empêche un
+ * appui dans les ordres de désigner un hexagone.
+ */
+export const dansChamp = (ch, p) => p.x >= ch.x && p.x <= ch.x + ch.w && p.y >= ch.y && p.y <= ch.y + ch.h
 
 /** Coordonnées écran d'un hexagone, caméra comprise. */
-export function place(vue, q, r) {
+export function place(ch, vue, q, r) {
   const p = versEcran(q, r, vue.R)
-  const c = centreEcran()
+  const c = centreEcran(ch)
   return { x: p.x - vue.cam.x + c.x, y: p.y - vue.cam.y + c.y }
 }
 
 /** L'hexagone sous le doigt, ou `null` si le doigt est hors du champ. */
-export function hexSous(vue, p) {
-  if (p.y < CHAMP.y || p.y > CHAMP.y + CHAMP.h) return null
-  const c = centreEcran()
+export function hexSous(ch, vue, p) {
+  if (!dansChamp(ch, p)) return null
+  const c = centreEcran(ch)
   return versHex(p.x - c.x + vue.cam.x, p.y - c.y + vue.cam.y, vue.R)
 }
 
 /** Recadre la caméra pour qu'on ne se perde jamais hors de la carte. */
-export function borneCamera(vue, carte) {
+export function borneCamera(ch, vue, carte) {
   const l = RACINE3 * vue.R
   const largeur = l * (carte.cols + 0.5)
   const hauteur = 1.5 * vue.R * (carte.rows - 1) + 2 * vue.R
   const marge = vue.R
   // Carte plus petite que la fenêtre : on la centre au lieu de la coller au bord.
   vue.cam.x =
-    largeur <= CHAMP.w
+    largeur <= ch.w
       ? largeur / 2 - l / 2
-      : Math.max(CHAMP.w / 2 - marge, Math.min(largeur - CHAMP.w / 2 - l / 2 + marge, vue.cam.x))
+      : Math.max(ch.w / 2 - marge, Math.min(largeur - ch.w / 2 - l / 2 + marge, vue.cam.x))
   vue.cam.y =
-    hauteur <= CHAMP.h
+    hauteur <= ch.h
       ? hauteur / 2 - vue.R
-      : Math.max(CHAMP.h / 2 - marge, Math.min(hauteur - CHAMP.h / 2 - vue.R + marge, vue.cam.y))
+      : Math.max(ch.h / 2 - marge, Math.min(hauteur - ch.h / 2 - vue.R + marge, vue.cam.y))
 }
 
-export function centreSur(vue, carte, q, r) {
+export function centreSur(ch, vue, carte, q, r) {
   const p = versEcran(q, r, vue.R)
   vue.cam.x = p.x
   vue.cam.y = p.y
-  borneCamera(vue, carte)
+  borneCamera(ch, vue, carte)
 }
 
 /** Une caméra neuve, cadrée sur le gros de la compagnie. */
-export function nouvelleVue(bat, zoom = 0) {
-  const vue = { R: rayonPour(bat.carte, zoom), cam: { x: 0, y: 0 }, zoom, connu: [] }
+export function nouvelleVue(ch, bat, zoom = 0) {
+  const vue = { R: rayonPour(ch, bat.carte, zoom), cam: { x: 0, y: 0 }, zoom, connu: [] }
   const miennes = B.vivantes(bat, 0)
   if (miennes.length) {
     const q = miennes.reduce((s, u) => s + u.q, 0) / miennes.length
     const r = miennes.reduce((s, u) => s + u.r, 0) / miennes.length
-    centreSur(vue, bat.carte, Math.round(q), Math.round(r))
-  } else borneCamera(vue, bat.carte)
+    centreSur(ch, vue, bat.carte, Math.round(q), Math.round(r))
+  } else borneCamera(ch, vue, bat.carte)
   return vue
+}
+
+/**
+ * Le format a changé sous une bataille en cours : le rayon qui cadrait la
+ * carte ne la cadre plus, et la caméra pointe hors du nouveau champ.
+ */
+export function recadre(ch, vue, carte) {
+  vue.R = rayonPour(ch, carte, vue.zoom)
+  borneCamera(ch, vue, carte)
 }
 
 // --- Dessin ------------------------------------------------------------------------
 
-const dansEcran = (p, R) =>
-  p.x > CHAMP.x - R * 2 && p.x < CHAMP.x + CHAMP.w + R * 2 && p.y > CHAMP.y - R * 2 && p.y < CHAMP.y + CHAMP.h + R * 2
+const dansEcran = (ch, p, R) =>
+  p.x > ch.x - R * 2 && p.x < ch.x + ch.w + R * 2 && p.y > ch.y - R * 2 && p.y < ch.y + ch.h + R * 2
 
 /**
  * Le champ complet. `sel` décrit l'état du doigt : la troupe choisie, les
  * cases où elle peut aller, les cibles qu'elle peut frapper.
  */
-export function dessine(ctx, vue, bat, sel = {}) {
-  rect(ctx, CHAMP.x, CHAMP.y, CHAMP.w, CHAMP.h, ton(C.fond, -0.25))
-  trame(ctx, CHAMP.x, CHAMP.y, CHAMP.w, CHAMP.h, 24, ton(C.bord, -0.4))
+export function dessine(ctx, ch, vue, bat, sel = {}) {
+  rect(ctx, ch.x, ch.y, ch.w, ch.h, ton(C.fond, -0.25))
+  trame(ctx, ch.x, ch.y, ch.w, ch.h, 24, ton(C.bord, -0.4))
 
   const vus = B.visibles(bat, 0)
   const connu = vue.connu instanceof Set ? vue.connu : (vue.connu = new Set(vue.connu ?? []))
@@ -111,8 +128,8 @@ export function dessine(ctx, vue, bat, sel = {}) {
 
   // 1. le terrain
   for (const h of toutes(bat.carte)) {
-    const p = place(vue, h.q, h.r)
-    if (!dansEcran(p, vue.R)) continue
+    const p = place(ch, vue, h.q, h.r)
+    if (!dansEcran(ch, p, vue.R)) continue
     const k = cle(h.q, h.r)
     const t = terrainA(bat.carte, h.q, h.r)
     if (!connu.has(k)) {
@@ -133,8 +150,8 @@ export function dessine(ctx, vue, bat, sel = {}) {
   // 2. les repères de manœuvre, sous les troupes pour ne jamais les masquer
   for (const k of deplacables) {
     const [q, r] = k.split(':').map(Number)
-    const p = place(vue, q, r)
-    if (!dansEcran(p, vue.R)) continue
+    const p = place(ch, vue, q, r)
+    if (!dansEcran(ch, p, vue.R)) continue
     ctx.globalAlpha = 0.3
     hexagone(ctx, p.x, p.y, vue.R - 2, C.cyan, false)
     ctx.globalAlpha = 1
@@ -143,8 +160,8 @@ export function dessine(ctx, vue, bat, sel = {}) {
 
   // 3. la fumée
   for (const f of bat.fumees) {
-    const p = place(vue, f.q, f.r)
-    if (!dansEcran(p, vue.R)) continue
+    const p = place(ch, vue, f.q, f.r)
+    if (!dansEcran(ch, p, vue.R)) continue
     ctx.globalAlpha = 0.55
     hexagone(ctx, p.x, p.y, vue.R - 1, ton(C.faible, 0.25), false)
     ctx.globalAlpha = 1
@@ -154,8 +171,8 @@ export function dessine(ctx, vue, bat, sel = {}) {
   for (const u of bat.unites) {
     if (u.pv <= 0) continue
     if (u.camp !== 0 && !B.voitUnite(bat, 0, u, vus)) continue
-    const p = place(vue, u.q, u.r)
-    if (!dansEcran(p, vue.R)) continue
+    const p = place(ch, vue, u.q, u.r)
+    if (!dansEcran(ch, p, vue.R)) continue
     dessineUnite(ctx, vue, bat, u, p, {
       choisie: sel.unite === u,
       cible: cibles.has(cle(u.q, u.r)),
@@ -166,7 +183,7 @@ export function dessine(ctx, vue, bat, sel = {}) {
   // 5. le chemin prévu, par-dessus tout : c'est lui qu'on regarde en jouant
   if (sel.chemin?.length > 1) {
     for (let i = 1; i < sel.chemin.length; i++) {
-      const p = place(vue, sel.chemin[i].q, sel.chemin[i].r)
+      const p = place(ch, vue, sel.chemin[i].q, sel.chemin[i].r)
       rect(ctx, p.x - 3, p.y - 3, 6, 6, i === sel.chemin.length - 1 ? C.accent : C.cyan)
     }
   }

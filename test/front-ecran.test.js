@@ -14,11 +14,14 @@ import front from '../src/massif/front.js'
 import * as B from '../src/massif/front/bataille.js'
 import * as Cie from '../src/massif/front/compagnie.js'
 import { fauxJeu, fauxCtx, PAS, W, H, HUD } from './faux.js'
-import { CHAMP } from '../src/massif/front/vue/champ.js'
 import * as VC from '../src/massif/front/vue/champ.js'
+import * as VD from '../src/massif/front/vue/dispo.js'
 import { cle } from '../src/massif/front/hex.js'
 import { OBJECTIFS } from '../src/massif/front/carte.js'
 import { largeurTexte } from '../src/dessin.js'
+
+/** La fenêtre du champ, telle que le jeu la calcule lui-même. */
+const champDe = (j) => VD.bataille(j).champ
 
 const dessine = (j) => {
   const ctx = fauxCtx()
@@ -40,15 +43,16 @@ function tape(j, quoi, filtre) {
 /** Tape sur un hexagone précis du champ de bataille. */
 function tapeHex(j, q, r) {
   dessine(j)
-  const p = VC.place(j.e.vueChamp, q, r)
-  assert.ok(p.y > CHAMP.y && p.y < CHAMP.y + CHAMP.h, `l’hexagone ${q},${r} n’est pas à l’écran`)
+  const ch = champDe(j)
+  const p = VC.place(ch, j.e.vueChamp, q, r)
+  assert.ok(p.y > ch.y && p.y < ch.y + ch.h, `l’hexagone ${q},${r} n’est pas à l’écran`)
   front.appui(j, p)
   front.relache(j, p)
   return p
 }
 
 /** Un point est-il dans la fenêtre du champ ? */
-const visible = (p) => p.x > 0 && p.x < W && p.y > CHAMP.y && p.y < CHAMP.y + CHAMP.h
+const visible = (j, p) => VC.dansChamp(champDe(j), p)
 
 /** Une partie amenée jusqu'à la bataille, en tapant comme un joueur. */
 function jusquAuFeu(graine = 5) {
@@ -155,8 +159,8 @@ test('une vignette choisit la troupe et recentre la caméra dessus', () => {
   const u = B.vivantes(j.e.bat, 0)[1]
   tape(j, 'troupe', (z) => z.ref === u.ref)
   assert.equal(j.e.sel.unite, u, 'la vignette ne choisit rien')
-  const p = VC.place(j.e.vueChamp, u.q, u.r)
-  assert.ok(visible(p), 'la troupe choisie n’est pas à l’écran')
+  const p = VC.place(champDe(j), j.e.vueChamp, u.q, u.r)
+  assert.ok(visible(j, p), 'la troupe choisie n’est pas à l’écran')
   assert.ok(j.e.sel.deplacements.size > 0, 'aucune case atteignable proposée')
 })
 
@@ -168,8 +172,9 @@ test('un appui sur une case atteignable déplace la troupe, et REVENIR la ramèn
   const dest = [...j.e.sel.deplacements]
     .map((k) => k.split(':').map(Number))
     .find(([q, r]) => {
-      const p = VC.place(j.e.vueChamp, q, r)
-      return p.y > CHAMP.y + 20 && p.y < CHAMP.y + CHAMP.h - 20
+      const ch = champDe(j)
+      const p = VC.place(ch, j.e.vueChamp, q, r)
+      return p.y > ch.y + 20 && p.y < ch.y + ch.h - 20
     })
   assert.ok(dest, 'aucune case atteignable visible')
   tapeHex(j, dest[0], dest[1])
@@ -185,7 +190,7 @@ test('un glissement ne déplace jamais une troupe', () => {
   tape(j, 'troupe', (z) => z.ref === u.ref)
   const depart = { q: u.q, r: u.r }
   dessine(j)
-  const p = VC.place(j.e.vueChamp, u.q, u.r)
+  const p = VC.place(champDe(j), j.e.vueChamp, u.q, u.r)
   front.appui(j, { x: p.x, y: p.y })
   j.maintenu = true
   for (let i = 1; i <= 8; i++) {
@@ -238,8 +243,8 @@ test('le zoom change la taille des hexagones sans perdre la troupe choisie', () 
   tape(j, 'zoom')
   assert.notEqual(j.e.vueChamp.R, avant, 'le zoom ne change rien')
   assert.equal(j.e.sel.unite, u)
-  const p = VC.place(j.e.vueChamp, u.q, u.r)
-  assert.ok(visible(p), 'la troupe choisie est sortie de l’écran')
+  const p = VC.place(champDe(j), j.e.vueChamp, u.q, u.r)
+  assert.ok(visible(j, p), 'la troupe choisie est sortie de l’écran')
 })
 
 test('une bataille se joue jusqu’au bilan, rien qu’en passant les tours', () => {

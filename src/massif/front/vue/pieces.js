@@ -139,25 +139,33 @@ export function paragraphe(ctx, s, x, y, taille, largeur, couleur = C.faible, in
 }
 
 /** L'entête d'un écran de menu : un titre, un sous-titre, et le trait. */
-export function entete(ctx, titre, sous, teinte = C.accent) {
+export function entete(ctx, e, titre, sous, teinte = C.accent) {
   ctx.textAlign = 'left'
-  texte(ctx, titre, 20, 76, 20, teinte, 700, 250, 1)
+  texte(ctx, titre, e.titre.x, e.titre.y, 20, teinte, 700, e.titre.max, 1)
   if (sous) {
     ctx.textAlign = 'right'
-    texte(ctx, sous, 340, 76, 13, C.faible, 700, 150)
+    texte(ctx, sous, e.sous.x, e.sous.y, 13, C.faible, 700, e.sous.max)
   }
-  rect(ctx, 20, 90, 320, PX, C.bord)
+  rect(ctx, e.trait.x, e.trait.y, e.trait.w, PX, C.bord)
   ctx.textAlign = 'left'
 }
 
-/** Le bandeau d'or et de niveau, présent sur tous les écrans de camp. */
-export function bourse(ctx, c, y = 600) {
-  rect(ctx, 0, y - 8, 360, PX, C.bord)
+/** Une ligne de la bourse : elle sait de quel bord elle se cale. */
+function ligneBourse(ctx, s, l, couleur) {
+  ctx.textAlign = l.droite ? 'right' : 'left'
+  texte(ctx, s, l.x, l.y, l.taille, couleur, 700, l.max)
   ctx.textAlign = 'left'
-  texte(ctx, `${c.or} OR`, 20, y + 10, 15, C.accent, 700, 140)
-  ctx.textAlign = 'right'
-  texte(ctx, `NIVEAU ${c.niveau} · ${c.troupes.length} TROUPES`, 340, y + 10, 12, C.faible, 700, 200)
-  ctx.textAlign = 'left'
+}
+
+/**
+ * L'or et le niveau, présents sur tous les écrans de camp. Debout c'est un
+ * bandeau en pied de page ; couché il n'y a pas de pied de page à dépenser, et
+ * les deux lignes remontent au bout de la ligne de titre.
+ */
+export function bourse(ctx, c, b) {
+  if (b.trait) rect(ctx, b.trait.x, b.trait.y, b.trait.w, PX, C.bord)
+  ligneBourse(ctx, `${c.or} OR`, b.or, C.accent)
+  ligneBourse(ctx, `NIVEAU ${c.niveau} · ${c.troupes.length} TROUPES`, b.etat, C.faible)
 }
 
 export { rect, cadre, texte, largeurTexte, lueur, ombre, px, PX, C, ton }

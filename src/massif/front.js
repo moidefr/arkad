@@ -31,6 +31,7 @@ import { APT } from './front/donnees/aptitudes.js'
 import * as VC from './front/vue/champ.js'
 import * as VB from './front/vue/bataille.js'
 import * as VM from './front/vue/menus.js'
+import * as VD from './front/vue/dispo.js'
 
 const CLE_META = 'front.meta'
 const metaVide = { meilleurNiveau: 0, batailles: 0, campagnes: 0 }
@@ -56,6 +57,12 @@ export default {
   persistant: true,
   sansScore: true,
   ciel: C.vert,
+  // Une grille de 19 × 15 mesure 33,8 R de large pour 23 R de haut. Debout,
+  // la fenêtre du champ est carrée et la carte n'y entre qu'en rapetissant les
+  // hexagones sous le doigt ; couchée, elle a exactement la forme de la carte,
+  // et le panneau d'ordres passe à droite au lieu de manger la moitié basse.
+  paysage: true,
+  confort: 'paysage',
 
   titreHud: (j) => {
     const e = j.e
@@ -82,7 +89,7 @@ export default {
       j.e.c = brut.c
       j.e.bat = brut.bat
       if (j.e.bat) {
-        j.e.vueChamp = VC.nouvelleVue(j.e.bat)
+        j.e.vueChamp = VC.nouvelleVue(VD.bataille(j).champ, j.e.bat)
         j.e.vue = 'bataille'
       } else j.e.vue = 'camp'
     } else {
@@ -92,6 +99,23 @@ export default {
   },
 
   quitte: (j) => sauve(j),
+
+  /**
+   * L'écran a tourné en pleine partie. Le rayon qui cadrait la carte ne la
+   * cadre plus et la caméra pointe hors de la nouvelle fenêtre ; un défilement
+   * de liste mesuré dans l'autre gabarit ne désigne plus rien ; et le doigt en
+   * cours a été posé sur des coordonnées qui n'existent plus.
+   */
+  redim(j) {
+    const e = j.e
+    e.geste = null
+    e.defile = 0
+    if (!e.bat || !e.vueChamp) return
+    const ch = VD.bataille(j).champ
+    VC.recadre(ch, e.vueChamp, e.bat.carte)
+    const u = e.sel?.unite ?? B.vivantes(e.bat, 0)[0]
+    if (u) VC.centreSur(ch, e.vueChamp, e.bat.carte, u.q, u.r)
+  },
 
   // --- Le temps ----------------------------------------------------------------
 
@@ -115,7 +139,7 @@ export default {
       sauve(j)
       return
     }
-    VC.centreSur(e.vueChamp, e.bat.carte, u.q, u.r)
+    VC.centreSur(VD.bataille(j).champ, e.vueChamp, e.bat.carte, u.q, u.r)
     const acte = IA.joueUne(e.bat, u)
     e.attente = acte?.attaque || acte?.ordre ? 0.62 : 0.28
     if (acte?.attaque) {
@@ -131,18 +155,21 @@ export default {
     const e = j.e
     ctx.textAlign = 'left'
     ctx.textBaseline = 'middle'
-    if (e.vue === 'bataille' && e.bat) return dessineBataille(j, ctx)
-
+    // Purgé avant l'aiguillage, bataille comprise : sinon le cadre de la
+    // dernière liste survit à l'entrée au combat, et un glissement dans le
+    // panneau d'ordres se croit encore en train de faire défiler la caserne.
     e.defileMax = 0
     e.listeRect = null
-    if (e.vue === 'titre') e.zones = VM.titre(ctx, !!e.c, e.meta)
-    else if (e.vue === 'camp') e.zones = VM.camp(ctx, e.c)
-    else if (e.vue === 'campagne') e.zones = VM.campagne(ctx, e.c, e.choix)
-    else if (e.vue === 'caserne') e.zones = defilante(e, VM.caserne(ctx, e.c, e.defile))
-    else if (e.vue === 'uniques') e.zones = defilante(e, VM.uniques(ctx, e.c, e.defile))
-    else if (e.vue === 'compagnie') e.zones = defilante(e, VM.compagnie(ctx, e.c, e.selTroupe, e.defile))
+    if (e.vue === 'bataille' && e.bat) return dessineBataille(j, ctx)
+
+    if (e.vue === 'titre') e.zones = VM.titre(ctx, j, !!e.c, e.meta)
+    else if (e.vue === 'camp') e.zones = VM.camp(ctx, j, e.c)
+    else if (e.vue === 'campagne') e.zones = VM.campagne(ctx, j, e.c, e.choix)
+    else if (e.vue === 'caserne') e.zones = defilante(e, VM.caserne(ctx, j, e.c, e.defile))
+    else if (e.vue === 'uniques') e.zones = defilante(e, VM.uniques(ctx, j, e.c, e.defile))
+    else if (e.vue === 'compagnie') e.zones = defilante(e, VM.compagnie(ctx, j, e.c, e.selTroupe, e.defile))
     else if (e.vue === 'fiche') e.zones = ficheOuRetour(j, ctx)
-    else if (e.vue === 'bilan') e.zones = VM.bilan(ctx, e.c, e.rapport)
+    else if (e.vue === 'bilan') e.zones = VM.bilan(ctx, j, e.c, e.rapport)
     ctx.textAlign = 'center'
   },
 
@@ -154,7 +181,7 @@ export default {
       bouge: 0,
       cam: e.vueChamp ? { ...e.vueChamp.cam } : null,
       defile: e.defile,
-      champ: e.vue === 'bataille' && p.y >= VC.CHAMP.y && p.y <= VC.CHAMP.y + VC.CHAMP.h,
+      champ: e.vue === 'bataille' && VC.dansChamp(VD.bataille(j).champ, p),
       liste: e.defileMax > 0 && !!e.listeRect && p.y >= e.listeRect.y && p.y <= e.listeRect.y + e.listeRect.h,
     }
   },
@@ -188,7 +215,7 @@ function glisse(j) {
   if (g.champ && g.cam && e.vueChamp) {
     e.vueChamp.cam.x = g.cam.x - dx
     e.vueChamp.cam.y = g.cam.y - dy
-    VC.borneCamera(e.vueChamp, e.bat.carte)
+    VC.borneCamera(VD.bataille(j).champ, e.vueChamp, e.bat.carte)
   } else if (g.liste) {
     e.defile = Math.max(0, Math.min(e.defileMax, g.defile - dy))
   }
@@ -206,9 +233,9 @@ function ficheOuRetour(j, ctx) {
   const u = Cie.trouve(j.e.c, j.e.selTroupe)
   if (!u) {
     j.e.vue = 'compagnie'
-    return VM.camp(ctx, j.e.c)
+    return VM.camp(ctx, j, j.e.c)
   }
-  return VM.fiche(ctx, j.e.c, u)
+  return VM.fiche(ctx, j, j.e.c, u)
 }
 
 // --- Bataille ---------------------------------------------------------------------
@@ -217,20 +244,22 @@ function dessineBataille(j, ctx) {
   const e = j.e
   const sel = e.sel
   const bat = e.bat
-  VC.dessine(ctx, e.vueChamp, bat, {
+  const d = VD.bataille(j)
+  VC.dessine(ctx, d.champ, e.vueChamp, bat, {
     unite: sel.unite,
     visee: sel.visee,
     deplacements: sel.deplacements,
     cibles: sel.mode === 'ordre' ? sel.casesOrdre : sel.cibles,
     chemin: sel.chemin,
   })
-  const zb = VB.bandeau(ctx, bat, e.vueChamp)
-  const zp = VB.panneauBas(ctx, bat, { ...sel, confirmeRetraite: e.confirmeRetraite })
+  const zb = VB.bandeau(ctx, d, bat, e.vueChamp)
+  const zp = VB.panneauBas(ctx, d, bat, { ...sel, confirmeRetraite: e.confirmeRetraite })
   e.zones = [...zb, ...zp]
   if (bat.camp === 1) {
-    rect(ctx, 0, VB.PANNEAU.y - 22, 360, 22, C.rouge)
+    const t = d.tourAdverse
+    rect(ctx, t.x, t.y, t.w, t.h, C.rouge)
     ctx.textAlign = 'center'
-    texte(ctx, 'TOUR ADVERSE', 180, VB.PANNEAU.y - 11, 12, C.fond, 700, 300)
+    texte(ctx, 'TOUR ADVERSE', t.x + t.w / 2, t.y + t.h / 2, 12, C.fond, 700, 300)
     ctx.textAlign = 'left'
   }
 }
@@ -256,7 +285,7 @@ function choisit(j, u) {
   const e = j.e
   e.sel = { unite: u }
   rafraichitSel(j)
-  VC.centreSur(e.vueChamp, e.bat.carte, u.q, u.r)
+  VC.centreSur(VD.bataille(j).champ, e.vueChamp, e.bat.carte, u.q, u.r)
   j.son.clic()
 }
 
@@ -265,7 +294,7 @@ function appuiChamp(j, p) {
   const bat = e.bat
   const sel = e.sel
   if (bat.camp !== 0 || bat.fini) return
-  const h = VC.hexSous(e.vueChamp, p)
+  const h = VC.hexSous(VD.bataille(j).champ, e.vueChamp, p)
   if (!h) return
   const sous = B.uniteA(bat, h.q, h.r)
 
@@ -298,7 +327,7 @@ function appuiChamp(j, p) {
         j.son.casse(8)
         j.fx.secoue(7)
       }
-      VC.centreSur(e.vueChamp, bat.carte, h.q, h.r)
+      VC.centreSur(VD.bataille(j).champ, e.vueChamp, bat.carte, h.q, h.r)
       rafraichitSel(j)
       sauve(j)
     }
@@ -318,7 +347,7 @@ function joueOrdre(j, h) {
   const somme = (r.degats ?? []).reduce((s, x) => s + x.degats, 0)
   if (somme) {
     j.fx.secoue(6)
-    const p = VC.place(e.vueChamp, h.q, h.r)
+    const p = VC.place(VD.bataille(j).champ, e.vueChamp, h.q, h.r)
     j.fx.bulle(p.x, p.y - 10, '−' + somme, C.rouge, 17)
   }
   rafraichitSel(j)
@@ -332,7 +361,8 @@ function frappe(j) {
   const u = sel.unite
   const c = sel.visee
   if (!u || !c) return
-  const p = VC.place(e.vueChamp, c.q, c.r)
+  const ch = VD.bataille(j).champ
+  const p = VC.place(ch, e.vueChamp, c.q, c.r)
   const r = B.attaque(e.bat, u, c)
   sel.visee = null
   if (!r) return j.son.rate()
@@ -340,7 +370,7 @@ function frappe(j) {
   j.fx.secoue(r.mort ? 8 : 4)
   j.fx.bulle(p.x, p.y - 10, '−' + r.degats, r.mort ? C.vert : C.accent, r.mort ? 19 : 15)
   if (r.riposte) {
-    const q = VC.place(e.vueChamp, u.q, u.r)
+    const q = VC.place(ch, e.vueChamp, u.q, u.r)
     j.fx.bulle(q.x, q.y - 10, '−' + r.riposte, C.rouge, 13)
   }
   if (B.aFini(u) || u.pv <= 0) deselectionne(j)
@@ -402,7 +432,8 @@ function actions(j, z) {
       const u = Cie.recruteUnique(c, z.uq)
       if (!u) return j.son.rate()
       j.son.record()
-      j.fx.eclat(180, 300, C.violet, { n: 30, vitesse: 220 })
+      const ou = VD.uniques(j).eclat
+      j.fx.eclat(ou.x, ou.y, C.violet, { n: 30, vitesse: 220 })
       // Un unique recruté rejoint le front tout de suite s'il reste une place :
       // sans ça, on paie très cher un dossier qui dort au dépôt.
       Cie.enrole(c, u.id)
@@ -441,11 +472,12 @@ function actions(j, z) {
     // Bataille
     zoom: () => {
       const v = e.vueChamp
+      const ch = VD.bataille(j).champ
       const u = e.sel.unite ?? B.vivantes(e.bat, 0)[0]
       v.zoom = v.zoom ? 0 : 1
-      v.R = VC.rayonPour(e.bat.carte, v.zoom)
-      if (u) VC.centreSur(v, e.bat.carte, u.q, u.r)
-      else VC.borneCamera(v, e.bat.carte)
+      v.R = VC.rayonPour(ch, e.bat.carte, v.zoom)
+      if (u) VC.centreSur(ch, v, e.bat.carte, u.q, u.r)
+      else VC.borneCamera(ch, v, e.bat.carte)
       j.son.clic()
     },
     finTour: () => {
@@ -521,7 +553,7 @@ function engage(j) {
   const bat = Cie.prepare(e.c, e.choix)
   if (!bat) return j.son.rate()
   e.bat = bat
-  e.vueChamp = VC.nouvelleVue(bat)
+  e.vueChamp = VC.nouvelleVue(VD.bataille(j).champ, bat)
   e.sel = {}
   e.attente = 0.3
   e.vue = 'bataille'
