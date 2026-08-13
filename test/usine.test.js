@@ -47,7 +47,15 @@ test('chaque palier de machine coûte plus et rapporte plus', () => {
 
 test('une sauvegarde de la version 1 se relit sans rien perdre', () => {
   // Exactement le format écrit par l'ancienne `usine.js`.
-  const v1 = { minerai: 5000, n: [40, 12, 3, 1, 0], ame: ['g0', 'm1', 'g1', 'h1'], total: 9e5, lingots: 4, fontes: 1, quand: Date.now() }
+  const v1 = {
+    minerai: 5000,
+    n: [40, 12, 3, 1, 0],
+    ame: ['g0', 'm1', 'g1', 'h1'],
+    total: 9e5,
+    lingots: 4,
+    fontes: 1,
+    quand: Date.now(),
+  }
   const e = L.migre(v1)
   assert.ok(e, 'la migration a renoncé')
   assert.equal(e.v, L.VERSION)
@@ -63,7 +71,13 @@ test('une sauvegarde de la version 1 se relit sans rien perdre', () => {
 })
 
 test('une sauvegarde abîmée ne propage jamais NaN', () => {
-  const e = L.migre({ v: L.VERSION, minerai: 'beaucoup', n: [null, undefined, NaN], ame: ['inconnu'], rech: ['jamais'] })
+  const e = L.migre({
+    v: L.VERSION,
+    minerai: 'beaucoup',
+    n: [null, undefined, NaN],
+    ame: ['inconnu'],
+    rech: ['jamais'],
+  })
   assert.ok(e)
   assert.equal(e.minerai, 0)
   assert.deepEqual(e.ame, [])
@@ -207,7 +221,10 @@ test('un ouvrier coûte toujours entre 3 secondes et 3 minutes de production', (
   })
   assert.ok(releves.length > 10, 'pas assez de relevés')
   for (const r of releves) {
-    assert.ok(r.s > 3 && r.s < 180, `à ${(r.t / 3600).toFixed(1)} h, un ouvrier coûte ${r.s.toFixed(0)} s de production`)
+    assert.ok(
+      r.s > 3 && r.s < 180,
+      `à ${(r.t / 3600).toFixed(1)} h, un ouvrier coûte ${r.s.toFixed(0)} s de production`,
+    )
   }
 })
 
@@ -293,6 +310,75 @@ test('dix heures de jeu ne laissent ni NaN, ni contenu épuisé', () => {
   // Mais pas au point que le joueur piétine.
   assert.ok(e.rech.length >= 8, `seulement ${e.rech.length} recherches en dix heures, le jeu est trop lent`)
   assert.ok(e.fontes >= 1, 'jamais l’occasion de refondre en dix heures')
+})
+
+/**
+ * Le test qui manquait.
+ *
+ * Les précédents appuyaient au hasard et vérifiaient seulement que rien ne
+ * plantait. Or plus rien n'était achetable dans aucune liste — machines,
+ * ouvriers, améliorations, recherches — parce que l'appui reconstruisait les
+ * lignes au lieu de relire celles qui avaient été dessinées. Ça ne lève aucune
+ * erreur : ça ne fait simplement rien. Un test qui n'assère pas un effet ne
+ * teste rien.
+ */
+test('on peut vraiment acheter, en passant par le vrai chemin d’appui', () => {
+  const j = fauxJeu(usine, { graine: 5 })
+  const ctx = fauxCtx()
+  const dessine = () => {
+    ctx.ops.length = 0
+    usine.dessine(j, ctx)
+  }
+  const tape = (x, y) => {
+    j.pointer.x = x
+    j.pointer.y = y
+    usine.appui(j, j.pointer)
+    usine.relache(j, j.pointer)
+  }
+
+  j.e.minerai = 1e9
+  dessine()
+
+  // La première ligne de l'onglet USINE est celle des ouvriers.
+  const ouvriers = j.e.ouvriers
+  tape(180, 374)
+  assert.equal(j.e.ouvriers, ouvriers + 1, 'appuyer sur la ligne OUVRIERS n’embauche personne')
+
+  // La deuxième est la première machine.
+  dessine()
+  const machines = j.e.n[0]
+  tape(180, 426)
+  assert.equal(j.e.n[0], machines + 1, 'appuyer sur une ligne de machine n’achète rien')
+
+  // Onglet ATELIER : la première amélioration visible.
+  usine.appui(j, { x: 139, y: 325 })
+  dessine()
+  const ame = j.e.ame.length
+  tape(180, 372)
+  assert.equal(j.e.ame.length, ame + 1, 'appuyer sur une amélioration n’achète rien')
+
+  // Onglet ÉTUDES : la première recherche disponible.
+  usine.appui(j, { x: 225, y: 325 })
+  dessine()
+  tape(180, 376)
+  assert.equal(j.e.enCours.length, 1, 'appuyer sur une recherche ne la lance pas')
+})
+
+test('un glissement ne déclenche jamais un achat', () => {
+  const j = fauxJeu(usine, { graine: 5 })
+  const ctx = fauxCtx()
+  j.e.minerai = 1e9
+  usine.dessine(j, ctx)
+
+  const avant = j.e.ouvriers
+  j.pointer.x = 180
+  j.pointer.y = 374
+  usine.appui(j, j.pointer)
+  j.maintenu = true
+  j.pointer.y = 300 // le doigt remonte de 74 px : c'est un défilement
+  usine.maj(j, PAS)
+  usine.relache(j, j.pointer)
+  assert.equal(j.e.ouvriers, avant, 'un défilement a embauché quelqu’un')
 })
 
 test('le jeu tourne, se dessine et se sauve', () => {

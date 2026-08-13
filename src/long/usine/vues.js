@@ -65,6 +65,14 @@ export const ongletTouche = (p) => {
  * donc rien à restaurer et rien qui déborde.
  */
 function liste(j, ctx, lignes, dessineLigne, fenetre = LISTE.h) {
+  // Les lignes posées au dessin sont **conservées** : l'appui relit
+  // exactement celles-là.
+  //
+  // Elles étaient reconstruites à chaque appui, donc sans leur position — les
+  // objets n'étaient pas les mêmes — et plus rien dans aucune liste n'était
+  // cliquable : ni machine, ni ouvrier, ni amélioration, ni recherche. Seuls
+  // la scène et les onglets répondaient encore.
+  j.e.posees = lignes
   let y = LISTE.y - j.e.defile
   for (const l of lignes) {
     // On ne dessine que ce qui tombe dans la fenêtre. Pas de découpe du
@@ -76,9 +84,19 @@ function liste(j, ctx, lignes, dessineLigne, fenetre = LISTE.h) {
   }
 }
 
-/** Ne trouve que ce qui a été dessiné : une ligne hors fenêtre n'existe pas. */
-const trouve = (lignes, p, fenetre = LISTE.h) =>
-  p.y > LISTE.y + fenetre ? null : (lignes.find((l) => p.y >= l._y && p.y <= l._y + l.h) ?? null)
+/**
+ * Ne trouve que ce qui a été dessiné : une ligne hors fenêtre n'existe pas, et
+ * une ligne jamais posée non plus.
+ */
+const trouve = (j, quoi, p, fenetre = LISTE.h) => {
+  if (p.y > LISTE.y + fenetre) return null
+  const lignes = j.e.posees ?? []
+  return (
+    lignes.find(
+      (l) => l._y != null && p.y >= l._y && p.y <= l._y + l.h && (!quoi || l.quoi === quoi || quoi === '*'),
+    ) ?? null
+  )
+}
 
 export function hauteur(lignes) {
   return lignes.reduce((s, l) => s + l.h + 4, 0)
@@ -165,7 +183,7 @@ function ligneMachine(ctx, e, i, y) {
 }
 
 export function appuiUsine(j, p) {
-  const l = trouve(lignesUsine(j.e), p)
+  const l = trouve(j, '*', p)
   if (!l) return false
   if (l.quoi === 'ouvriers') {
     if (!L.embauche(j.e)) return (j.son.rate(), true)
@@ -254,7 +272,7 @@ export function appuiAtelier(j, p) {
     j.fx.eclat(180, 250, C.accent, { n: 44, vitesse: 300 })
     return true
   }
-  const l = trouve(lignesAtelier(j.e), p, FENETRE_ATELIER)
+  const l = trouve(j, 'ame', p, FENETRE_ATELIER)
   if (!l) return false
   if (!L.acheteAmelioration(j.e, l.x.id)) return (j.son.rate(), true)
   j.son.record()
@@ -323,7 +341,7 @@ export function dessineRecherche(j, ctx) {
 }
 
 export function appuiRecherche(j, p) {
-  const l = trouve(lignesRecherche(j.e), p)
+  const l = trouve(j, '*', p)
   if (!l || l.quoi !== 'libre') return false
   if (!L.lanceRecherche(j.e, l.r.id)) return (j.son.rate(), true)
   j.son.clic()
