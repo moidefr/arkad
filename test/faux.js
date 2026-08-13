@@ -53,6 +53,8 @@ export function fauxCtx() {
   return {
     ops,
     fillStyle: '#000',
+    strokeStyle: '#000',
+    lineWidth: 1,
     font: '',
     textAlign: 'center',
     textBaseline: 'middle',
@@ -77,6 +79,44 @@ export function fauxCtx() {
     },
     rect(x, y, w, h) {
       chemin = { x: x + dx, y: y + dy, w, h }
+    },
+    // Le thème moderne peint par chemin plutôt que par `fillRect`. On rend la
+    // même op des deux côtés : c'est ce qui permet de comparer la disposition
+    // d'un thème à l'autre sans que la comparaison porte sur la manière de
+    // peindre.
+    roundRect(x, y, w, h, r) {
+      chemin = { x: x + dx, y: y + dy, w, h, r }
+    },
+    arc(cx, cy, r) {
+      chemin = { x: cx + dx - r, y: cy + dy - r, w: r * 2, h: r * 2, disque: true }
+    },
+    fill() {
+      if (chemin) ops.push({ type: 'rect', ...chemin, couleur: this.fillStyle, alpha: this.globalAlpha, coupe })
+    },
+    stroke() {
+      // Un trait est centré sur son chemin : il déborde de la moitié de sa
+      // largeur de chaque côté. Enregistrer le chemin nu ferait croire qu'un
+      // cadre tracé occupe moins de place qu'un cadre posé en quatre bandes,
+      // alors qu'à l'écran les deux couvrent exactement le même rectangle.
+      if (!chemin) return
+      const d = (this.lineWidth ?? 1) / 2
+      ops.push({
+        type: 'trait',
+        ...chemin,
+        x: chemin.x - d,
+        y: chemin.y - d,
+        w: chemin.w + d * 2,
+        h: chemin.h + d * 2,
+        couleur: this.strokeStyle,
+        alpha: this.globalAlpha,
+        coupe,
+      })
+    },
+    createLinearGradient() {
+      // Un dégradé n'a pas de position à tester : on retient sa dernière
+      // couleur pour que `fillStyle` reste une chaîne comparable.
+      let derniere = '#000'
+      return { addColorStop: (_p, c) => (derniere = c), toString: () => derniere }
     },
     clip() {
       if (chemin) coupe = coupe ? croise(coupe, chemin) : chemin

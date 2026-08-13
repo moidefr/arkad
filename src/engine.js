@@ -22,6 +22,7 @@ import { Input } from './input.js'
 import { C, ton } from './palette.js'
 import { son } from './son.js'
 import { musique, pourJeu } from './musique.js'
+import { theme } from './theme.js'
 import { Effets } from './effets.js'
 import { lis, ecris } from './stockage.js'
 import { FORMATS, HUD, orientationAppareil, formatPour, tailleDe, suggestion } from './format.js'
@@ -121,6 +122,13 @@ function dispoMenu(W, H, n) {
 }
 
 const boutonMenu = (i, d) => ({ x: d.x, y: d.y + i * d.pas, w: d.w, h: d.h })
+
+/**
+ * Le menu de pause. Une seule liste, lue par le dessin **et** par l'appui :
+ * les deux se sont déjà désynchronisés une fois dans ce projet, et c'était un
+ * bouton qui ne répondait pas là où on le voyait.
+ */
+const MENU_PAUSE = ['REPRENDRE', 'RECOMMENCER', 'QUITTER', 'SON', 'IMAGE']
 
 const dans = (p, z) => p.x >= z.x && p.x <= z.x + z.w && p.y >= z.y && p.y <= z.y + z.h
 
@@ -477,8 +485,8 @@ export class Moteur {
     }
 
     if (this.phase === 'pause') {
-      const d = dispoMenu(this.W, this.H, 4)
-      const i = [0, 1, 2, 3].findIndex((k) => dans(p, boutonMenu(k, d)))
+      const d = dispoMenu(this.W, this.H, MENU_PAUSE.length)
+      const i = MENU_PAUSE.findIndex((_, k) => dans(p, boutonMenu(k, d)))
       if (i !== 1) this.arme = 0
       if (i === 0) return (son.clic(), this._bascullePause())
       if (i === 1) {
@@ -493,6 +501,7 @@ export class Moteur {
       }
       if (i === 2) return (son.clic(), this._quitte())
       if (i === 3) return (son.bascule(), musique.accorde())
+      if (i === 4) return (theme.bascule(), son.clic())
       return
     }
 
@@ -762,13 +771,13 @@ export class Moteur {
   _pause() {
     const ctx = this.ctx
     this._voile()
-    const d = dispoMenu(this.W, this.H, 4)
+    const d = dispoMenu(this.W, this.H, MENU_PAUSE.length)
     texte(ctx, '-- PAUSE --', this.W / 2, d.y - 46, 26, C.accent, 700, undefined, 3)
-    const libelles = ['REPRENDRE', 'RECOMMENCER', 'QUITTER', 'SON']
-    libelles.forEach((libelle, i) => {
+    MENU_PAUSE.forEach((libelle, i) => {
       let l = libelle
       let teinte
       if (i === 3) l = son.libelle
+      if (i === 4) l = `IMAGE : ${theme.nom}`
       // Sur un jeu long, « recommencer » efface une partie de plusieurs
       // heures : autant que le bouton le dise, et qu'il le demande deux fois.
       if (i === 1 && this.def.persistant) {
