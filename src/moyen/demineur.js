@@ -1,12 +1,38 @@
 import { C, ton } from '../palette.js'
 import { texte, rect, cadre, bloc, lueur } from '../dessin.js'
 
-const COLS = 9
-const RANGS = 12
 const CASE = 38
-const X0 = 9
-const Y0 = 132
 const LONG_APPUI = 0.32 // au-delà, on pose un drapeau
+
+/**
+ * Ce que la grille laisse au-dessus d'elle et sous elle.
+ *
+ * Debout, elle commence sous deux lignes d'information empilées et garde une
+ * large marge en bas : ce sont les mesures d'origine, et elles redonnent case
+ * pour case les 9 × 12 posées en (9, 132). Couché, la hauteur est le bien rare
+ * — les deux lignes se rangent côte à côte et la marge basse tombe à un liseré,
+ * ce qui laisse sept rangs au lieu de six.
+ */
+const HAUT_DEBOUT = 132
+const BAS_DEBOUT = 52
+const HAUT_COUCHE = 84
+const BAS_COUCHE = 10
+
+/**
+ * La grille prend toute la largeur et toute la hauteur qui reste, en cases
+ * entières de 38 px, et se centre sur ce qui dépasse.
+ *
+ * Debout : 9 × 12 en (9, 132). Couché : 16 × 7 en (16, 84) — près du double de
+ * front, et c'est là que le démineur est le meilleur, parce qu'une déduction
+ * de bord se lit d'un coup au lieu de se dérouler en colonne.
+ */
+function dispo(j) {
+  const haut = j.paysage ? HAUT_COUCHE : HAUT_DEBOUT
+  const bas = j.paysage ? BAS_COUCHE : BAS_DEBOUT
+  const cols = Math.floor(j.W / CASE)
+  const rangs = Math.floor((j.H - haut - bas) / CASE)
+  return { cols, rangs, x0: Math.floor((j.W - cols * CASE) / 2), y0: haut }
+}
 
 /**
  * Une grille seule tient cinq minutes. Le jeu, c'est la série : chaque grille
@@ -16,12 +42,21 @@ const LONG_APPUI = 0.32 // au-delà, on pose un drapeau
 const MINES_DEPART = 14
 const MINES_PAS = 3
 
+/** La grille debout : c'est sur elle que la difficulté et la prime sont réglées. */
+const REFERENCE = 9 * 12
+
 export default {
   id: 'demineur',
   nom: 'DÉMINEUR',
   pitch: 'Appui court pour creuser, appui long pour marquer',
   couleur: C.vert,
   unite: 'pts',
+  // Un champ de mines se lit d'autant mieux qu'on en voit large : 112 cases de
+  // front couché contre 108 en colonne, mais surtout seize de large, où les
+  // bords et les coins — les seules cases dont on déduit quelque chose sans
+  // deviner — sont tous visibles en même temps.
+  paysage: true,
+  confort: 'paysage',
 
   finTitre: (j) => ({ texte: `BOUM · GRILLE ${j.e.grille}`, couleur: C.rouge }),
 
@@ -29,6 +64,24 @@ export default {
     j.e.grille = 1
     j.e.fanfare = 0
     pose(j)
+  },
+
+  /**
+   * L'écran a tourné en pleine partie. Une grille de démineur ne se recadre
+   * pas : un nombre ne veut rien dire ailleurs que sur les huit cases qu'il
+   * compte, et rogner une colonne rendrait faux tout ce que le joueur venait de
+   * déduire. On repose donc une grille neuve, au même numéro donc à la même
+   * difficulté — le score déjà encaissé, lui, reste acquis.
+   *
+   * Et seulement si la grille change vraiment de taille : une rotation qui ne
+   * déplacerait que le cadrage ne doit pas coûter une partie en cours.
+   */
+  redim(j) {
+    const d = dispo(j)
+    if (d.cols === j.e.cols && d.rangs === j.e.rangs) return Object.assign(j.e, d)
+    pose(j)
+    j.fx.bulle(j.W / 2, j.H / 2, 'GRILLE REPOSÉE', C.accent, 18)
+    j.son.niveau()
   },
 
   maj(j, dt) {
@@ -47,11 +100,12 @@ export default {
   },
 
   dessine(j, ctx) {
+    const { cols, x0, y0 } = j.e
     ctx.textAlign = 'center'
     for (let i = 0; i < j.e.cases.length; i++) {
       const c = j.e.cases[i]
-      const x = X0 + (i % COLS) * CASE
-      const y = Y0 + Math.floor(i / COLS) * CASE
+      const x = x0 + (i % cols) * CASE
+      const y = y0 + Math.floor(i / cols) * CASE
 
       if (!c.vu) {
         bloc(ctx, x + 1, y + 1, CASE - 2, CASE - 2, ton(C.panneau, 0.22), 3)
@@ -81,12 +135,24 @@ export default {
       else if (c.voisins) texte(ctx, c.voisins, x + CASE / 2, y + CASE / 2, 20, TEINTE[c.voisins - 1], 700)
     }
 
+    // Debout les quatre informations s'empilent en deux lignes ; couché, la
+    // hauteur qu'elles prendraient est un rang de cases, alors elles se rangent
+    // sur une seule ligne, le rappel de l'appui long au milieu.
     ctx.textAlign = 'left'
-    texte(ctx, `GRILLE ${j.e.grille}`, 12, 76, 16, C.accent, 700)
-    texte(ctx, `${j.e.mines - j.e.marque} mines`, 12, 102, 14, C.faible, 700)
-    ctx.textAlign = 'right'
-    texte(ctx, `${Math.floor(j.t)} s`, j.W - 12, 76, 14, C.faible, 700)
-    texte(ctx, 'appui long = drapeau', j.W - 12, 102, 13, C.faible, 700)
+    if (j.paysage) {
+      texte(ctx, `GRILLE ${j.e.grille}`, 12, 70, 16, C.accent, 700)
+      texte(ctx, `${j.e.mines - j.e.marque} mines`, 122, 70, 14, C.faible, 700)
+      ctx.textAlign = 'center'
+      texte(ctx, 'appui long = drapeau', j.W / 2, 70, 13, C.faible, 700)
+      ctx.textAlign = 'right'
+      texte(ctx, `${Math.floor(j.t)} s`, j.W - 12, 70, 14, C.faible, 700)
+    } else {
+      texte(ctx, `GRILLE ${j.e.grille}`, 12, 76, 16, C.accent, 700)
+      texte(ctx, `${j.e.mines - j.e.marque} mines`, 12, 102, 14, C.faible, 700)
+      ctx.textAlign = 'right'
+      texte(ctx, `${Math.floor(j.t)} s`, j.W - 12, 76, 14, C.faible, 700)
+      texte(ctx, 'appui long = drapeau', j.W - 12, 102, 13, C.faible, 700)
+    }
     ctx.textAlign = 'center'
 
     if (j.e.fanfare > 0) {
@@ -99,7 +165,7 @@ export default {
 
   appui(j, p) {
     if (j.e.fanfare > 0) return
-    const i = index(p)
+    const i = index(j, p)
     if (i === null) return
     j.e.appui = { i, duree: 0, fait: false }
   },
@@ -115,8 +181,15 @@ export default {
 const TEINTE = [C.cyan, C.vert, C.accent, C.violet, C.rouge, C.rouge, C.rouge, C.rouge]
 
 function pose(j) {
-  j.e.mines = MINES_DEPART + (j.e.grille - 1) * MINES_PAS
-  j.e.cases = Array.from({ length: COLS * RANGS }, () => ({
+  Object.assign(j.e, dispo(j))
+  const n = j.e.cols * j.e.rangs
+  // Ce qui fait la difficulté d'une grille, c'est la densité de mines, jamais
+  // leur nombre : à quatorze mines fixes, les 112 cases couchées seraient plus
+  // faciles que les 108 debout, et la série entière glisserait d'un cran. On
+  // garde donc les mines par case. Debout le rapport vaut un tout rond, et la
+  // suite reste 14, 17, 20…
+  j.e.mines = Math.round(((MINES_DEPART + (j.e.grille - 1) * MINES_PAS) * n) / REFERENCE)
+  j.e.cases = Array.from({ length: n }, () => ({
     mine: false,
     vu: false,
     drapeau: false,
@@ -128,24 +201,25 @@ function pose(j) {
   j.e.appui = null
 }
 
-function index(p) {
-  const c = Math.floor((p.x - X0) / CASE)
-  const r = Math.floor((p.y - Y0) / CASE)
-  if (c < 0 || c >= COLS || r < 0 || r >= RANGS) return null
-  return r * COLS + c
+function index(j, p) {
+  const c = Math.floor((p.x - j.e.x0) / CASE)
+  const r = Math.floor((p.y - j.e.y0) / CASE)
+  if (c < 0 || c >= j.e.cols || r < 0 || r >= j.e.rangs) return null
+  return r * j.e.cols + c
 }
 
-function voisins(i) {
-  const c = i % COLS
-  const r = Math.floor(i / COLS)
+function voisins(j, i) {
+  const cols = j.e.cols
+  const c = i % cols
+  const r = Math.floor(i / cols)
   const out = []
   for (let dc = -1; dc <= 1; dc++) {
     for (let dr = -1; dr <= 1; dr++) {
       if (!dc && !dr) continue
       const nc = c + dc
       const nr = r + dr
-      if (nc < 0 || nc >= COLS || nr < 0 || nr >= RANGS) continue
-      out.push(nr * COLS + nc)
+      if (nc < 0 || nc >= cols || nr < 0 || nr >= j.e.rangs) continue
+      out.push(nr * cols + nc)
     }
   }
   return out
@@ -153,7 +227,7 @@ function voisins(i) {
 
 /** Les mines arrivent après le premier creusement : on ne perd jamais au premier coup. */
 function seme(j, epargne) {
-  const interdit = new Set([epargne, ...voisins(epargne)])
+  const interdit = new Set([epargne, ...voisins(j, epargne)])
   let reste = j.e.mines
   while (reste > 0) {
     const i = Math.floor(Math.random() * j.e.cases.length)
@@ -162,7 +236,7 @@ function seme(j, epargne) {
     reste--
   }
   for (let i = 0; i < j.e.cases.length; i++) {
-    j.e.cases[i].voisins = voisins(i).filter((k) => j.e.cases[k].mine).length
+    j.e.cases[i].voisins = voisins(j, i).filter((k) => j.e.cases[k].mine).length
   }
   j.e.place = true
 }
@@ -180,11 +254,12 @@ function creuse(j, i) {
   if (c.vu || c.drapeau) return
   if (!j.e.place) seme(j, i)
 
+  const { cols, x0, y0 } = j.e
   if (c.mine) {
     for (const k of j.e.cases) if (k.mine) k.vu = true
     j.son.rate()
     j.fx.secoue(10)
-    j.fx.eclat(X0 + (i % COLS) * CASE + CASE / 2, Y0 + Math.floor(i / COLS) * CASE + CASE / 2, C.rouge, {
+    j.fx.eclat(x0 + (i % cols) * CASE + CASE / 2, y0 + Math.floor(i / cols) * CASE + CASE / 2, C.rouge, {
       n: 22,
       vitesse: 220,
     })
@@ -192,7 +267,9 @@ function creuse(j, i) {
   }
 
   // Propagation en largeur : la profondeur donne le retard d'ouverture, donc
-  // la vague se voit partir du doigt.
+  // la vague se voit partir du doigt. Le retard est par case et une case fait
+  // 38 px dans les deux gabarits — la vague traverse donc l'écran à la même
+  // vitesse à l'œil, et il n'y a rien à corriger de ce côté.
   let front = [i]
   let profondeur = 0
   let ouvertes = 0
@@ -204,7 +281,7 @@ function creuse(j, i) {
       cc.vu = true
       cc.ouvert = j.t + profondeur * 0.035
       ouvertes++
-      if (cc.voisins === 0) suivant.push(...voisins(k))
+      if (cc.voisins === 0) suivant.push(...voisins(j, k))
     }
     front = suivant
     profondeur++
@@ -216,8 +293,12 @@ function creuse(j, i) {
 }
 
 function suivante(j) {
-  // Prime de vitesse, puis on remet ça avec trois mines de plus.
-  j.score += Math.max(200, 1200 - Math.floor(j.t) * 4) * j.e.grille
+  // Prime de vitesse, puis on remet ça avec trois mines de plus. La prime se
+  // juge au temps *par case* : une grille plus large en demande plus au regard,
+  // et un chrono absolu la punirait d'être grande alors qu'elle n'est pas plus
+  // dure. Debout le facteur vaut un, donc la prime est au pixel celle d'avant.
+  const n = j.e.cols * j.e.rangs
+  j.score += Math.max(200, 1200 - Math.round((Math.floor(j.t) * 4 * REFERENCE) / n)) * j.e.grille
   j.e.grille++
   j.son.record()
   j.fx.eclat(j.W / 2, j.H / 2, C.accent, { n: 34, vitesse: 250 })

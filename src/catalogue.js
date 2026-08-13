@@ -32,6 +32,7 @@ import taquin from './moyen/taquin.js'
 import donjon from './long/donjon.js'
 import usine from './long/usine/index.js'
 import expedition from './long/expedition.js'
+import breche from './long/breche/index.js'
 
 import front from './massif/front.js'
 
@@ -80,7 +81,7 @@ export const CATEGORIES = [
     duree: '20 minutes à 10 heures',
     detail: 'ça continue quand on ferme',
     couleur: C.violet,
-    jeux: [donjon, usine, expedition],
+    jeux: [donjon, usine, expedition, breche],
   },
   {
     id: 'massif',

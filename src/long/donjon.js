@@ -1,5 +1,5 @@
 import { C, ton } from '../palette.js'
-import { texte, rect, bloc, lueur } from '../dessin.js'
+import { texte, rect, bloc, lueur, PX } from '../dessin.js'
 
 const COLS = 11
 const RANGS = 13
@@ -7,6 +7,76 @@ const CASE = 32
 const X0 = 4
 const Y0 = 132
 const VUE = 4 // rayon de lumière autour du personnage
+
+/** Le plus grand entier qui fasse tenir treize rangs sous un bandeau, couché. */
+const CASE_L = 22
+
+/**
+ * Où se pose la carte, et tout ce qui l'entoure.
+ *
+ * Debout, ce sont les constantes d'origine au pixel près : la grille en haut à
+ * gauche, la vie collée sous le bandeau, deux lignes de journal tout en bas.
+ * Couché, la carte passe à gauche et le reste devient une colonne à droite —
+ * barres, étage, inventaire, et **les six lignes** que `dit()` gardait déjà
+ * sans jamais avoir la place de les montrer.
+ *
+ * Le donjon garde ses 11 × 13 cases dans les deux sens. `carte` et `memoire`
+ * sont indexées dessus, et l'étage sauvegardé se relit avec les mêmes index :
+ * tourner l'appareil en pleine descente ne peut donc rien rendre incohérent.
+ * Seule la case rétrécit — et avec elle tout ce qui se dessine dedans, via
+ * `ech()`. Rien n'est mis en cache, il n'y a donc pas de `redim` : chaque image
+ * et chaque appui relisent la même disposition.
+ *
+ * C'est aussi ce qui dispense de tout re-réglage. Un donjon se joue au tour,
+ * pas à la seconde : le nombre de pas pour traverser un étage, le nombre de
+ * bêtes, la portée de l'archer et le rayon de vue sont comptés en cases, et
+ * aucune case n'a été ajoutée ni retirée. Seule la cible du doigt demandait
+ * une correction, et elle est faite dans `appui`.
+ */
+function dispo(j) {
+  if (!j.paysage) {
+    return {
+      taille: CASE,
+      x: X0,
+      y: Y0,
+      // Debout, marcher se commande de n'importe où : l'écran entier est la
+      // manette, et c'est ce qui rend le jeu jouable d'une main.
+      zone: { x: 0, y: 0, w: j.W, h: j.H },
+      panneau: { x: 16, w: j.W - 32 },
+      bandeau: { pv: 64, barre: 76, xp: 92, bas: 106, sac: { x: j.W - 16, y: 106, align: 'right', w: 250 } },
+      journal: { x: 16, y: j.H - 40, pas: 18, n: 2, w: 328 },
+      tresor: { x: j.W / 2, y: 300 },
+    }
+  }
+  const cote = CASE_L
+  const x = 12
+  const y = 64
+  const bord = x + COLS * cote + x // la frontière entre ce qu'on foule et ce qu'on lit
+  const col = bord + 12
+  const large = j.W - col - 16
+  return {
+    taille: cote,
+    x,
+    y,
+    zone: { x: 0, y: 0, w: bord, h: j.H },
+    panneau: { x: col, w: large },
+    bandeau: { pv: 72, barre: 84, xp: 102, bas: 118, sac: { x: col, y: 138, align: 'left', w: large } },
+    journal: { x: col, y: 180, pas: 26, n: 6, w: large },
+    tresor: { x: x + (COLS * cote) / 2, y: y + (RANGS * cote) / 2 },
+  }
+}
+
+/**
+ * Les tailles du dessin sont données pour la case debout, de 32 pixels. Couché,
+ * tout ce qui vit dans une case — le point de sol, la marge de l'escalier, la
+ * barre de blessure, les lettres — suit la même réduction, sinon un gobelin de
+ * 22 pixels porterait une lettre de 22 pixels.
+ */
+const ech = (g, v) => Math.round((v * g.taille) / CASE)
+
+const centreX = (g, c) => g.x + c * g.taille + g.taille / 2
+const centreY = (g, r) => g.y + r * g.taille + g.taille / 2
+const dans = (p, z) => p.x >= z.x && p.x <= z.x + z.w && p.y >= z.y && p.y <= z.y + z.h
 
 /**
  * Chaque bête a une manière d'être pénible qui lui est propre. C'est ça qui
@@ -42,6 +112,12 @@ export default {
   unite: 'étages',
   ciel: C.violet,
   persistant: true,
+  // Une carte plus un journal : le genre demande la grille à gauche et le texte
+  // à droite. Debout, le rayon de vue ne remplit jamais que 9 × 9 cases — les
+  // quatre rangs de plus ne sont que du noir — pendant que six lignes de
+  // journal se serrent en deux et que l'inventaire s'écrase sous le bandeau.
+  paysage: true,
+  confort: 'paysage',
 
   finTitre: () => ({ texte: 'MORT', couleur: C.rouge }),
 
@@ -66,6 +142,9 @@ export default {
 
   dessine(j, ctx) {
     const h = j.e.h
+    const g = dispo(j)
+    const cote = g.taille
+    const relief = Math.max(2, ech(g, 3))
 
     for (let r = 0; r < RANGS; r++) {
       for (let c = 0; c < COLS; c++) {
@@ -75,16 +154,18 @@ export default {
         if (!eclaire && !j.e.memoire[i]) continue
         if (eclaire) j.e.memoire[i] = true
 
-        const x = X0 + c * CASE
-        const y = Y0 + r * CASE
+        const x = g.x + c * cote
+        const y = g.y + r * cote
         const t = j.e.carte[i]
-        if (t === '#') bloc(ctx, x, y, CASE, CASE, eclaire ? C.bord : ton(C.panneau, -0.3), 3)
+        if (t === '#') bloc(ctx, x, y, cote, cote, eclaire ? C.bord : ton(C.panneau, -0.3), relief)
         else {
-          rect(ctx, x + 14, y + 14, 3, 3, eclaire ? C.faible : C.panneau)
+          const point = ech(g, 14)
+          rect(ctx, x + point, y + point, ech(g, 3), ech(g, 3), eclaire ? C.faible : C.panneau)
           if (t === '>') {
-            if (eclaire) lueur(ctx, x + 6, y + 6, CASE - 12, CASE - 12, C.accent, 3)
-            bloc(ctx, x + 6, y + 6, CASE - 12, CASE - 12, eclaire ? C.accent : C.panneau, 2)
-            texte(ctx, '>', x + CASE / 2, y + CASE / 2, 18, C.fond, 700)
+            const m = ech(g, 6)
+            if (eclaire) lueur(ctx, x + m, y + m, cote - m * 2, cote - m * 2, C.accent, 3)
+            bloc(ctx, x + m, y + m, cote - m * 2, cote - m * 2, eclaire ? C.accent : C.panneau, Math.max(2, ech(g, 2)))
+            texte(ctx, '>', x + cote / 2, y + cote / 2, ech(g, 18), C.fond, 700)
           }
         }
       }
@@ -93,62 +174,97 @@ export default {
     for (const o of j.e.objets) {
       if (!connu(j, o)) continue
       const d = OBJETS[o.type]
-      texte(ctx, d.l, X0 + o.c * CASE + CASE / 2, Y0 + o.r * CASE + CASE / 2, 20, d.couleur, 700)
+      texte(ctx, d.l, centreX(g, o.c), centreY(g, o.r), ech(g, 20), d.couleur, 700)
     }
 
     for (const m of j.e.monstres) {
       if (!visible(j, m)) continue
       const t = BESTIAIRE[m.type]
-      const x = X0 + m.c * CASE
-      const y = Y0 + m.r * CASE
+      const x = g.x + m.c * cote
+      const y = g.y + m.r * cote
       // Une bête entamée porte sa blessure : on choisit sur quoi s'acharner.
       if (m.pv < m.pvMax) {
-        rect(ctx, x + 4, y + CASE - 6, (CASE - 8) * (m.pv / m.pvMax), 3, C.rouge)
+        const bord = ech(g, 4)
+        rect(ctx, x + bord, y + cote - ech(g, 6), (cote - ech(g, 8)) * (m.pv / m.pvMax), ech(g, 3), C.rouge)
       }
-      texte(ctx, t.l, x + CASE / 2, y + CASE / 2 - 2, 22, t.couleur, 700)
+      texte(ctx, t.l, x + cote / 2, y + cote / 2 - ech(g, 2), ech(g, 22), t.couleur, 700)
     }
 
-    lueur(ctx, X0 + h.c * CASE + 7, Y0 + h.r * CASE + 7, CASE - 14, CASE - 14, C.accent, 3)
-    bloc(ctx, X0 + h.c * CASE + 7, Y0 + h.r * CASE + 7, CASE - 14, CASE - 14, C.accent, 3)
+    const moi = ech(g, 7)
+    const x = g.x + h.c * cote + moi
+    const y = g.y + h.r * cote + moi
+    lueur(ctx, x, y, cote - moi * 2, cote - moi * 2, C.accent, 3)
+    bloc(ctx, x, y, cote - moi * 2, cote - moi * 2, C.accent, relief)
 
-    entete(j, ctx)
-    ctx.textAlign = 'left'
-    j.e.lignes.slice(-2).forEach((l, i) => {
-      texte(ctx, l, 16, j.H - 40 + i * 18, 13, i === 1 ? C.texte : C.faible, 700, 328)
-    })
-    ctx.textAlign = 'center'
+    if (j.paysage) {
+      // La règle verticale dit aussi où s'arrête la manette : à gauche on
+      // marche, à droite on lit.
+      rect(ctx, g.zone.w, g.y, PX, RANGS * cote, C.bord)
+      rect(ctx, g.panneau.x, g.journal.y - 22, g.panneau.w, PX, C.bord)
+    }
+
+    entete(j, ctx, g)
+    journal(j, ctx, g)
   },
 
   appui(j, p) {
+    const g = dispo(j)
+    if (!dans(p, g.zone)) return
     const h = j.e.h
-    const dx = p.x - (X0 + h.c * CASE + CASE / 2)
-    const dy = p.y - (Y0 + h.r * CASE + CASE / 2)
+    const dx = p.x - centreX(g, h.c)
+    const dy = p.y - centreY(g, h.r)
     // Appuyer sur soi-même, c'est attendre : parfois le meilleur coup est de
-    // laisser l'autre venir à portée.
-    if (Math.abs(dx) < CASE / 2 && Math.abs(dy) < CASE / 2) return tour(j, { c: 0, r: 0 })
+    // laisser l'autre venir à portée. Cette cible-là garde ses 32 pixels de
+    // côté même quand la case en fait 22 : c'est un pouce qui vise, et un pouce
+    // ne rétrécit pas quand l'écran tourne.
+    const attente = Math.max(g.taille, CASE) / 2
+    if (Math.abs(dx) < attente && Math.abs(dy) < attente) return tour(j, { c: 0, r: 0 })
     const pas = Math.abs(dx) > Math.abs(dy) ? { c: Math.sign(dx), r: 0 } : { c: 0, r: Math.sign(dy) }
     tour(j, pas)
   },
 }
 
-function entete(j, ctx) {
+function entete(j, ctx, g) {
   const h = j.e.h
+  const b = g.bandeau
+  const { x, w } = g.panneau
   const part = Math.max(0, h.pv / h.pvMax)
-  rect(ctx, 16, 76, 328, 14, C.panneau)
-  rect(ctx, 16, 76, 328 * part, 14, part > 0.35 ? C.vert : C.rouge)
+  rect(ctx, x, b.barre, w, 14, C.panneau)
+  rect(ctx, x, b.barre, w * part, 14, part > 0.35 ? C.vert : C.rouge)
 
   ctx.textAlign = 'left'
-  texte(ctx, `${Math.max(0, h.pv)}/${h.pvMax} PV`, 16, 64, 13, C.texte, 700)
-  texte(ctx, `étage ${h.etage}`, 16, 106, 13, C.accent, 700)
+  texte(ctx, `${Math.max(0, h.pv)}/${h.pvMax} PV`, x, b.pv, 13, C.texte, 700)
+  texte(ctx, `étage ${h.etage}`, x, b.bas, 13, C.accent, 700)
   ctx.textAlign = 'right'
-  texte(ctx, `niv ${h.niveau}`, j.W - 16, 64, 13, C.faible, 700)
-  texte(ctx, `épée +${h.arme} · plaques +${h.armure} · ${h.or} or`, j.W - 16, 106, 12, C.faible, 700, 250)
+  texte(ctx, `niv ${h.niveau}`, x + w, b.pv, 13, C.faible, 700)
+  // Debout, l'inventaire se serre à droite de l'étage faute de place ; couché,
+  // la colonne est haute et il descend d'une ligne, en clair.
+  ctx.textAlign = b.sac.align
+  texte(ctx, `épée +${h.arme} · plaques +${h.armure} · ${h.or} or`, b.sac.x, b.sac.y, 12, C.faible, 700, b.sac.w)
   ctx.textAlign = 'center'
 
   // Barre d'expérience, fine, juste sous les points de vie.
   const seuil = h.niveau * 20
-  rect(ctx, 16, 92, 328, 3, C.panneau)
-  rect(ctx, 16, 92, 328 * Math.min(1, h.xp / seuil), 3, C.cyan)
+  rect(ctx, x, b.xp, w, 3, C.panneau)
+  rect(ctx, x, b.xp, w * Math.min(1, h.xp / seuil), 3, C.cyan)
+}
+
+/**
+ * Le journal. `dit()` en garde six depuis toujours ; debout, le bas de l'écran
+ * n'en montrait que deux. La colonne couchée les tient toutes, et les plus
+ * anciennes s'éteignent au lieu de disparaître d'un coup.
+ */
+function journal(j, ctx, g) {
+  const lignes = j.e.lignes.slice(-g.journal.n)
+  ctx.textAlign = 'left'
+  lignes.forEach((l, i) => {
+    // Au tout premier tour il n'y a qu'une ligne, et rien à quoi la comparer :
+    // elle reste éteinte comme le reste du passé.
+    const vive = lignes.length > 1 && i === lignes.length - 1
+    const couleur = vive ? C.texte : i >= lignes.length - 2 ? C.faible : ton(C.faible, -0.4)
+    texte(ctx, l, g.journal.x, g.journal.y + i * g.journal.pas, 13, couleur, 700, g.journal.w)
+  })
+  ctx.textAlign = 'center'
 }
 
 // --- Génération --------------------------------------------------------------
@@ -301,10 +417,11 @@ function tour(j, pas) {
 
 function frappe(j, m) {
   const h = j.e.h
+  const g = dispo(j)
   const degats = h.force + h.arme * 2 + Math.floor(Math.random() * 3)
   m.pv -= degats
   j.son.casse(4)
-  j.fx.eclat(X0 + m.c * CASE + CASE / 2, Y0 + m.r * CASE + CASE / 2, C.rouge, { n: 8, vitesse: 120 })
+  j.fx.eclat(centreX(g, m.c), centreY(g, m.r), C.rouge, { n: 8, vitesse: 120 })
   if (m.pv > 0) {
     dit(j, `tu frappes le ${BESTIAIRE[m.type].nom} (${degats})`)
     return
@@ -316,7 +433,7 @@ function frappe(j, m) {
   if (BESTIAIRE[m.type].boss) {
     h.or += 50 + j.e.h.etage * 10
     dit(j, 'son trésor est à toi')
-    j.fx.eclat(j.W / 2, 300, C.accent, { n: 30, vitesse: 240 })
+    j.fx.eclat(g.tresor.x, g.tresor.y, C.accent, { n: 30, vitesse: 240 })
   }
   monte(j)
 }
@@ -332,7 +449,8 @@ function monte(j) {
   h.force += 2
   dit(j, `niveau ${h.niveau} — tu te sens plus solide`)
   j.son.niveau()
-  j.fx.eclat(X0 + h.c * CASE + CASE / 2, Y0 + h.r * CASE + CASE / 2, C.accent, { n: 18, vitesse: 160 })
+  const g = dispo(j)
+  j.fx.eclat(centreX(g, h.c), centreY(g, h.r), C.accent, { n: 18, vitesse: 160 })
 }
 
 function ramasse(j) {
@@ -350,7 +468,8 @@ function ramasse(j) {
 
   dit(j, OBJETS[o.type].dit)
   j.son.ramasse()
-  j.fx.eclat(X0 + h.c * CASE + CASE / 2, Y0 + h.r * CASE + CASE / 2, OBJETS[o.type].couleur, { n: 10, vitesse: 120 })
+  const g = dispo(j)
+  j.fx.eclat(centreX(g, h.c), centreY(g, h.r), OBJETS[o.type].couleur, { n: 10, vitesse: 120 })
 }
 
 function attaque(j, m, portee) {
