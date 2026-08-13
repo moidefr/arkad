@@ -21,7 +21,8 @@ import {
   accord,
   frequence,
 } from '../src/musique/composition.js'
-import { BRECHE, JEUX, TOUTES, PAR_ID, pourMonde, pourJeu } from '../src/musique/table.js'
+import { BRECHE, RUEE, JEUX, TOUTES, PAR_ID, pourMonde, pourJeu } from '../src/musique/table.js'
+import { NIVEAUX } from '../src/long/ruee/donnees.js'
 import { MONDES } from '../src/long/breche/donnees.js'
 import { TOUS } from '../src/catalogue.js'
 import { MODES } from '../src/son.js'
@@ -30,10 +31,17 @@ const MELODIQUES = ['basse', 'nappe', 'accords', 'arpege', 'chant']
 
 // --- La table -----------------------------------------------------------------
 
-test('cinquante bandes pour BRÈCHE, une par jeu pour le reste', () => {
+test('cinquante bandes pour BRÈCHE, cinq pour RUÉE, une par jeu pour le reste', () => {
   assert.equal(BRECHE.length, 50)
-  assert.equal(JEUX.length, TOUS.length - 1, 'un jeu de la borne n’a pas sa bande (BRÈCHE a les siennes)')
-  assert.equal(TOUTES.length, BRECHE.length + JEUX.length)
+  assert.equal(RUEE.length, NIVEAUX.length, 'chaque niveau de RUÉE a sa bande, et le niveau est calé dessus')
+  // RUÉE a ses cinq bandes de niveau *et* une bande de menu dans JEUX ; BRÈCHE
+  // est le seul jeu à ne pas en avoir, ses cinquante lui suffisent.
+  assert.equal(JEUX.length, TOUS.length - 1, 'un jeu de la borne n’a pas sa bande')
+  assert.equal(TOUTES.length, BRECHE.length + RUEE.length + JEUX.length)
+})
+
+test('chaque niveau de RUÉE pointe sur une bande qui existe', () => {
+  for (const n of NIVEAUX) assert.ok(PAR_ID[n.bande], `${n.id} demande la bande ${n.bande}, qui n’existe pas`)
 })
 
 test('chaque fiche est complète et cohérente', () => {
@@ -45,7 +53,9 @@ test('chaque fiche est complète et cohérente', () => {
     assert.ok(!noms.has(f.nom), 'deux bandes portent le même nom : ' + f.nom)
     noms.add(f.nom)
     assert.ok(f.nom.length >= 3, f.id)
-    assert.ok(f.bpm >= 60 && f.bpm <= 160, `${f.id} : ${f.bpm} battements`)
+    // Le plafond est monté de 160 à 180 en ajoutant RUÉE : le dernier niveau
+    // se court à 172, et c'est le tempo qui donne son allure au niveau.
+    assert.ok(f.bpm >= 60 && f.bpm <= 180, `${f.id} : ${f.bpm} battements`)
     assert.ok(GAMMES[f.gamme], `${f.id} : gamme inconnue ${f.gamme}`)
     assert.ok(AMBIANCES[f.ambiance], `${f.id} : ambiance inconnue ${f.ambiance}`)
     assert.ok(f.tonique >= 0 && f.tonique < 12, f.id)

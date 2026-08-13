@@ -74,6 +74,18 @@ export function fauxCtx() {
     },
     scale() {},
     setTransform() {},
+    /**
+     * La rotation est enregistrée mais **pas appliquée** aux coordonnées.
+     *
+     * C'est un choix, pas un oubli : les tests d'écran vérifient que rien ne
+     * sort du cadre ni ne passe sous le bandeau, et le seul objet tourné de la
+     * borne est le cube de RUÉE, large de 22 px et jamais près d'un bord. Faire
+     * tourner pour de vrai demanderait une matrice complète pour rendre des
+     * bornes 3 px plus larges sur un objet, ce que personne ne teste.
+     */
+    rotate(a) {
+      this.angle = a
+    },
     beginPath() {
       chemin = null
     },

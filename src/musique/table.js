@@ -122,9 +122,24 @@ export const JEUX = [
   t('usine', 'LA GRANDE MACHINE', 108, 'dorien', 6, 'mecanique', 0x808899),
   t('expedition', 'NEUF CENTS KILOMÈTRES', 70, 'mineur', 11, 'calme', 0x9099aa),
   t('front', 'LA COMPAGNIE', 96, 'harmonique', 4, 'martial', 0xa0aabb),
+  t('ruee', 'DROIT DEVANT', 150, 'mineur', 9, 'course', 0xb0bbcc),
 ]
 
-export const TOUTES = [...BRECHE, ...JEUX]
+/**
+ * Les cinq de RUÉE, une par niveau. Elles sont plus rapides que tout le reste
+ * de la borne parce que le niveau est **calé sur elles** : c'est le tempo qui
+ * donne l'allure de défilement, donc changer la bande d'un niveau, c'est
+ * changer le niveau.
+ */
+export const RUEE = [
+  t('ruee1', 'PREMIÈRE RUÉE', 140, 'mineur', 4, 'course', 0x1155aa),
+  t('ruee2', 'LA FERRAILLE', 152, 'phrygien', 9, 'mecanique', 0x2266bb),
+  t('ruee3', 'L’ENVOL', 146, 'dorien', 2, 'course', 0x3377cc),
+  t('ruee4', 'LES ORBES', 158, 'mixolydien', 7, 'fete', 0x4488dd),
+  t('ruee5', 'LA DERNIÈRE', 172, 'harmonique', 0, 'brasier', 0x5599ee),
+]
+
+export const TOUTES = [...BRECHE, ...RUEE, ...JEUX]
 export const PAR_ID = Object.fromEntries(TOUTES.map((x) => [x.id, x]))
 
 /**
