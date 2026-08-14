@@ -59,7 +59,7 @@ const visible = (j, p) => VC.dansChamp(champDe(j), p)
 function jusquAuFeu(graine = 5) {
   const j = fauxJeu(front, { graine, neuve: true })
   tape(j, 'nouvelle')
-  assert.equal(j.e.vue, 'camp')
+  assert.equal(j.e.vue, 'village')
   tape(j, 'campagne')
   tape(j, 'offre', (z) => z.k === 0)
   tape(j, 'engager')
@@ -69,23 +69,23 @@ function jusquAuFeu(graine = 5) {
 
 // --- L'enchaînement des écrans ---------------------------------------------------
 
-test('on lève une compagnie et on arrive au camp en un appui', () => {
+test('on lève une compagnie et on arrive au village en un appui', () => {
   const j = fauxJeu(front, { graine: 1, neuve: true })
   assert.equal(j.e.vue, 'titre')
   tape(j, 'nouvelle')
-  assert.equal(j.e.vue, 'camp')
+  assert.equal(j.e.vue, 'village')
   assert.ok(j.e.c.troupes.length === 3)
   assert.ok(j.e.c.or > 0)
 })
 
-test('chaque écran du camp s’ouvre et se referme', () => {
+test('chaque écran du village s’ouvre et se referme', () => {
   const j = fauxJeu(front, { graine: 2, neuve: true })
   tape(j, 'nouvelle')
   for (const ecran of ['campagne', 'caserne', 'uniques', 'compagnie', 'ville']) {
     tape(j, ecran)
     assert.equal(j.e.vue, ecran, `${ecran} ne s’ouvre pas`)
     tape(j, 'retour')
-    assert.equal(j.e.vue, 'camp', `${ecran} ne se referme pas`)
+    assert.equal(j.e.vue, 'village', `${ecran} ne se referme pas`)
   }
 })
 
@@ -103,7 +103,7 @@ test('la ville ouvre le détail d’un bâtiment, qui se construit et se referme
   tape(j, 'retour')
   assert.equal(j.e.vue, 'ville', 'le détail ne revient pas à la liste des bâtiments')
   tape(j, 'retour')
-  assert.equal(j.e.vue, 'camp', 'la liste des bâtiments ne revient pas au camp')
+  assert.equal(j.e.vue, 'village', 'la liste des bâtiments ne revient pas au village')
 })
 
 test('recruter à la caserne coûte de l’or et ajoute vraiment une troupe', () => {
@@ -445,7 +445,7 @@ test('une bataille se joue jusqu’au bilan, rien qu’en passant les tours', ()
   assert.equal(j.e.vue, 'bilan', 'la bataille ne se termine pas')
   assert.ok(j.e.rapport, 'aucun rapport')
   tape(j, 'suite')
-  assert.ok(j.e.vue === 'camp' || j.fini, 'on ne revient pas au camp')
+  assert.ok(j.e.vue === 'village' || j.fini, 'on ne revient pas au village')
 })
 
 test('la partie se sauvegarde et se relit en pleine bataille', () => {
@@ -482,7 +482,7 @@ function tousLesEcrans() {
   j.e.c.or = 99999
   j.e.c.niveau = 8
   Cie.rafraichit(j.e.c)
-  for (const vue of ['camp', 'campagne', 'caserne', 'uniques', 'compagnie']) {
+  for (const vue of ['campagne', 'caserne', 'uniques', 'compagnie']) {
     j.e.vue = vue
     if (vue === 'campagne') j.e.choix = 0
     if (vue === 'compagnie') j.e.selTroupe = j.e.c.troupes[0].id

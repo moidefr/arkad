@@ -33,6 +33,7 @@ import * as VC from './front/vue/champ.js'
 import * as VB from './front/vue/bataille.js'
 import * as VM from './front/vue/menus.js'
 import * as VD from './front/vue/dispo.js'
+import * as VV from './front/vue/village.js'
 import { bascule } from './front/vue/aptitudes-ui.js'
 
 const CLE_META = 'front.meta'
@@ -93,7 +94,7 @@ export default {
       if (j.e.bat) {
         j.e.vueChamp = VC.nouvelleVue(VD.bataille(j).champ, j.e.bat)
         j.e.vue = 'bataille'
-      } else j.e.vue = 'camp'
+      } else j.e.vue = 'village'
     } else {
       j.e.c = null
       j.e.vue = 'titre'
@@ -165,7 +166,7 @@ export default {
     if (e.vue === 'bataille' && e.bat) return dessineBataille(j, ctx)
 
     if (e.vue === 'titre') e.zones = VM.titre(ctx, j, !!e.c, e.meta)
-    else if (e.vue === 'camp') e.zones = VM.camp(ctx, j, e.c)
+    else if (e.vue === 'village') e.zones = VV.village(ctx, j, e.c)
     else if (e.vue === 'campagne') e.zones = VM.campagne(ctx, j, e.c, e.choix)
     else if (e.vue === 'caserne') e.zones = defilante(e, VM.caserne(ctx, j, e.c, e.defile))
     else if (e.vue === 'uniques') e.zones = defilante(e, VM.uniques(ctx, j, e.c, e.defile))
@@ -238,7 +239,8 @@ function ficheOuRetour(j, ctx) {
   const u = Cie.trouve(e.c, e.selTroupe)
   if (!u) {
     e.vue = 'compagnie'
-    return { zones: VM.camp(ctx, j, e.c), max: 0, rect: null }
+    e.selTroupe = null
+    return VM.compagnie(ctx, j, e.c, e.selTroupe, e.defile)
   }
   return VM.fiche(ctx, j, e.c, u, e.defile, e.selEquip, e.aptOuvertes)
 }
@@ -433,22 +435,33 @@ function actions(j, z) {
       e.c = Cie.nouvelle((j.hasard() * 4294967296) >>> 0)
       e.meta.campagnes = (e.meta.campagnes ?? 0) + 1
       ecritMeta(e.meta)
-      e.vue = 'camp'
+      e.vue = 'village'
       j.son.niveau()
       sauve(j)
     },
-    reprendre: () => ((e.vue = 'camp'), j.son.clic()),
+    reprendre: () => ((e.vue = 'village'), j.son.clic()),
 
-    // Camp
+    // Le village
     campagne: () => va(j, 'campagne'),
     caserne: () => va(j, 'caserne'),
     uniques: () => va(j, 'uniques'),
     compagnie: () => va(j, 'compagnie'),
     ville: () => va(j, 'ville'),
-    retour: () => va(j, e.vue === 'fiche' ? 'compagnie' : e.vue === 'batiment' ? 'ville' : 'camp'),
+    retour: () => {
+      if (e.vue === 'fiche') return va(j, 'compagnie')
+      // Le détail d'un bâtiment se rejoint depuis deux endroits — un
+      // emplacement du village qui y va tout droit, ou la liste des neuf
+      // bâtiments — et RETOUR doit revenir par où on est vraiment venu.
+      if (e.vue === 'batiment') return va(j, e.batimentRetour ?? 'ville')
+      va(j, 'village')
+    },
 
     // La ville et ses bâtiments
-    batiment: () => ((e.batimentId = z.id), va(j, 'batiment')),
+    batiment: () => {
+      e.batimentId = z.id
+      e.batimentRetour = e.vue === 'village' ? 'village' : 'ville'
+      va(j, 'batiment')
+    },
     construire: () => (V.construit(c, e.batimentId) ? (j.son.record(), sauve(j)) : j.son.rate()),
     entraine: () => (V.entraine(c, z.id) ? (j.son.record(), sauve(j)) : j.son.rate()),
     achete: () => (Cie.acheteObjet(c, z.id) ? (j.son.record(), sauve(j)) : j.son.rate()),
@@ -529,7 +542,7 @@ function actions(j, z) {
         j.efface()
         return j.perdu()
       }
-      va(j, 'camp')
+      va(j, 'village')
     },
 
     // Bataille

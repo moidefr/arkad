@@ -66,7 +66,9 @@ function tousLesEcrans(format) {
   j.e.c.or = 99999
   j.e.c.niveau = 8
   Cie.rafraichit(j.e.c)
-  for (const vue of ['camp', 'campagne', 'caserne', 'uniques', 'compagnie']) {
+  j.e.vue = 'village'
+  ecrans.push(['village', dessine(j), j.e.zones.slice()])
+  for (const vue of ['campagne', 'caserne', 'uniques', 'compagnie']) {
     j.e.vue = vue
     if (vue === 'campagne') j.e.choix = 0
     if (vue === 'compagnie') j.e.selTroupe = j.e.c.troupes[0].id
@@ -133,14 +135,9 @@ const empreinte = (ctx) =>
  */
 const PORTRAIT = [
   ['titre', 18, 'ec969a079f2d16e6'],
-  // Réétalonné : la caserne enrôle désormais au niveau de la troupe alignée et
-  // non à celui de la compagnie, donc le chiffre porté par les cartes du camp a
-  // changé. Le nombre de traits, lui, est identique — c'est du texte, pas de la
-  // disposition.
-  // Réétalonné : le lot 3 ajoute un cinquième bouton au camp, vers les
-  // bâtiments — en attendant le village vivant du lot 6, qui remplacera cet
-  // écran entier.
-  ['camp', 70, '6d3df41c9de4d3e5'],
+  // Neuf au lot 6 : le camp aux boutons empilés est remplacé par le village
+  // vivant — huit emplacements réactifs, un ciel qui suit l'heure du jour.
+  ['village', 100, '6bfdb08783e68e50'],
   ['campagne', 54, '3b9b04d51ab6a423'],
   // Réétalonné : le lot 2 ajoute dix classes au vivier générique, donc le
   // même tirage à la même graine ne pioche plus les mêmes six cartes à la
@@ -166,7 +163,9 @@ const PORTRAIT = [
   ['bataille/troupe', 408, 'efac87fa29a5f1f7'],
   ['bataille/prévision', 414, '60ac62ce0f8d6e5d'],
   ['bataille/ennemi', 366, '533c94270d6d6930'],
-  ['bilan', 24, '35fd99153039daaf'],
+  // Réétalonné au lot 6 : le bouton du bilan dit désormais AU VILLAGE, plus
+  // « AU CAMP » — même bouton, même nombre de traits, texte différent.
+  ['bilan', 24, '57c4aca6a720fec9'],
 ]
 
 test('le portrait n’a pas bougé d’un pixel', () => {
@@ -189,7 +188,7 @@ test('les rectangles historiques du portrait sont exactement ceux d’avant', ()
   assert.equal(b.px, 8)
   assert.equal(b.pw, 344)
 
-  assert.deepEqual(VD.camp(j).items[1], { x: 20, y: 248, w: 320, h: 58, quoi: 'caserne' })
+  assert.deepEqual(VD.village(j).plots[1], { x: 92, y: 160, w: 84, h: 92 })
   assert.deepEqual(VD.caserne(j).zone, { x: 20, y: 118, w: 320, h: 396 })
   assert.deepEqual(VD.compagnie(j, 2, true).zone, { x: 20, y: 116, w: 320, h: 348 })
   assert.deepEqual(VD.titre(j, true).reprendre, { x: 50, y: 300, w: 260, h: 56, quoi: 'reprendre' })
@@ -530,8 +529,8 @@ for (const format of ['portrait', 'paysage']) {
     const suite = ctx.zones[0]
     for (const o of ops) {
       const p = peint(o)
-      if (!p || o.s === 'AU CAMP') continue
-      assert.ok(p.y + p.h <= suite.y || p.y >= suite.y + suite.h, `« ${o.s} » descend sur le bouton AU CAMP`)
+      if (!p || o.s === 'AU VILLAGE') continue
+      assert.ok(p.y + p.h <= suite.y || p.y >= suite.y + suite.h, `« ${o.s} » descend sur le bouton AU VILLAGE`)
     }
   })
 }
@@ -703,17 +702,17 @@ test('une bataille couchée se joue jusqu’au bilan par le vrai chemin d’appu
   }
   assert.equal(j.e.vue, 'bilan', 'la bataille couchée ne se termine pas')
   tape(j, 'suite')
-  assert.ok(j.e.vue === 'camp' || j.fini)
+  assert.ok(j.e.vue === 'village' || j.fini)
 })
 
-test('couché, tous les écrans du camp s’ouvrent et se referment', () => {
+test('couché, tous les écrans du village s’ouvrent et se referment', () => {
   const j = fauxJeu(front, { graine: 61, neuve: true, format: 'paysage' })
   tape(j, 'nouvelle')
   for (const ecran of ['campagne', 'caserne', 'uniques', 'compagnie']) {
     tape(j, ecran)
     assert.equal(j.e.vue, ecran, `${ecran} ne s’ouvre pas couché`)
     tape(j, 'retour')
-    assert.equal(j.e.vue, 'camp', `${ecran} ne se referme pas couché`)
+    assert.equal(j.e.vue, 'village', `${ecran} ne se referme pas couché`)
   }
 })
 

@@ -1,6 +1,8 @@
 /**
- * Tous les écrans hors bataille : le titre, le camp, la carte des
- * engagements, la caserne, l'état-major, la compagnie, la fiche, le bilan.
+ * Tous les écrans hors bataille : le titre, la carte des engagements, la
+ * caserne, l'état-major, la compagnie, la fiche, le bilan. Le village vivant
+ * lui-même a sa propre vue (`village.js`) — la scène a besoin du temps de
+ * jeu pour bouger, ce qu'aucun autre écran d'ici ne lit.
  *
  * Chaque fonction lit ses rectangles dans `dispo.js` et rend les zones
  * tactiles **au même endroit qu'elle a dessiné**. Une zone n'existe que si
@@ -104,71 +106,6 @@ export function titre(ctx, j, reprise, meta) {
   texte(ctx, 'les batailles s’agrandissent à mesure que la compagnie monte', p2.x, p2.y, 11, C.faible, 700, 330)
   ctx.textAlign = 'left'
   return zones
-}
-
-// --- Le camp ------------------------------------------------------------------------
-
-export function camp(ctx, j, c) {
-  const ch = D.chassis(j)
-  const d = D.camp(j)
-  entete(ctx, ch.entete, 'LE CAMP', `ENGAGEMENT ${c.engagements + 1}`)
-
-  const r = d.resume
-  const droite = r.x + r.w - 10
-  panneau(ctx, r.x, r.y, r.w, r.h)
-  texte(ctx, `NIVEAU ${c.niveau}`, r.x + 10, r.y + 22, 20, C.accent, 700, 150)
-  ctx.textAlign = 'right'
-  texte(ctx, `${c.victoires} victoires · ${c.pertes} perdus`, droite, r.y + 22, 11, C.faible, 700, 160)
-  ctx.textAlign = 'left'
-  const k = c.renom / Cie.seuilRenom(c.niveau)
-  barre(ctx, r.x + 10, r.y + 34, r.w - 20, 7, k, C.accent, C.bord)
-  texte(ctx, `RENOM ${c.renom}/${Cie.seuilRenom(c.niveau)}`, r.x + 10, r.y + 54, 11, C.faible, 700, 140)
-  ctx.textAlign = 'right'
-  texte(
-    ctx,
-    `${Cie.alignees(c).length}/${Cie.places(c.niveau)} EN LIGNE`,
-    droite,
-    r.y + 54,
-    11,
-    Cie.alignees(c).length ? C.vert : C.rouge,
-    700,
-    160,
-  )
-  ctx.textAlign = 'left'
-
-  const construits = V.BATIMENTS.filter((b) => V.niveauBat(c, b.id) > 0).length
-  const libelles = {
-    campagne: { nom: 'PARTIR EN ENGAGEMENT', sous: c.plan?.length ? `${c.plan.length} offres` : '', primaire: true },
-    caserne: { nom: 'CASERNE', sous: `${c.offre?.caserne.length ?? 0} recrues à l’étal` },
-    uniques: { nom: 'ÉTAT-MAJOR', sous: `${c.offre?.uniques.length ?? 0} dossiers`, teinte: C.violet },
-    compagnie: { nom: 'LA COMPAGNIE', sous: `${c.troupes.length} troupes au dépôt`, teinte: C.cyan },
-    ville: { nom: 'BÂTIMENTS', sous: `${construits}/${V.BATIMENTS.length} construits`, teinte: C.accent },
-  }
-  for (const z of d.items) {
-    const it = libelles[z.quoi]
-    bouton(ctx, z, it.nom, { primaire: it.primaire, teinte: it.teinte })
-    ctx.textAlign = 'right'
-    texte(ctx, it.sous, z.x + z.w - 10, z.y + z.h - 12, 10, C.faible, 700, 180)
-    ctx.textAlign = 'left'
-  }
-
-  if (c.dernier) {
-    texte(
-      ctx,
-      `DERNIER : ${c.dernier.gagne ? 'VICTOIRE' : 'REVERS'} · ${c.dernier.titre ?? ''}`,
-      d.dernier.x,
-      d.dernier.y,
-      11,
-      c.dernier.gagne ? C.vert : C.rouge,
-      700,
-      ch.L,
-    )
-  }
-  if (!Cie.alignees(c).length)
-    texte(ctx, 'AUCUNE TROUPE EN LIGNE — VOIR LA COMPAGNIE', d.alerte.x, d.alerte.y, 11, C.rouge, 700, ch.L)
-
-  bourse(ctx, c, D.bourse(j))
-  return d.items
 }
 
 // --- Les bâtiments ----------------------------------------------------------------------
@@ -863,7 +800,7 @@ export function bilan(ctx, j, c, r) {
     })
 
   // Debout les trois listes se suivent dans la même colonne ; couché chacune
-  // tient la sienne, ce qui les empêche de descendre sur le bouton AU CAMP.
+  // tient la sienne, ce qui les empêche de descendre sur le bouton AU VILLAGE.
   // Le curseur se range donc par **abscisse** et non par rang de section :
   // indexé par rang, debout où les trois abscisses sont la même, chaque section
   // repartait du haut et écrivait sur la précédente.
@@ -882,7 +819,7 @@ export function bilan(ctx, j, c, r) {
     curseurs.set(x, y + 8)
   })
 
-  bouton(ctx, d.suite, 'AU CAMP', { primaire: true })
+  bouton(ctx, d.suite, 'AU VILLAGE', { primaire: true })
   return [d.suite]
 }
 

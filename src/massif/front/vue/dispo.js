@@ -110,46 +110,33 @@ export function titre(j, reprise) {
   }
 }
 
-// --- Le camp ----------------------------------------------------------------------------
-
-const QUATRE = ['campagne', 'caserne', 'uniques', 'compagnie']
+// --- Le village vivant --------------------------------------------------------------------
 
 /**
- * Le cinquième bouton, vers les bâtiments, ne rejoint pas la grille des
- * quatre premiers : sa forme (une bande large et basse) est différente, et
- * la ligne le fait tenir sous 360 px de haut couché. C'est un pis-aller —
- * le lot 6 remplace cet écran entier par le village vivant — mais tant
- * qu'il n'existe pas, les bâtiments ont besoin d'une porte.
+ * Le village : un ciel, deux rangées de quatre emplacements, un résumé en
+ * bas. Les emplacements pavent le plein bord à bord (x=0) comme la scène de
+ * l'usine — une scène n'a pas la marge d'un menu. `village.js` associe ces
+ * huit rectangles aux huit entrées de `PLOTS`, dans le même ordre visuel :
+ * rangée du fond d'abord, rangée proche ensuite, gauche à droite.
  */
-export function camp(j) {
+export function village(j) {
   const c = chassis(j)
-  const resume = { x: c.M, y: 100, w: c.L, h: 66 }
-  if (c.large) {
-    // Deux colonnes de deux, rangées resserrées à 46 pour laisser la place à
-    // la bande « BÂTIMENTS » sous elles, et encore deux lignes de texte.
-    const w = Math.floor((c.L - 10) / 2)
-    const items = QUATRE.map((quoi, i) => ({
-      x: c.M + (i % 2) * (w + 10),
-      y: 180 + Math.floor(i / 2) * 54,
-      w,
-      h: 46,
-      quoi,
-    }))
-    items.push({ x: c.M, y: 288, w: c.L, h: 40, quoi: 'ville' })
-    return {
-      resume,
-      items,
-      dernier: { x: c.M, y: 340 },
-      alerte: { x: c.M, y: 354 },
-    }
+  const ligne = (w, y, h) => {
+    const gap = Math.floor((j.W - 4 * w) / 3)
+    return Array.from({ length: 4 }, (_, i) => ({ x: i * (w + gap), y, w, h }))
   }
-  const items = QUATRE.map((quoi, i) => ({ x: c.M, y: 180 + i * 68, w: c.L, h: 58, quoi }))
-  items.push({ x: c.M, y: 180 + 4 * 68, w: c.L, h: 46, quoi: 'ville' })
+  if (c.large)
+    return {
+      entete: c.entete,
+      ciel: { x: 0, y: 98, w: j.W, h: 34 },
+      plots: [...ligne(142, 140, 70), ...ligne(142, 218, 90)],
+      resume: { x: c.M, y: 312, w: c.L, h: 40 },
+    }
   return {
-    resume,
-    items,
-    dernier: { x: c.M, y: 512 },
-    alerte: { x: c.M, y: 530 },
+    entete: c.entete,
+    ciel: { x: 0, y: 98, w: j.W, h: 56 },
+    plots: [...ligne(84, 160, 92), ...ligne(84, 260, 132)],
+    resume: { x: c.M, y: 414, w: c.L, h: 66 },
   }
 }
 
@@ -386,7 +373,7 @@ export function fiche(j) {
 /**
  * Trois listes qui s'empilent : promotions, butin, disparus. Debout elles se
  * suivent en une colonne ; couché elles tiennent chacune la sienne, ce qui
- * évite qu'un revers coûteux écrive par-dessus le bouton AU CAMP.
+ * évite qu'un revers coûteux écrive par-dessus le bouton AU VILLAGE.
  */
 export function bilan(j) {
   const c = chassis(j)
