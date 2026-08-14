@@ -8,7 +8,13 @@
  * C'est le seul moyen de tenir un jeu de trente-cinq classes et quarante-deux
  * uniques : ASCENSION, avant lui, est mort de n'avoir jamais été mesuré.
  *
- *   node test/front-banc.mjs [campagnes]
+ *   node test/front-banc.mjs [campagnes] [engagements]
+ *
+ * `engagements` vaut 200 par défaut : c'est le plancher en dessous duquel une
+ * courbe de progression ne se distingue pas du bruit. Les 30 d'origine
+ * suffisaient à repérer un bug grossier (une classe jamais recrutée) mais pas
+ * à juger d'une pente sur toute une campagne — voir les bandes de victoire
+ * plus bas, qui n'ont de sens que sur un long parcours.
  */
 import * as B from '../src/massif/front/bataille.js'
 import * as IA from '../src/massif/front/ia.js'
@@ -21,7 +27,17 @@ import { genereCarte, placeLibre } from '../src/massif/front/carte.js'
 import { versAxial, cle } from '../src/massif/front/hex.js'
 
 const CAMPAGNES = Number(process.argv[2] ?? 12)
-const ENGAGEMENTS = 30
+const ENGAGEMENTS = Number(process.argv[3] ?? 200)
+
+/**
+ * Les bandes de victoire visées. En dessous de 45 %, une campagne se sent
+ * injuste ; au-dessus de 80 %, elle n'oppose plus de résistance. Le saut
+ * entre deux niveaux consécutifs est la vraie mesure des montagnes russes :
+ * une pente peut rester dans les bandes tout en étant heurtée de sauts.
+ */
+const VICTOIRE_MIN = 0.45
+const VICTOIRE_MAX = 0.8
+const SAUT_MAX = 0.15
 
 /** Joue une bataille jusqu'au bout, des deux côtés, sans dessiner. */
 function joue(bat, replierSous = 0.3) {
@@ -78,14 +94,18 @@ for (let n = 0; n < CAMPAGNES; n++) {
     joue(bat)
     if (!B.fini(bat)) sansFin++
 
-    const objet = parObjectif.get(bat.objectif.id) ?? { n: 0, g: 0, t: 0, parObj: 0, parMassacre: 0 }
+    const objet = parObjectif.get(bat.objectif.id) ?? { n: 0, g: 0, t: 0, parObj: 0, parMassacre: 0, parTemps: 0 }
     objet.n++
     objet.t += bat.tour
     if (bat.fini === 'gagne') objet.g++
     // Par quelle porte on est sorti. Un objectif qu'on ne franchit jamais
-    // *par lui-même* n'est pas un mode de jeu, c'est une étiquette.
+    // *par lui-même* n'est pas un mode de jeu, c'est une étiquette — et une
+    // victoire au chronomètre (force restante à la fin des tours) est la
+    // même chose que gagner « TENIR LE CHOC » sous un autre nom : elle mérite
+    // sa propre colonne plutôt que de rester cachée dans le total.
     if (bat.cause === 'objectif') objet.parObj++
-    if (bat.cause === 'anéantissement') objet.parMassacre++
+    else if (bat.cause === 'anéantissement') objet.parMassacre++
+    else if (bat.cause === 'temps') objet.parTemps++
     parObjectif.set(bat.objectif.id, objet)
 
     const pal = Math.min(20, niveau)
@@ -134,15 +154,31 @@ for (let n = 0; n < CAMPAGNES; n++) {
 }
 
 console.log('  par niveau de compagnie —')
+let precedent = null
 for (const pal of [...parNiveau.keys()].sort((a, b) => a - b)) {
   const e = parNiveau.get(pal)
+  const taux = e.g / e.n
   console.log(
     `    niv ${String(pal).padStart(2)} · ${String(e.n).padStart(3)} batailles · ` +
-      `${((e.g / e.n) * 100).toFixed(0).padStart(3)} % gagnées · ` +
+      `${(taux * 100).toFixed(0).padStart(3)} % gagnées · ` +
       `${(e.t / e.n).toFixed(1).padStart(4)} tours · ` +
       `${(e.unites / e.n).toFixed(1)} troupes alignées · ` +
       `${(e.perdus / e.n).toFixed(2)} perte(s) par bataille`,
   )
+  // Les bandes ne valent que sur un échantillon qui tient debout, et que
+  // passé les tout premiers niveaux — une campagne a le droit de commencer
+  // facile, c'est le reste de la pente qui doit rester cohérent.
+  if (e.n >= 15 && pal >= 3) {
+    if (taux < VICTOIRE_MIN || taux > VICTOIRE_MAX) {
+      console.log(
+        `      ⚠ niv ${pal} hors bande [${VICTOIRE_MIN * 100}–${VICTOIRE_MAX * 100} %] : ${(taux * 100).toFixed(0)} %`,
+      )
+    }
+    if (precedent != null && Math.abs(taux - precedent) > SAUT_MAX) {
+      console.log(`      ⚠ saut de ${(Math.abs(taux - precedent) * 100).toFixed(0)} points depuis le niveau précédent`)
+    }
+    precedent = taux
+  }
 }
 
 console.log('\n  par objectif —')
@@ -152,8 +188,15 @@ for (const o of OBJECTIFS) {
   console.log(
     `    ${o.nom.padEnd(18)} ${((e.g / e.n) * 100).toFixed(0).padStart(3)} % · ${(e.t / e.n).toFixed(1)} tours · ` +
       `${String(e.n).padStart(4)} fois · résolu par l’objectif ${((e.parObj / e.n) * 100).toFixed(0).padStart(3)} % ` +
-      `· par massacre ${((e.parMassacre / e.n) * 100).toFixed(0).padStart(3)} %`,
+      `· par massacre ${((e.parMassacre / e.n) * 100).toFixed(0).padStart(3)} % ` +
+      `· par temps ${((e.parTemps / e.n) * 100).toFixed(0).padStart(3)} %`,
   )
+  // Un objectif qui ne se résout presque jamais par sa propre règle n'est pas
+  // un mode de jeu — que la porte de sortie soit le massacre ou le chrono
+  // ne change rien au diagnostic.
+  if (e.n >= 20 && e.parObj / e.n < 0.1) {
+    console.log(`      ⚠ ${o.nom} se résout à moins de 10 % par sa propre règle`)
+  }
 }
 
 console.log('\n  par classe (celles jamais alignées sont du remplissage) —')
