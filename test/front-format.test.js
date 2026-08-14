@@ -132,8 +132,13 @@ const PORTRAIT = [
   // disposition.
   ['camp', 59, '3051a123754d48ab'],
   ['campagne', 54, '3b9b04d51ab6a423'],
-  ['caserne', 87, '7bbd1d92c9ce7d20'],
-  ['uniques', 65, '5fd1b54767fbc37f'],
+  // Réétalonné : le lot 2 ajoute dix classes au vivier générique, donc le
+  // même tirage à la même graine ne pioche plus les mêmes six cartes à la
+  // caserne — et le tirage d'uniques qui suit dans le même flux de hasard en
+  // pioche d'autres à son tour. Même nombre de traits par carte, textes
+  // différents : ce n'est pas la disposition qui a bougé.
+  ['caserne', 87, '2e76887e29820200'],
+  ['uniques', 65, 'f9eb2366a6a79c11'],
   ['compagnie', 89, '77d685cf64eaba4a'],
   ['fiche', 63, 'eedf887e3fd64603'],
   ['bataille', 396, 'cad016f2097e0dab'],
@@ -141,8 +146,12 @@ const PORTRAIT = [
   // elle, donc la barre de moral de la troupe sélectionnée ne part plus de la
   // même valeur. Même nombre de traits — c'est une longueur, pas une position.
   ['bataille/troupe', 408, 'b06ac2c0b8b01898'],
-  ['bataille/prévision', 414, '31f1100cc351fa28'],
-  ['bataille/ennemi', 366, 'fcc0258684ea47de'],
+  // Réétalonné avec la caserne et les uniques ci-dessus : à graine égale, une
+  // armée composée d'un vivier de classes plus large n'aligne plus les mêmes
+  // troupes, donc ni la prévision de tir ni la fiche adverse inspectée ne
+  // portent les mêmes chiffres. Toujours le même nombre de traits.
+  ['bataille/prévision', 414, '836fe1f95832306e'],
+  ['bataille/ennemi', 366, 'e3de531b52a5acc7'],
   ['bilan', 24, '35fd99153039daaf'],
 ]
 

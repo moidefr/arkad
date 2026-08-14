@@ -201,6 +201,25 @@ test('un ordre a toujours une portée cohérente et un refroidissement', () => {
   }
 })
 
+test('tout ordre a au moins un porteur, classe ou unique — sinon il est aussi orphelin qu’un passif', () => {
+  for (const a of APTITUDES.filter((x) => x.ordre)) {
+    const parClasse = CLASSES.some((c) => c.apt.includes(a.id))
+    const parUnique = UNIQUES.some((u) => u.apt.includes(a.id))
+    assert.ok(parClasse || parUnique, `ordre orphelin : ${a.id}`)
+  }
+})
+
+test('aucune unité ne cumule plus de trois ordres — le plafond de boutons du combat', () => {
+  for (const c of CLASSES) {
+    const u = U.creeGenerique(c.id, c.rang)
+    assert.ok(U.ordres(u).length <= 3, `${c.id} : ${U.ordres(u).length} ordres`)
+  }
+  for (const uq of UNIQUES) {
+    const u = U.creeUnique(uq.id, uq.rang)
+    assert.ok(U.ordres(u).length <= 3, `${uq.id} : ${U.ordres(u).length} ordres`)
+  }
+})
+
 // --- Les uniques -------------------------------------------------------------
 
 test('chaque unique a une identité complète et une classe réelle', () => {

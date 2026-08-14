@@ -76,51 +76,64 @@ const c = (id, nom, court, type, rang, pv, att, def, portee, mvt, vue, prix, apt
  */
 export const CLASSES = [
   // --- Infanterie -----------------------------------------------------------
-  c('milicien', 'MILICIEN', 'MIL', 'INF', 1, 26, 9, 5, [1, 1], 4, 3, 40),
+  c('milicien', 'MILICIEN', 'MIL', 'INF', 1, 26, 9, 5, [1, 1], 4, 3, 40, ['estoc']),
   c('piquier', 'PIQUIER', 'PIQ', 'INF', 1, 28, 10, 6, [1, 1], 4, 3, 55, ['traque_monte']),
-  c('fantassin', 'FANTASSIN', 'FAN', 'INF', 2, 32, 11, 7, [1, 1], 4, 3, 75),
+  c('fantassin', 'FANTASSIN', 'FAN', 'INF', 2, 32, 11, 7, [1, 1], 4, 3, 75, ['estoc_puissant']),
   c('hallebardier', 'HALLEBARDIER', 'HAL', 'INF', 4, 34, 13, 8, [1, 1], 4, 3, 110, ['zone_controle']),
   c('legionnaire', 'LÉGIONNAIRE', 'LEG', 'INF', 6, 38, 14, 10, [1, 1], 4, 3, 160, ['bouclier']),
+  c('pertuisanier', 'PERTUISANIER', 'PER', 'INF', 7, 40, 15, 11, [1, 1], 4, 3, 185, [
+    'zone_controle',
+    'estoc_puissant',
+  ]),
   c('garde', 'GARDE', 'GAR', 'INF', 9, 44, 15, 13, [1, 1], 3, 3, 225, ['cuirasse', 'zone_controle']),
   c('grenadier', 'GRENADIER', 'GRE', 'INF', 12, 40, 18, 9, [1, 1], 4, 3, 275, ['grenade']),
   c('brise_ligne', 'BRISE-LIGNE', 'BRL', 'INF', 15, 48, 20, 12, [1, 1], 4, 3, 360, ['charge', 'brise_ligne']),
 
   // --- Troupes légères ------------------------------------------------------
-  c('eclaireur', 'ÉCLAIREUR', 'ECL', 'LEG', 1, 22, 8, 4, [1, 1], 6, 5, 45, ['insaisissable', 'guetteur']),
+  c('eclaireur', 'ÉCLAIREUR', 'ECL', 'LEG', 1, 22, 8, 4, [1, 1], 6, 5, 45, ['insaisissable', 'guetteur', 'sprint']),
   c('traqueur', 'TRAQUEUR', 'TRQ', 'LEG', 2, 24, 10, 4, [1, 2], 5, 4, 70, ['embuscade']),
-  c('voltigeur', 'VOLTIGEUR', 'VLT', 'LEG', 4, 26, 12, 5, [1, 1], 6, 4, 105, ['tirailleur']),
+  c('chasseur', 'CHASSEUR', 'CHS', 'LEG', 3, 25, 11, 5, [1, 1], 6, 4, 88, ['feinte']),
+  c('voltigeur', 'VOLTIGEUR', 'VLT', 'LEG', 4, 26, 12, 5, [1, 1], 6, 4, 105, ['tirailleur', 'sprint']),
   c('sapeur', 'SAPEUR', 'SAP', 'LEG', 5, 28, 11, 6, [1, 1], 5, 3, 125, ['pontonnier', 'mine']),
   c('rodeur', 'RÔDEUR', 'ROD', 'LEG', 8, 28, 14, 5, [1, 1], 6, 4, 190, ['embuscade', 'montagnard']),
+  c('escarmoucheur', 'ESCARMOUCHEUR', 'ESC', 'LEG', 10, 29, 16, 6, [1, 1], 7, 5, 250, ['tirailleur', 'embuscade']),
   c('ombre', 'OMBRE', 'OMB', 'LEG', 13, 30, 18, 6, [1, 1], 7, 5, 310, ['embuscade_maitre', 'brise_ligne']),
 
   // --- Montés ---------------------------------------------------------------
   c('cavalier', 'CAVALIER', 'CAV', 'MON', 2, 30, 11, 6, [1, 1], 7, 4, 85, ['charge']),
+  c('chevau_leger', 'CHEVAU-LÉGER', 'CVL', 'MON', 3, 30, 13, 6, [1, 1], 7, 4, 108, ['charge_hussarde']),
   c('lancier', 'LANCIER', 'LAN', 'MON', 4, 32, 14, 7, [1, 1], 7, 4, 130, ['charge_lourde']),
-  c('dragon', 'DRAGON', 'DRA', 'MON', 6, 32, 12, 8, [1, 2], 6, 4, 175, ['tirailleur']),
-  c('hussard', 'HUSSARD', 'HUS', 'MON', 8, 30, 15, 6, [1, 1], 8, 5, 205, ['charge', 'insaisissable']),
+  c('dragon', 'DRAGON', 'DRA', 'MON', 6, 32, 12, 8, [1, 2], 6, 4, 175, ['tirailleur', 'sprint']),
+  c('hussard', 'HUSSARD', 'HUS', 'MON', 8, 30, 15, 6, [1, 1], 8, 5, 205, ['charge', 'insaisissable', 'sprint']),
   c('cuirassier', 'CUIRASSIER', 'CUI', 'MON', 11, 40, 17, 12, [1, 1], 6, 4, 285, ['charge', 'cuirasse']),
   c('chevalier', 'CHEVALIER', 'CHV', 'MON', 15, 46, 20, 14, [1, 1], 6, 4, 395, ['charge_lourde', 'zone_controle']),
 
   // --- Tir ------------------------------------------------------------------
-  c('frondeur', 'FRONDEUR', 'FRO', 'TIR', 1, 20, 9, 3, [1, 2], 5, 4, 42),
-  c('archer', 'ARCHER', 'ARC', 'TIR', 1, 22, 10, 4, [1, 3], 4, 4, 60),
+  c('frondeur', 'FRONDEUR', 'FRO', 'TIR', 1, 20, 9, 3, [1, 2], 5, 4, 42, ['tir_rapide']),
+  c('archer', 'ARCHER', 'ARC', 'TIR', 1, 22, 10, 4, [1, 3], 4, 4, 60, ['tir_rapide']),
+  c('pistolier', 'PISTOLIER', 'PIS', 'TIR', 2, 22, 11, 4, [1, 2], 4, 4, 75, ['tir_rapide']),
   c('arbaletrier', 'ARBALÉTRIER', 'ARB', 'TIR', 3, 24, 13, 5, [1, 3], 4, 4, 100, ['perce_armure']),
   c('tirailleur', 'TIRAILLEUR', 'TRA', 'TIR', 5, 24, 12, 4, [1, 3], 5, 4, 120, ['tirailleur']),
   c('fusilier', 'FUSILIER', 'FUS', 'TIR', 8, 28, 16, 6, [1, 4], 4, 4, 200, ['perce_armure']),
   c('marqueur', 'MARQUEUR', 'MRQ', 'TIR', 11, 26, 18, 5, [2, 5], 4, 5, 265, ['sniper', 'precision']),
+  c('mousquetaire', 'MOUSQUETAIRE', 'MOU', 'TIR', 13, 29, 20, 6, [1, 4], 4, 4, 310, ['perce_armure', 'sniper']),
 
   // --- Engins ---------------------------------------------------------------
   c('baliste', 'BALISTE', 'BAL', 'ENG', 4, 26, 16, 5, [2, 4], 2, 3, 140, ['volee']),
+  c('orgue', 'ORGUE', 'ORG', 'ENG', 5, 27, 17, 5, [2, 4], 2, 3, 165, ['salve']),
   c('catapulte', 'CATAPULTE', 'CAT', 'ENG', 7, 30, 20, 6, [3, 5], 2, 3, 215, ['volee_lourde']),
   c('mortier', 'MORTIER', 'MOR', 'ENG', 10, 28, 22, 5, [3, 6], 2, 3, 280, ['barrage']),
+  c('demolisseur', 'DÉMOLISSEUR', 'DEM', 'ENG', 12, 31, 24, 7, [2, 5], 2, 3, 330, ['perce_armure', 'sabotage']),
   c('canon', 'CANON', 'CAN', 'ENG', 14, 34, 26, 8, [2, 6], 2, 3, 380, ['perce_total', 'volee']),
 
   // --- Soutien --------------------------------------------------------------
   c('infirmier', 'INFIRMIER', 'INF', 'SOU', 1, 22, 5, 4, [1, 1], 5, 3, 65, ['soigneur', 'soin']),
   c('porte_ordre', 'PORTE-ORDRE', 'POR', 'SOU', 3, 24, 6, 5, [1, 1], 6, 4, 105, ['commandement', 'ralliement']),
+  c('aumonier', 'AUMÔNIER', 'AUM', 'SOU', 4, 25, 7, 5, [1, 1], 5, 4, 125, ['discipline', 'soin_campagne']),
   c('ingenieur', 'INGÉNIEUR', 'ING', 'SOU', 6, 26, 8, 6, [1, 1], 4, 3, 150, ['pontonnier', 'ponton', 'retranchement']),
   c('vivandier', 'VIVANDIÈRE', 'VIV', 'SOU', 9, 26, 6, 6, [1, 1], 5, 3, 200, ['soigneur_chef', 'inspire']),
   c('tambour', 'TAMBOUR', 'TAM', 'SOU', 12, 26, 7, 6, [1, 1], 5, 3, 260, ['commandement_large', 'cri_guerre']),
+  c('estafette', 'ESTAFETTE', 'ESF', 'SOU', 15, 29, 8, 7, [1, 1], 5, 4, 340, ['commandement_large', 'aguerri']),
 ]
 
 export const CL = Object.fromEntries(CLASSES.map((x) => [x.id, x]))

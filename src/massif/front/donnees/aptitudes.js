@@ -238,6 +238,71 @@ export const APTITUDES = [
     { forme: 'soi', froid: 6, effets: { rejoue: true, soin: 16 } },
     'Rend 16 points de vie et rend son action : on rejoue immédiatement.',
   ),
+  // Les six ordres ci-dessus (assaut_general, tenir_ligne, ordre_marche,
+  // fumigene, tir_precis, second_souffle) ne sont donnés à aucune classe
+  // générique : ils sont réservés aux uniques qui les portent déjà dans
+  // `uniques.js`. C'est volontaire — une signature de personnage, pas un
+  // oubli — et le test « tout ordre a au moins un porteur » les valide par
+  // ce biais plutôt que par une classe.
+
+  // --- Ordres neufs : un premier geste pour les classes qui n'en avaient
+  // aucun, et de quoi peupler les dix classes ajoutées. -----------------------
+  o(
+    'estoc',
+    'ESTOC',
+    'EST',
+    { forme: 'ennemi', portee: [1, 1], froid: 3, effets: { degats: 1.3, finTour: true } },
+    '+30 % de dégâts au contact, riposte comprise. Termine le tour.',
+  ),
+  o(
+    'estoc_puissant',
+    'ESTOC PUISSANT',
+    'ESP',
+    { forme: 'ennemi', portee: [1, 1], froid: 3, effets: { degats: 1.5, finTour: true } },
+    '+50 % de dégâts au contact, riposte comprise. Termine le tour.',
+  ),
+  o(
+    'tir_rapide',
+    'TIR RAPIDE',
+    'TRP',
+    { forme: 'ennemi', portee: [1, 4], froid: 2, effets: { degats: 0.65, finTour: true } },
+    'Un tir à longue portée, moins appuyé qu’un tir posé : 65 % de dégâts. Termine le tour.',
+  ),
+  o(
+    'feinte',
+    'FEINTE',
+    'FEI',
+    { forme: 'soi', froid: 3, effets: { mvt: 2, etat: { def: 0.12 }, duree: 1, finTour: false } },
+    '+2 points de mouvement et +12 % de défense ce tour-ci. Ne termine pas le tour.',
+  ),
+  o(
+    'charge_hussarde',
+    'CHARGE HUSSARDE',
+    'CHU',
+    { forme: 'soi', froid: 4, effets: { mvt: 4, etat: { att: 0.15 }, duree: 1, finTour: false } },
+    '+4 points de mouvement et +15 % de dégâts ce tour-ci. Ne termine pas le tour.',
+  ),
+  o(
+    'salve',
+    'SALVE',
+    'SAL',
+    { forme: 'hex', portee: [2, 5], froid: 5, effets: { degats: 0.55, rayon: 2, sansRiposte: true, finTour: true } },
+    'Un tir groupé qui éclabousse deux hexagones alentour, sans appeler de riposte. Termine le tour.',
+  ),
+  o(
+    'soin_campagne',
+    'SOIN DE CAMPAGNE',
+    'SDC',
+    { forme: 'allie', portee: [1, 2], froid: 3, effets: { soin: 16, etat: { def: 0.08 }, duree: 2, finTour: true } },
+    'Rend 16 points de vie et +8 % de défense pendant deux tours. Termine le tour.',
+  ),
+  o(
+    'sabotage',
+    'SABOTAGE',
+    'SAB',
+    { forme: 'hex', portee: [1, 1], froid: 5, effets: { terrain: 'ruines', finTour: true } },
+    'Transforme un hexagone voisin en ruines : plus de couvert, plus dur à traverser. Termine le tour.',
+  ),
 ]
 
 export const APT = Object.fromEntries(APTITUDES.map((a) => [a.id, a]))

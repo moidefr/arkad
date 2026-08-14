@@ -273,7 +273,14 @@ function rafraichitSel(j) {
   sel.deplacements = VC.casesDeplacement(e.bat, u)
   sel.ciblesUnite = B.cibles(e.bat, u)
   sel.cibles = new Set(sel.ciblesUnite.map((c) => cle(c.q, c.r)))
-  sel.ordres = U.ordres(u).slice(0, 3)
+  // Trois boutons au plus s'affichent : les ordres jouables tout de suite
+  // passent devant ceux en recharge, sinon une troupe à quatre ordres pouvait
+  // n'en montrer que des indisponibles.
+  const dispo = new Set(B.ordresJouables(e.bat, u).map((a) => a.id))
+  sel.ordres = U.ordres(u)
+    .slice()
+    .sort((a, b) => (dispo.has(b.id) ? 1 : 0) - (dispo.has(a.id) ? 1 : 0))
+    .slice(0, 3)
   sel.chemin = null
 }
 
