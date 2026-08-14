@@ -9,6 +9,7 @@
 import { CL, GRADES, GRADE_MAX_GENERIQUE, TYPE } from './donnees/classes.js'
 import { UQ, RAR } from './donnees/uniques.js'
 import { APT } from './donnees/aptitudes.js'
+import { OBJ, EMPLACEMENTS, TIERS } from './donnees/objets.js'
 import { pondere } from './rng.js'
 
 /**
@@ -149,11 +150,15 @@ export function creeGenerique(clId, niveau, nom, initiale) {
     blesse: 0,
     batailles: 0,
     tues: 0,
+    equip: equipVide(),
   }
   u.grade = gradeAtteint(u)
   u.pv = fiche(u).pvMax
   return u
 }
+
+/** Trois emplacements, tous vides — la forme que `u.equip` garde toujours. */
+export const equipVide = () => ({ arme: null, armure: null, accessoire: null })
 
 export function creeUnique(uqId, niveau) {
   const uq = UQ[uqId]
@@ -172,6 +177,7 @@ export function creeUnique(uqId, niveau) {
     blesse: 0,
     batailles: 0,
     tues: 0,
+    equip: equipVide(),
   }
   // Le grade de la fiche est un **plancher**, pas un plafond : sans ce
   // rappel, un unique sergent recruté au niveau 12 sortait moins gradé — donc
@@ -217,24 +223,58 @@ export const CROISSANCE = 0.09
 export const ENDURANCE = 1.7
 
 /**
- * Ce que vaut une unité, hors bataille : classe, niveau, grade, unique.
- * Les bonus de terrain, d'aura et d'état sont ajoutés par `bataille.js` — ici
- * on ne connaît que la troupe elle-même.
+ * Les aptitudes que porte réellement une unité : celles de sa classe/de son
+ * unique, **plus** les passives que son équipement ajoute.
+ *
+ * Un seul endroit lit `u.equip` pour en tirer des aptitudes — exactement
+ * comme un seul endroit lit `u.uq`. `passif()`, `fichePassif()` et `ordres()`
+ * passent tous par ici, ce qui suffit à ce qu'un objet à passif se comporte
+ * en tout point comme si la classe elle-même le portait. Un objet ne porte
+ * jamais d'ordre (règle de `donnees/objets.js`), donc `ordres()` n'en verra
+ * jamais sortir d'ici — mais il lit quand même cette liste, pour ne pas
+ * dupliquer la fusion à un deuxième endroit.
+ */
+export function aptEffectives(u) {
+  const dEquip = Object.values(u.equip ?? {})
+    .filter(Boolean)
+    .map((inst) => OBJ[inst.id]?.passif)
+    .filter(Boolean)
+  return [...new Set([...(u.apt ?? []), ...dEquip])]
+}
+
+/** La somme des bonus chiffrés de l'équipement, chaque tier multipliant le bonus de base. */
+function bonusEquip(u) {
+  const s = { pv: 0, att: 0, def: 0, mvt: 0, vue: 0, portee: 0 }
+  for (const inst of Object.values(u.equip ?? {})) {
+    if (!inst) continue
+    const obj = OBJ[inst.id]
+    if (!obj?.bonus) continue
+    const mult = TIERS[(inst.tier ?? 1) - 1]?.mult ?? 1
+    for (const cle of Object.keys(s)) if (obj.bonus[cle]) s[cle] += obj.bonus[cle] * mult
+  }
+  return s
+}
+
+/**
+ * Ce que vaut une unité, hors bataille : classe, niveau, grade, unique,
+ * équipement. Les bonus de terrain, d'aura et d'état sont ajoutés par
+ * `bataille.js` — ici on ne connaît que la troupe elle-même.
  */
 export function fiche(u) {
   const cl = CL[u.cl]
   const g = GRADES[u.grade] ?? GRADES[0]
   const b = u.uq ? (UQ[u.uq].bonus ?? {}) : {}
+  const eq = bonusEquip(u)
   const k = 1 + CROISSANCE * (u.niv - 1)
   return {
     cl,
     type: cl.type,
-    pvMax: Math.round((cl.pv * k * g.pv + (b.pv ?? 0)) * ENDURANCE),
-    att: cl.att * k * g.att + (b.att ?? 0),
-    def: cl.def * k * g.def + (b.def ?? 0),
-    portee: [cl.portee[0], cl.portee[1] + (b.portee ?? 0) + passif(u, 'precision')],
-    mvt: cl.mvt + (b.mvt ?? 0) + passif(u, 'marcheur'),
-    vue: cl.vue + (b.vue ?? 0) + passif(u, 'guetteur'),
+    pvMax: Math.round((cl.pv * k * g.pv + (b.pv ?? 0) + eq.pv) * ENDURANCE),
+    att: cl.att * k * g.att + (b.att ?? 0) + eq.att,
+    def: cl.def * k * g.def + (b.def ?? 0) + eq.def,
+    portee: [cl.portee[0], cl.portee[1] + (b.portee ?? 0) + eq.portee + passif(u, 'precision')],
+    mvt: cl.mvt + (b.mvt ?? 0) + eq.mvt + passif(u, 'marcheur'),
+    vue: cl.vue + (b.vue ?? 0) + eq.vue + passif(u, 'guetteur'),
     aura: g.aura + passif(u, 'commandement'),
   }
 }
@@ -242,7 +282,7 @@ export function fiche(u) {
 /** La valeur d'une passive, 0 si l'unité ne l'a pas. Les doublons ne s'additionnent pas. */
 export function passif(u, cle) {
   let v = 0
-  for (const id of u.apt ?? []) {
+  for (const id of aptEffectives(u)) {
     const a = APT[id]
     if (a?.passif === cle) v = Math.max(v, a.valeur)
   }
@@ -252,7 +292,7 @@ export function passif(u, cle) {
 /** L'aptitude passive `cle` portée par l'unité, pour lire ses champs annexes. */
 export function fichePassif(u, cle) {
   let meilleure = null
-  for (const id of u.apt ?? []) {
+  for (const id of aptEffectives(u)) {
     const a = APT[id]
     if (a?.passif === cle && (!meilleure || a.valeur > meilleure.valeur)) meilleure = a
   }
@@ -260,7 +300,20 @@ export function fichePassif(u, cle) {
 }
 
 /** Les ordres — les aptitudes actives — que porte l'unité. */
-export const ordres = (u) => (u.apt ?? []).map((id) => APT[id]).filter((a) => a?.ordre)
+export const ordres = (u) =>
+  aptEffectives(u)
+    .map((id) => APT[id])
+    .filter((a) => a?.ordre)
+
+/** Équipe un objet du dépôt (retourne l'ancien occupant de l'emplacement, s'il y en avait un). */
+export function equipe(u, emplacement, inst) {
+  if (!EMPLACEMENTS.includes(emplacement)) return null
+  const objet = OBJ[inst?.id]
+  if (inst && (!objet || objet.emplacement !== emplacement)) return null
+  const ancien = u.equip[emplacement] ?? null
+  u.equip[emplacement] = inst ?? null
+  return ancien
+}
 
 export const estUnique = (u) => !!u.uq
 export const nomComplet = (u) => (u.uq ? UQ[u.uq].nom : `${u.ini}. ${u.nom}`)

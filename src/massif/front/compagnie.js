@@ -11,9 +11,10 @@
  *   — l'**ÉTAT-MAJOR**, où passent des gens qui ont un nom, un titre et un
  *     grade, tirés selon un taux d'apparition indexé sur le niveau.
  */
-import { melange32, derive, entre, parmi, melange } from './rng.js'
+import { melange32, derive, entre, parmi, melange, pondere } from './rng.js'
 import { CLASSES, CL, GRADES } from './donnees/classes.js'
 import { UNIQUES, UQ, RAR } from './donnees/uniques.js'
+import { OBJETS, OBJ as OBJET, TIER_MAX, prixObjet, prixAmelioration } from './donnees/objets.js'
 import { BIOMES } from './terrain.js'
 import * as U from './unites.js'
 import * as V from './ville.js'
@@ -74,6 +75,7 @@ export function nouvelle(graine) {
     choix: null,
     dernier: null,
     ville: V.villeNeuve(),
+    objets: [],
   }
   c.escouades = [{ nom: 'PREMIÈRE', chef: c.troupes[0].id, membres: c.troupes.map((t) => t.id) }]
   rafraichit(c)
@@ -94,6 +96,8 @@ export function migre(brut) {
   V.cale(c)
   c.escouades ??= []
   c.uniquesVus ??= []
+  c.objets ??= []
+  for (const u of c.troupes) u.equip ??= U.equipVide()
   if (!c.plan) planifie(c)
   if (!c.offre) rafraichit(c)
   return brut
@@ -246,10 +250,59 @@ export function reforme(c, id) {
   const u = trouve(c, id)
   if (!u) return 0
   const rendu = U.prixRevente(u, c.niveau)
+  // L'équipement ne part pas avec la troupe qu'on réforme : il revient au
+  // dépôt, sinon renvoyer un milicien blessé coûterait aussi l'armure qu'on
+  // vient de payer.
+  for (const emp of ['arme', 'armure', 'accessoire']) {
+    const ancien = U.equipe(u, emp, null)
+    if (ancien) c.objets.push(ancien)
+  }
   retireDe(c, id)
   c.troupes = c.troupes.filter((t) => t.id !== id)
   c.or += rendu
   return rendu
+}
+
+/**
+ * Équipe une instance du dépôt (`c.objets[indexDepot]`) sur une troupe.
+ * L'ancien occupant de l'emplacement, s'il y en avait un, retourne au dépôt —
+ * jamais perdu, jamais dupliqué.
+ */
+export function equipeObjet(c, id, emplacement, indexDepot) {
+  const u = trouve(c, id)
+  const inst = c.objets[indexDepot]
+  if (!u || !inst) return false
+  const objet = OBJET[inst.id]
+  if (!objet || objet.emplacement !== emplacement) return false
+  c.objets.splice(indexDepot, 1)
+  const ancien = U.equipe(u, emplacement, inst)
+  if (ancien) c.objets.push(ancien)
+  return true
+}
+
+/** Déséquipe : l'instance retourne au dépôt. */
+export function deposeObjet(c, id, emplacement) {
+  const u = trouve(c, id)
+  if (!u) return false
+  const ancien = U.equipe(u, emplacement, null)
+  if (!ancien) return false
+  c.objets.push(ancien)
+  return true
+}
+
+/** Améliore une instance équipée d'un tier, contre or — plafonnée par `plafond` (le niveau de la forge). */
+export function ameliore(c, id, emplacement, plafond) {
+  const u = trouve(c, id)
+  const inst = u?.equip?.[emplacement]
+  if (!inst) return false
+  const objet = OBJET[inst.id]
+  const tierVise = (inst.tier ?? 1) + 1
+  if (!objet || tierVise > TIER_MAX || tierVise > plafond) return false
+  const prix = prixAmelioration(objet, tierVise, c.niveau, U.echelle)
+  if (c.or < prix) return false
+  c.or -= prix
+  inst.tier = tierVise
+  return true
 }
 
 /** L'infirmerie : soigner coûte, et c'est ce qui donne un prix à une victoire chère. */
@@ -496,6 +549,20 @@ export function bilan(c, bat) {
   c.engagements++
   if (gagne) c.victoires++
 
+  // Le butin ne tombe que sur une victoire — une retraite ou une défaite ne
+  // laisse personne fouiller le champ. La chance monte doucement avec le
+  // niveau, comme le reste de l'économie.
+  if (gagne) {
+    const rng = melange32(derive(c.graine, 777, c.engagements))
+    if (rng() < 0.3 + c.niveau * 0.01) {
+      const objet = pondere(rng, OBJETS, (x) => (x.rang <= c.niveau ? 1 / (1 + (c.niveau - x.rang) * 0.15) : 0))
+      if (objet) {
+        c.objets.push({ id: objet.id, tier: 1 })
+        rapport.butin = objet
+      }
+    }
+  }
+
   rapport.niveaux = 0
   while (c.renom >= seuilRenom(c.niveau)) {
     c.renom -= seuilRenom(c.niveau)
@@ -519,4 +586,4 @@ export function bilan(c, bat) {
  */
 export const aneantie = (c) => c.troupes.length === 0 && !c.offre?.caserne.some((l) => l.prix <= c.or)
 
-export { OBJECTIFS, OBJ, GRADES, CL, UQ, RAR, U }
+export { OBJECTIFS, OBJ, GRADES, CL, UQ, RAR, U, OBJETS, OBJET, TIER_MAX, prixObjet }

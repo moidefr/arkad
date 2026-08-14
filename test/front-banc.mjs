@@ -71,6 +71,17 @@ function auCamp(c) {
   for (const t of [...c.troupes].sort((a, b) => U.fiche(b).att - U.fiche(a).att)) {
     if (!Cie.escouadeDe(c, t.id)) Cie.enrole(c, t.id)
   }
+  // On équipe ce que le butin a donné : la première troupe alignée qui a un
+  // emplacement vide reçoit le premier objet du dépôt qui va dedans. Ce n'est
+  // pas malin, mais ça suffit à mesurer si l'équipement se fait réellement
+  // porter plutôt que de dormir dans le dépôt.
+  for (const t of Cie.alignees(c)) {
+    for (const emp of ['arme', 'armure', 'accessoire']) {
+      if (t.equip[emp]) continue
+      const i = c.objets.findIndex((o) => Cie.OBJET[o.id]?.emplacement === emp)
+      if (i >= 0) Cie.equipeObjet(c, t.id, emp, i)
+    }
+  }
 }
 
 // --- Les campagnes ------------------------------------------------------------------
