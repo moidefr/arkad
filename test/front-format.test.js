@@ -150,7 +150,11 @@ const PORTRAIT = [
   ['caserne', 87, '2e76887e29820200'],
   ['uniques', 65, 'f9eb2366a6a79c11'],
   ['compagnie', 89, '77d685cf64eaba4a'],
-  ['fiche', 63, 'eedf887e3fd64603'],
+  // Réétalonné au lot 4 : la fiche troque sa grille de six cases et son
+  // « FORT/FAIBLE CONTRE » textuel pour des pastilles, trois emplacements
+  // d'équipement et des puces hexagonales — plus de traits, même plancher
+  // tactile.
+  ['fiche', 136, '6f2302147b44086a'],
   // Neufs au lot 3 : la liste des bâtiments, et le détail de la caserne (le
   // seul qui ait quelque chose de propre à montrer — ses sessions).
   ['ville', 81, 'fe41f50755b1fcff'],

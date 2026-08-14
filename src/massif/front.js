@@ -33,6 +33,7 @@ import * as VC from './front/vue/champ.js'
 import * as VB from './front/vue/bataille.js'
 import * as VM from './front/vue/menus.js'
 import * as VD from './front/vue/dispo.js'
+import { bascule } from './front/vue/aptitudes-ui.js'
 
 const CLE_META = 'front.meta'
 const metaVide = { meilleurNiveau: 0, batailles: 0, campagnes: 0 }
@@ -171,7 +172,7 @@ export default {
     else if (e.vue === 'compagnie') e.zones = defilante(e, VM.compagnie(ctx, j, e.c, e.selTroupe, e.defile))
     else if (e.vue === 'ville') e.zones = defilante(e, VM.ville(ctx, j, e.c, e.defile))
     else if (e.vue === 'batiment') e.zones = defilante(e, VM.batiment(ctx, j, e.c, e.batimentId, e.defile))
-    else if (e.vue === 'fiche') e.zones = ficheOuRetour(j, ctx)
+    else if (e.vue === 'fiche') e.zones = defilante(e, ficheOuRetour(j, ctx))
     else if (e.vue === 'bilan') e.zones = VM.bilan(ctx, j, e.c, e.rapport)
     ctx.textAlign = 'center'
   },
@@ -233,12 +234,13 @@ const defilante = (e, r) => {
 
 /** La fiche n'existe que si la troupe existe : réformer depuis la fiche la fait disparaître. */
 function ficheOuRetour(j, ctx) {
-  const u = Cie.trouve(j.e.c, j.e.selTroupe)
+  const e = j.e
+  const u = Cie.trouve(e.c, e.selTroupe)
   if (!u) {
-    j.e.vue = 'compagnie'
-    return VM.camp(ctx, j, j.e.c)
+    e.vue = 'compagnie'
+    return { zones: VM.camp(ctx, j, e.c), max: 0, rect: null }
   }
-  return VM.fiche(ctx, j, j.e.c, u)
+  return VM.fiche(ctx, j, e.c, u, e.defile, e.selEquip, e.aptOuvertes)
 }
 
 // --- Bataille ---------------------------------------------------------------------
@@ -469,8 +471,31 @@ function actions(j, z) {
     },
     depot: () => (e.selTroupe && Cie.retireDe(c, e.selTroupe) ? (j.son.clic(), sauve(j)) : j.son.rate()),
     nouvelleEscouade: () => (Cie.creeEscouade(c) ? (j.son.clic(), sauve(j)) : j.son.rate()),
-    fiche: () => (e.selTroupe ? va(j, 'fiche') : j.son.rate()),
+    fiche: () => (e.selTroupe ? ((e.selEquip = null), (e.aptOuvertes = new Set()), va(j, 'fiche')) : j.son.rate()),
     soigne: () => (Cie.soigne(c, e.selTroupe) ? (j.son.record(), sauve(j)) : j.son.rate()),
+
+    // La fiche : équipement et aptitudes
+    equipSlot: () => {
+      e.selEquip = e.selEquip === z.slot ? null : z.slot
+      e.defile = 0
+      j.son.clic()
+    },
+    poseEquip: () => {
+      if (!Cie.equipeObjet(c, e.selTroupe, e.selEquip, z.i)) return j.son.rate()
+      e.selEquip = null
+      j.son.record()
+      sauve(j)
+    },
+    deposeEquip: () => {
+      if (!Cie.deposeObjet(c, e.selTroupe, e.selEquip)) return j.son.rate()
+      e.selEquip = null
+      j.son.record()
+      sauve(j)
+    },
+    aptToggle: () => {
+      e.aptOuvertes = bascule(e.aptOuvertes ?? new Set(), z.id)
+      j.son.clic()
+    },
     reforme: () => {
       Cie.reforme(c, e.selTroupe)
       e.selTroupe = null

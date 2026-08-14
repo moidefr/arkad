@@ -346,28 +346,35 @@ export function compagnie(j, n, peutOuvrir) {
 export function fiche(j) {
   const c = chassis(j)
   if (c.large) {
-    // Couché : l'état civil à gauche, les aptitudes à droite. C'est la seule
-    // page du jeu dont le contenu ne tient pas debout dans 300 px de haut.
-    const p = { x: c.M, y: 98, w: 290, h: 156 }
+    // Couché : l'état civil, l'équipement et les types à gauche, les
+    // aptitudes à droite. C'est la seule page du jeu dont le contenu ne
+    // tient pas debout dans 300 px de haut.
+    const p = { x: c.M, y: 98, w: 290, h: 70 }
+    const eqW = Math.floor((p.w - 16) / 3)
     return {
       panneau: p,
-      fort: { x: c.M + 10, y: 266 },
-      faible: { x: p.x + p.w, y: 266 },
-      compteurs: { x: c.M, y: 288 },
-      aptitudes: { x: 330, y: 104, w: 290, debut: 124, max: 300 },
+      stats: { x: c.M, y: 172, w: p.w, h: 26 },
+      equip: [0, 1, 2].map((i) => ({ x: c.M + i * (eqW + 8), y: 202, w: eqW, h: 32, quoi: 'equipSlot' })),
+      types: { x: c.M, y: 238, w: p.w, h: 26 },
+      compteurs: { x: c.M, y: 270 },
+      apTitre: { x: 330, y: 104 },
+      apZone: { x: 330, y: 124, w: 290, h: 176 },
       soigne: { x: c.M, y: 308, w: 190, h: 36, quoi: 'soigne' },
       reforme: { x: 216, y: 308, w: 190, h: 36, quoi: 'reforme' },
       retour: { x: 412, y: 308, w: 208, h: 36, quoi: 'retour' },
     }
   }
-  const p = { x: c.M, y: 98, w: c.L, h: 156 }
+  const p = { x: c.M, y: 98, w: c.L, h: 92 }
+  const eqW = Math.floor((c.L - 16) / 3)
   const demi = Math.floor((c.L - 6) / 2)
   return {
     panneau: p,
-    fort: { x: c.M + 10, y: 262 },
-    faible: { x: p.x + p.w - 10, y: 262 },
+    stats: { x: c.M, y: 198, w: c.L, h: 32 },
+    equip: [0, 1, 2].map((i) => ({ x: c.M + i * (eqW + 8), y: 238, w: eqW, h: 46, quoi: 'equipSlot' })),
+    types: { x: c.M, y: 292, w: c.L, h: 34 },
     compteurs: { x: c.M, y: 492 },
-    aptitudes: { x: c.M, y: 278, w: c.L, debut: 298, max: 470 },
+    apTitre: { x: c.M, y: 330 },
+    apZone: { x: c.M, y: 340, w: c.L, h: 148 },
     soigne: { x: c.M, y: 508, w: demi, h: 38, quoi: 'soigne' },
     reforme: { x: c.M + demi + 6, y: 508, w: demi, h: 38, quoi: 'reforme' },
     retour: { x: c.M, y: 552, w: c.L, h: 36, quoi: 'retour' },

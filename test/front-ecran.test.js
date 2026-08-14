@@ -160,6 +160,52 @@ test('la fiche d’une troupe s’ouvre, soigne, et le soin coûte', () => {
   assert.ok(j.e.c.or < avant, 'le soin est gratuit')
 })
 
+test('la fiche équipe et déséquipe une troupe, par le vrai chemin d’appui', () => {
+  const j = fauxJeu(front, { graine: 9, neuve: true })
+  tape(j, 'nouvelle')
+  const u = j.e.c.troupes[0]
+  j.e.c.objets.push({ id: 'lame_courte', tier: 1 })
+  tape(j, 'compagnie')
+  tape(j, 'troupe', (z) => z.id === u.id)
+  tape(j, 'fiche')
+
+  const zVide = tape(j, 'equipSlot', (z) => z.slot === 'arme')
+  assert.equal(j.e.selEquip, 'arme', 'le tap sur l’emplacement n’ouvre pas le sélecteur')
+  tape(j, 'poseEquip')
+  assert.deepEqual(u.equip.arme, { id: 'lame_courte', tier: 1 }, 'l’objet ne s’équipe pas')
+  assert.equal(j.e.c.objets.length, 0, 'l’objet reste au dépôt en plus d’être équipé')
+  assert.equal(j.e.selEquip, null, 'le sélecteur reste ouvert après le choix')
+
+  tape(j, 'equipSlot', (z) => z.slot === 'arme')
+  tape(j, 'deposeEquip')
+  assert.equal(u.equip.arme, null, 'le retrait ne retire rien')
+  assert.equal(j.e.c.objets.length, 1, 'l’objet retiré ne revient pas au dépôt')
+})
+
+test('taper deux fois le même emplacement referme le sélecteur sans rien choisir', () => {
+  const j = fauxJeu(front, { graine: 10, neuve: true })
+  tape(j, 'nouvelle')
+  tape(j, 'compagnie')
+  tape(j, 'troupe', (z) => z.id === j.e.c.troupes[0].id)
+  tape(j, 'fiche')
+  tape(j, 'equipSlot', (z) => z.slot === 'armure')
+  assert.equal(j.e.selEquip, 'armure')
+  tape(j, 'equipSlot', (z) => z.slot === 'armure')
+  assert.equal(j.e.selEquip, null, 'un second tap sur le même emplacement ne referme rien')
+})
+
+test('une aptitude se déplie et se replie au tap, sans rien casser autour', () => {
+  const j = fauxJeu(front, { graine: 11, neuve: true })
+  tape(j, 'nouvelle')
+  tape(j, 'compagnie')
+  tape(j, 'troupe', (z) => z.id === j.e.c.troupes[0].id)
+  tape(j, 'fiche')
+  const z = tape(j, 'aptToggle')
+  assert.ok(j.e.aptOuvertes.has(z.id), 'le tap n’ouvre pas la description')
+  tape(j, 'aptToggle', (x) => x.id === z.id)
+  assert.ok(!j.e.aptOuvertes.has(z.id), 'un second tap ne referme pas la description')
+})
+
 // --- La bataille -------------------------------------------------------------------
 
 test('on engage, et le champ est planté avec les deux armées', () => {

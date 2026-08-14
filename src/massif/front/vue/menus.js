@@ -9,17 +9,18 @@
  * personne ici ne sait dans quel sens il travaille.
  */
 import { C, ton } from '../../../palette.js'
-import { rect, cadre, texte, largeurTexte, lueur, ombre, px, PX, bandeTramee } from '../../../dessin.js'
+import { rect, cadre, texte, largeurTexte, lueur, ombre, pastille, px, PX, bandeTramee } from '../../../dessin.js'
 import * as U from '../unites.js'
 import * as Cie from '../compagnie.js'
 import * as V from '../ville.js'
 import { CL, TYPE, TYPES, EFFICACITE, GRADES } from '../donnees/classes.js'
 import { UQ, RAR } from '../donnees/uniques.js'
 import { APT } from '../donnees/aptitudes.js'
-import { OBJ as OBJET, nomObjet, prixAmelioration, TIER_MAX } from '../donnees/objets.js'
+import { OBJ as OBJET, EMPLACEMENTS, nomObjet, prixAmelioration, TIER_MAX } from '../donnees/objets.js'
+import { ligneApt } from './aptitudes-ui.js'
 import { BIOMES } from '../terrain.js'
 import { OBJ } from '../carte.js'
-import { panneau, bouton, barre, teinteVie, tronque, paragraphe, entete, bourse, lignes } from './pieces.js'
+import { panneau, bouton, barre, teinteVie, tronque, paragraphe, entete, bourse, lignes, hexagone } from './pieces.js'
 import * as D from './dispo.js'
 
 // --- Liste défilante ------------------------------------------------------------------
@@ -643,7 +644,19 @@ export function compagnie(ctx, j, c, sel, defile) {
 
 // --- La fiche d'une troupe -----------------------------------------------------------------
 
-export function fiche(ctx, j, c, u) {
+/**
+ * La fiche d'une troupe — refondue autour de quatre bandes lisibles d'un
+ * regard plutôt qu'une grille de six cases en toutes lettres : les
+ * statistiques en pastilles-couleur, l'équipement en trois emplacements
+ * tapotables, le triangle des types en puces hexagonales, et les aptitudes
+ * en lignes qui se déplient au tap (`aptitudes-ui.js`, partagé avec le
+ * panneau de combat du lot 5).
+ *
+ * `selEquip` (un emplacement, ou `null`) fait basculer la bande du bas entre
+ * les aptitudes et le sélecteur du dépôt filtré sur cet emplacement — les
+ * deux occupent le même rectangle, jamais en même temps.
+ */
+export function fiche(ctx, j, c, u, defile, selEquip, aptOuvertes) {
   const ch = D.chassis(j)
   const d = D.fiche(j)
   const f = U.fiche(u)
@@ -667,48 +680,107 @@ export function fiche(ctx, j, c, u) {
   texte(ctx, `XP ${u.xp}/${U.besoinXp(u.niv)}`, ix, p.y + 66, 11, C.cyan, 700, 140)
   barre(ctx, ix, p.y + 74, iw, 5, u.xp / U.besoinXp(u.niv), C.cyan, C.bord)
 
-  const stats = [
-    ['ATTAQUE', Math.round(f.att)],
-    ['DÉFENSE', Math.round(f.def)],
-    ['MOUVEMENT', f.mvt],
-    ['PORTÉE', `${f.portee[0]}–${f.portee[1]}`],
-    ['VUE', f.vue],
-    ['AURA', f.aura || '—'],
+  // La bande de statistiques : une pastille-couleur par chiffre, sur une
+  // seule ligne — ce qu'était la grille de six cases en toutes lettres.
+  const STATS = [
+    ['ATT', Math.round(f.att), C.rouge],
+    ['DÉF', Math.round(f.def), C.cyan],
+    ['MVT', f.mvt, C.vert],
+    ['POR', `${f.portee[0]}–${f.portee[1]}`, C.accent],
+    ['VUE', f.vue, C.violet],
+    ['AUR', f.aura || '—', C.faible],
   ]
-  const demi = iw / 2
-  stats.forEach((s, i) => {
-    const x = ix + (i % 2) * demi
-    const y = p.y + 98 + Math.floor(i / 2) * 20
-    texte(ctx, s[0], x, y, 10, C.faible, 700, 96)
-    ctx.textAlign = 'right'
-    texte(ctx, String(s[1]), x + demi - 18, y, 13, C.texte, 700, 46)
+  const st = d.stats
+  const stW = st.w / STATS.length
+  STATS.forEach(([nom, val, teinte], i) => {
+    const x = st.x + i * stW
+    pastille(ctx, x + 8, st.y + st.h / 2, 4, teinte)
+    texte(ctx, nom, x + 16, st.y + st.h / 2 - 6, 8, C.faible, 700, stW - 18)
+    texte(ctx, String(val), x + 16, st.y + st.h / 2 + 9, 12, C.texte, 700, stW - 18)
+  })
+
+  // Les trois emplacements d'équipement : un contour seul quand ils sont
+  // vides, tapotables dans les deux cas. Un tap ouvre le sélecteur du dépôt,
+  // filtré sur ce seul emplacement.
+  d.equip.forEach((z, i) => {
+    const slot = EMPLACEMENTS[i]
+    const inst = u.equip?.[slot]
+    const ouvert = selEquip === slot
+    const teinte = inst ? C.accent : C.faible
+    if (ouvert) lueur(ctx, z.x, z.y, z.w, z.h, C.accent, 2, 0.4)
+    panneau(ctx, z.x, z.y, z.w, z.h, teinte)
+    ctx.textAlign = 'center'
+    texte(ctx, slot.toUpperCase().slice(0, 4), z.x + z.w / 2, z.y + 14, 8, C.faible, 700, z.w - 8)
+    texte(
+      ctx,
+      inst ? tronque(ctx, nomObjet(inst), 9, z.w - 8) : 'VIDE',
+      z.x + z.w / 2,
+      z.y + z.h - 10,
+      9,
+      inst ? C.texte : C.faible,
+      700,
+      z.w - 8,
+    )
     ctx.textAlign = 'left'
   })
 
-  // Le triangle des types, en clair. C'est la seule chose qu'un joueur doit
-  // savoir avant de choisir qui frappe qui, et elle n'est écrite nulle part
-  // ailleurs dans le jeu.
-  const fort = TYPES.filter((t) => EFFICACITE[f.type][t.id] >= 1.25)
-    .map((t) => t.court)
-    .join(' ')
-  const faible = TYPES.filter((t) => EFFICACITE[f.type][t.id] <= 0.85)
-    .map((t) => t.court)
-    .join(' ')
-  texte(ctx, `FORT CONTRE ${fort || '—'}`, d.fort.x, d.fort.y, 10, C.vert, 700, 150)
-  ctx.textAlign = 'right'
-  texte(ctx, `FAIBLE CONTRE ${faible || '—'}`, d.faible.x, d.faible.y, 10, C.rouge, 700, 150)
-  ctx.textAlign = 'left'
+  // Le triangle des types, en puces hexagonales : ▲ sur ce qu'on domine, ▼
+  // sur ce qui nous domine, la puce grisée sinon. Plus vite lu que deux
+  // lignes de sigles, et c'est la seule chose qu'un joueur doit savoir avant
+  // de choisir qui frappe qui.
+  const ty = d.types
+  const tyW = ty.w / TYPES.length
+  const cy = ty.y + ty.h / 2 - 5
+  const R = Math.min(11, tyW / 2 - 5, ty.h / 2 - 5)
+  TYPES.forEach((t, i) => {
+    const eff = EFFICACITE[f.type][t.id]
+    const neutre = eff > 0.85 && eff < 1.25
+    const x = ty.x + i * tyW + tyW / 2
+    const a = ctx.globalAlpha
+    if (neutre) ctx.globalAlpha = a * 0.35
+    hexagone(ctx, x, cy, R, t.couleur)
+    ctx.globalAlpha = a
+    ctx.textAlign = 'center'
+    if (!neutre) texte(ctx, eff >= 1.25 ? '▲' : '▼', x, cy + 3, 10, C.fond, 700, 20)
+    texte(ctx, t.court, x, ty.y + ty.h - 2, 8, C.faible, 700, tyW)
+    ctx.textAlign = 'left'
+  })
 
-  const a = d.aptitudes
-  texte(ctx, 'APTITUDES', a.x, a.y, 11, C.accent, 700, a.w)
-  let y = a.debut
-  for (const id of u.apt) {
-    const apt = APT[id]
-    if (!apt) continue
-    texte(ctx, apt.nom, a.x, y, 11, apt.ordre ? C.violet : C.texte, 700, a.w)
-    y += 14
-    y += paragraphe(ctx, apt.texte, a.x + 10, y, 9, a.w - 10, C.faible, 11) + 6
-    if (y > a.max) break
+  const az = d.apZone
+  const zones = []
+  let max = 0
+  if (selEquip) {
+    // Le sélecteur : les objets du dépôt qui vont dans cet emplacement, plus
+    // « RETIRER » en tête si la troupe en porte déjà un.
+    texte(ctx, `CHOISIR — ${selEquip.toUpperCase()}`, d.apTitre.x, d.apTitre.y, 11, C.accent, 700, az.w)
+    const options = c.objets.map((inst, i) => ({ i, inst })).filter((x) => OBJET[x.inst.id]?.emplacement === selEquip)
+    const lignesEq = [...(u.equip?.[selEquip] ? [{ retirer: true }] : []), ...options]
+    const r = liste(ctx, az, lignesEq, 44, defile, (ctx, z, l) => {
+      panneau(ctx, z.x, z.y, z.w, z.h, l.retirer ? C.rouge : C.bord)
+      if (l.retirer) {
+        texte(ctx, 'RETIRER L’ÉQUIPEMENT', z.x + 10, z.y + z.h / 2 + 4, 11, C.rouge, 700, z.w - 20)
+      } else {
+        const info = OBJET[l.inst.id]
+        texte(ctx, nomObjet(l.inst), z.x + 10, z.y + 18, 11, C.texte, 700, z.w - 20)
+        texte(ctx, info?.nom ?? '', z.x + 10, z.y + 34, 9, C.faible, 700, z.w - 20)
+      }
+    })
+    zones.push(...r.zones.map((z) => ({ ...z, quoi: z.el.retirer ? 'deposeEquip' : 'poseEquip', i: z.el.i })))
+    max = r.max
+    if (!lignesEq.length)
+      texte(ctx, 'RIEN DANS LE DÉPÔT POUR CET EMPLACEMENT', az.x, az.y + 20, 10, C.faible, 700, az.w)
+  } else {
+    texte(ctx, 'APTITUDES', d.apTitre.x, d.apTitre.y, 11, C.accent, 700, az.w)
+    let y = az.y
+    for (const id of U.aptEffectives(u)) {
+      const apt = APT[id]
+      if (!apt) continue
+      const ouverte = !!aptOuvertes?.has(id)
+      const h = ligneApt(ctx, az.x, y, az.w, apt, ouverte)
+      zones.push({ x: az.x, y, w: az.w, h, quoi: 'aptToggle', id })
+      y += h + 4
+      if (y > az.y + az.h) break
+    }
   }
 
   texte(
@@ -731,7 +803,8 @@ export function fiche(ctx, j, c, u) {
   bouton(ctx, d.reforme, `RÉFORMER +${U.prixRevente(u, c.niveau)}`, { teinte: C.rouge, petit: true })
   bouton(ctx, d.retour, 'RETOUR', { petit: true })
   bourse(ctx, c, D.bourse(j, true))
-  return [d.soigne, d.reforme, d.retour]
+  zones.push(...d.equip.map((z, i) => ({ ...z, slot: EMPLACEMENTS[i] })), d.soigne, d.reforme, d.retour)
+  return { zones, max, rect: selEquip ? az : null }
 }
 
 // --- Le bilan ------------------------------------------------------------------------------
