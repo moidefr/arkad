@@ -772,9 +772,10 @@ export function forceRestante(bat, camp) {
 function finDeTemps(bat) {
   if (bat.fini) return
   const o = bat.objectif
-  if (o.id === 'survie') return void (bat.fini = 'gagne')
+  if (o.id === 'survie') return void ((bat.cause = 'objectif'), (bat.fini = 'gagne'))
   const mienne = forceRestante(bat, 0)
   const sienne = forceRestante(bat, 1)
+  bat.cause = 'temps'
   bat.fini = mienne > sienne ? 'gagne' : 'perdu'
   note(bat, mienne > sienne ? 'L’ENNEMI ROMPT LE CONTACT' : 'LA COMPAGNIE DÉCROCHE')
 }
@@ -784,18 +785,32 @@ export function verifieFin(bat) {
   const o = bat.objectif
   const miens = vivantes(bat, 0)
   const siens = vivantes(bat, 1)
-  if (!miens.length) return (bat.fini = 'perdu')
-  if (!siens.length) return (bat.fini = 'gagne')
+  if (!miens.length) return ((bat.cause = 'anéantie'), (bat.fini = 'perdu'))
+
+  // **Anéantir l'adversaire ne gagne que les batailles dont c'est l'objet.**
+  //
+  // Tant que c'était une victoire universelle, c'était aussi le chemin le plus
+  // court pour tous les modes, et les autres n'étaient plus que des étiquettes :
+  // mesuré au banc, TENIR LES POINTS se résolvait par sa propre règle dans 4 %
+  // des cas et par le massacre dans 54 %, PERCER dans 1 % contre 42 %. On ne
+  // jouait jamais l'objectif, on le contournait.
+  //
+  // Le camp vide ne bloque rien pour autant : la partie continue sur un terrain
+  // libre, et l'objectif se referme de lui-même en quelques tours — tenir des
+  // points que personne ne conteste, ou traverser une carte déserte.
+  if (!siens.length && (o.id === 'annihilation' || o.id === 'decapitation')) {
+    return ((bat.cause = 'anéantissement'), (bat.fini = 'gagne'))
+  }
 
   if (o.id === 'decapitation') {
     const chef = siens.find((u) => u.ref === o.chef)
-    if (!chef) return (bat.fini = 'gagne')
+    if (!chef) return ((bat.cause = 'objectif'), (bat.fini = 'gagne'))
     const mien = miens.find((u) => u.ref === o.chefAllie)
-    if (o.chefAllie && !mien) return (bat.fini = 'perdu')
+    if (o.chefAllie && !mien) return ((bat.cause = 'objectif'), (bat.fini = 'perdu'))
   }
-  if (o.id === 'capture' && bat.tenus[0] >= (o.besoin ?? 3)) return (bat.fini = 'gagne')
-  if (o.id === 'capture' && bat.tenus[1] >= (o.besoin ?? 3)) return (bat.fini = 'perdu')
-  if (o.id === 'percee' && bat.perces >= (o.besoin ?? 2)) return (bat.fini = 'gagne')
+  if (o.id === 'capture' && bat.tenus[0] >= (o.besoin ?? 3)) return ((bat.cause = 'objectif'), (bat.fini = 'gagne'))
+  if (o.id === 'capture' && bat.tenus[1] >= (o.besoin ?? 3)) return ((bat.cause = 'objectif'), (bat.fini = 'perdu'))
+  if (o.id === 'percee' && bat.perces >= (o.besoin ?? 2)) return ((bat.cause = 'objectif'), (bat.fini = 'gagne'))
   return null
 }
 

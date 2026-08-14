@@ -33,12 +33,20 @@ export const depotMax = (n) => places(n) + 8
 /**
  * Le renom qu'il faut pour passer au niveau suivant.
  *
- * Réglé au banc : avec la courbe d'avant, trente engagements menaient au
- * niveau 5, et **vingt-six classes sur trente-cinq** n'étaient jamais
- * apparues à la caserne. Du contenu qu'on ne voit pas est du contenu qui
- * n'existe pas.
+ * **Le terme carré n'est pas décoratif.** Avec un seuil linéaire (16 + 6n) et
+ * une prime de victoire elle aussi linéaire (18 + 4n), le rapport tendait vers
+ * deux niveaux pour trois victoires — indéfiniment. Le niveau de la compagnie
+ * prenait donc une avance qui ne cessait jamais de croître : mesuré au banc,
+ * **cinq rangs** devant la troupe moyenne au vingt-huitième engagement. Or
+ * c'est le niveau global qui commande la taille des cartes, le budget adverse
+ * et ce qu'on trouve en boutique : le jeu se durcissait plus vite que la
+ * compagnie ne s'aguerrissait, et le rythme des troupes — qui, lui, est bon —
+ * n'y pouvait rien.
+ *
+ * Le début reste vif : une victoire par niveau les premiers rangs. C'est
+ * ensuite que la courbe rattrape la prime au lieu de la fuir.
  */
-export const seuilRenom = (n) => 16 + 6 * n
+export const seuilRenom = (n) => Math.round(14 + 5 * n + 0.75 * n * n)
 
 // --- Création et sauvegarde ------------------------------------------------------
 
@@ -170,14 +178,36 @@ export function nommeChef(c, e, id) {
 // --- Recrutement -----------------------------------------------------------------
 
 /** L'étal de la caserne et le carnet de l'état-major, retirés à chaque engagement. */
+/**
+ * Le niveau auquel la caserne enrôle.
+ *
+ * **Pas le niveau de la compagnie.** C'était le réglage d'origine, et il rendait
+ * la persistance absurde : mesuré au banc, le niveau global prend 4,2 rangs
+ * d'avance sur la troupe moyenne en vingt-huit engagements, si bien qu'une
+ * recrue payée trois cents pièces sortait meilleure que le vétéran de dix
+ * batailles qu'on avait soigné et gardé. Acheter battait conserver, toujours.
+ *
+ * La caserne enrôle donc au niveau de **ce qu'on aligne vraiment**, plafonné
+ * par le niveau de la compagnie. Une recrue comble un trou ou apporte une
+ * classe qu'on n'a pas ; elle ne remplace jamais un vétéran par une meilleure
+ * copie sortie du guichet.
+ */
+export function niveauRecrue(c) {
+  const t = c.troupes ?? []
+  if (!t.length) return 1
+  const moyenne = t.reduce((s, u) => s + u.niv, 0) / t.length
+  return Math.max(1, Math.min(c.niveau, Math.round(moyenne)))
+}
+
 export function rafraichit(c) {
   const rng = melange32(derive(c.graine, 55, c.engagements, c.niveau))
   const dispo = CLASSES.filter((x) => x.rang <= c.niveau)
   const stock = melange(rng, dispo).slice(0, Math.min(6, dispo.length))
+  const nivRecrue = niveauRecrue(c)
   const bassin = UNIQUES.map((u) => u.id)
   const offerts = U.tireUniques(rng, bassin, c.niveau, 3, c.uniquesVus)
   c.offre = {
-    caserne: stock.map((x) => ({ cl: x.id, prix: U.prixGenerique(x.id, c.niveau), niv: c.niveau })),
+    caserne: stock.map((x) => ({ cl: x.id, prix: U.prixGenerique(x.id, nivRecrue), niv: nivRecrue })),
     uniques: offerts.map((id) => ({
       uq: id,
       prix: U.prixUnique(id, c.niveau),

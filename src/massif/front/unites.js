@@ -277,11 +277,29 @@ export const besoinXp = (n) => Math.round(28 * Math.pow(n, 1.28))
  * au-delà, il faut recruter quelqu'un qui a un nom. Un unique ne redescend
  * jamais sous le grade avec lequel il est arrivé.
  */
+/**
+ * Le nombre de batailles qu'il faut avoir faites pour porter un grade.
+ *
+ * Un grade se gagne au feu, pas au guichet. Sans cette condition, une recrue
+ * générique sortait de la caserne avec le grade que son niveau lui donnait :
+ * mesuré au banc, **les six cartes de la caserne sur six** étaient gradées dès
+ * le septième engagement, et elles commandaient mieux que les sergents qu'on
+ * avait faits soi-même. Un unique, lui, arrive avec son nom et son rang —
+ * c'est précisément ce qu'on paie.
+ */
+export const BATAILLES_PAR_GRADE = [0, 2, 6, 12, 20, 30]
+
 export function gradeAtteint(u) {
   const plancher = u.uq ? UQ[u.uq].grade : 0
   const plafond = u.uq ? GRADES.length - 1 : GRADE_MAX_GENERIQUE
   let g = plancher
-  for (const gr of GRADES) if (gr.niveau <= u.niv && gr.id <= plafond) g = Math.max(g, gr.id)
+  for (const gr of GRADES) {
+    if (gr.id > plafond || gr.niveau > u.niv) continue
+    // Le plancher d'un unique ne se discute pas ; au-delà, tout le monde doit
+    // avoir servi.
+    if (gr.id > plancher && (u.batailles ?? 0) < BATAILLES_PAR_GRADE[gr.id]) continue
+    g = Math.max(g, gr.id)
+  }
   return g
 }
 
@@ -300,7 +318,12 @@ export function gagneXp(u, xp, plafond = 99) {
   u.grade = gradeAtteint(u)
   // Monter de niveau soigne la différence de vie maximale : on ne punit pas
   // une promotion en laissant la barre plus courte qu'avant.
-  if (u.niv > avant.niv) u.pv += Math.round((u.niv - avant.niv) * CL[u.cl].pv * CROISSANCE * ENDURANCE)
+  // Et jamais au-delà du maximum. L'incrément suppose que la vie ne dépend que
+  // du niveau ; depuis que le grade se gagne au feu et non au rang, les deux
+  // ne montent plus ensemble et l'incrément pouvait dépasser.
+  if (u.niv > avant.niv) {
+    u.pv = Math.min(fiche(u).pvMax, u.pv + Math.round((u.niv - avant.niv) * CL[u.cl].pv * CROISSANCE * ENDURANCE))
+  }
   return { xp: gagne, niveaux: u.niv - avant.niv, grade: u.grade > avant.grade ? u.grade : null }
 }
 

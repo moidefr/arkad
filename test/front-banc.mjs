@@ -64,6 +64,7 @@ console.log(`${CAMPAGNES} campagnes × ${ENGAGEMENTS} engagements\n`)
 const parNiveau = new Map()
 const parObjectif = new Map()
 const parClasse = new Map()
+const ecart = new Map()
 const finals = []
 let sansFin = 0
 
@@ -77,10 +78,14 @@ for (let n = 0; n < CAMPAGNES; n++) {
     joue(bat)
     if (!B.fini(bat)) sansFin++
 
-    const objet = parObjectif.get(bat.objectif.id) ?? { n: 0, g: 0, t: 0 }
+    const objet = parObjectif.get(bat.objectif.id) ?? { n: 0, g: 0, t: 0, parObj: 0, parMassacre: 0 }
     objet.n++
     objet.t += bat.tour
     if (bat.fini === 'gagne') objet.g++
+    // Par quelle porte on est sorti. Un objectif qu'on ne franchit jamais
+    // *par lui-même* n'est pas un mode de jeu, c'est une étiquette.
+    if (bat.cause === 'objectif') objet.parObj++
+    if (bat.cause === 'anéantissement') objet.parMassacre++
     parObjectif.set(bat.objectif.id, objet)
 
     const pal = Math.min(20, niveau)
@@ -102,6 +107,22 @@ for (let n = 0; n < CAMPAGNES; n++) {
 
     const r = Cie.bilan(c, bat)
     e.perdus += r.perdus.length
+
+    // L'écart entre le niveau de la compagnie et celui de ses troupes.
+    //
+    // C'est lui qui décide si garder une troupe a un sens : les cartes de la
+    // caserne sont créées AU niveau de la compagnie, donc dès que le niveau
+    // global court devant les vétérans, acheter bat toujours conserver, et la
+    // persistance — le sujet du jeu — ne veut plus rien dire.
+    if (c.troupes.length) {
+      const moy = c.troupes.reduce((s2, u) => s2 + u.niv, 0) / c.troupes.length
+      const g = ecart.get(k) ?? { n: 0, cie: 0, moy: 0, gradesShop: 0 }
+      g.n++
+      g.cie += c.niveau
+      g.moy += moy
+      g.gradesShop += (c.offre?.caserne ?? []).filter((l) => U.gradeAtteint({ niv: l.niv, uq: null }) > 0).length
+      ecart.set(k, g)
+    }
   }
   finals.push({
     niveau: c.niveau,
@@ -129,7 +150,9 @@ for (const o of OBJECTIFS) {
   const e = parObjectif.get(o.id)
   if (!e) continue
   console.log(
-    `    ${o.nom.padEnd(18)} ${((e.g / e.n) * 100).toFixed(0).padStart(3)} % · ${(e.t / e.n).toFixed(1)} tours · ${e.n} fois`,
+    `    ${o.nom.padEnd(18)} ${((e.g / e.n) * 100).toFixed(0).padStart(3)} % · ${(e.t / e.n).toFixed(1)} tours · ` +
+      `${String(e.n).padStart(4)} fois · résolu par l’objectif ${((e.parObj / e.n) * 100).toFixed(0).padStart(3)} % ` +
+      `· par massacre ${((e.parMassacre / e.n) * 100).toFixed(0).padStart(3)} %`,
   )
 }
 
@@ -157,6 +180,19 @@ if (sansFin) console.log(`    ⚠ ${sansFin} bataille(s) sans fin`)
 //
 // Une matrice qui se lit d'un coup : personne ne doit gagner contre tout le
 // monde, et personne ne doit perdre contre tout le monde.
+
+console.log('\n  niveau de la compagnie contre niveau des troupes —')
+console.log('    engagement   compagnie   troupes   écart   cartes gradées en caserne')
+for (const k of [...ecart.keys()].sort((a, b) => a - b)) {
+  if (k % 3) continue
+  const g = ecart.get(k)
+  const cie = g.cie / g.n
+  const moy = g.moy / g.n
+  console.log(
+    `    ${String(k + 1).padStart(9)}   ${cie.toFixed(1).padStart(9)}   ${moy.toFixed(1).padStart(7)}   ` +
+      `${(cie - moy).toFixed(1).padStart(5)}   ${(g.gradesShop / g.n).toFixed(1)} sur 6`,
+  )
+}
 
 // Sur une plaine nue, les troupes légères perdaient tous leurs duels : toute
 // leur fiche tient dans l'embuscade, et il n'y avait pas un bosquet. On mesure

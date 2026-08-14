@@ -126,17 +126,21 @@ const empreinte = (ctx) =>
  */
 const PORTRAIT = [
   ['titre', 18, 'ec969a079f2d16e6'],
-  ['camp', 59, 'b1a9fe8284708641'],
+  // Réétalonné : la caserne enrôle désormais au niveau de la troupe alignée et
+  // non à celui de la compagnie, donc le chiffre porté par les cartes du camp a
+  // changé. Le nombre de traits, lui, est identique — c'est du texte, pas de la
+  // disposition.
+  ['camp', 59, '3051a123754d48ab'],
   ['campagne', 54, '3b9b04d51ab6a423'],
-  ['caserne', 87, '880ef1c955502281'],
-  ['uniques', 65, 'b676316a6b563257'],
+  ['caserne', 87, '7bbd1d92c9ce7d20'],
+  ['uniques', 65, '5fd1b54767fbc37f'],
   ['compagnie', 89, '77d685cf64eaba4a'],
   ['fiche', 63, 'eedf887e3fd64603'],
   ['bataille', 396, 'cad016f2097e0dab'],
   ['bataille/troupe', 408, '8b79da9d914c844b'],
   ['bataille/prévision', 414, '31f1100cc351fa28'],
   ['bataille/ennemi', 366, 'fcc0258684ea47de'],
-  ['bilan', 24, 'e540684b8388e3af'],
+  ['bilan', 24, '35fd99153039daaf'],
 ]
 
 test('le portrait n’a pas bougé d’un pixel', () => {

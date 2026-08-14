@@ -131,7 +131,9 @@ test('un chef d’escouade est au moins caporal', () => {
   const e = c.escouades[0]
   const soldat = c.troupes.find((t) => t.grade === 0)
   assert.equal(C.nommeChef(c, e, soldat.id), false)
+  // Un grade se gagne au feu : le niveau ne suffit plus, il faut avoir servi.
   soldat.niv = 6
+  soldat.batailles = 8
   soldat.grade = U.gradeAtteint(soldat)
   assert.ok(soldat.grade >= 1)
   assert.equal(C.nommeChef(c, e, soldat.id), true)

@@ -301,16 +301,23 @@ test('la somme des taux d’apparition fait bien 1', () => {
 
 // --- Expérience --------------------------------------------------------------
 
-test('l’expérience fait monter, et le grade suit le niveau', () => {
+test('l’expérience fait monter, et le grade suit le niveau **et** le service', () => {
   const u = U.creeGenerique('milicien', 1)
   assert.equal(u.grade, 0)
+  // Le niveau seul ne donne rien : un grade se gagne au feu. C'est ce qui
+  // empêche la caserne de vendre des sergents tout faits.
   for (let i = 0; i < 40; i++) U.gagneXp(u, 60, 20)
   assert.ok(u.niv > 5, `niveau ${u.niv}`)
+  assert.equal(u.grade, 0, 'un niveau élevé sans une seule bataille ne donne pas de grade')
+
+  u.batailles = 8
+  U.gagneXp(u, 1)
   assert.ok(u.grade >= 2, `grade ${u.grade}`)
 })
 
 test('un générique ne dépasse jamais lieutenant', () => {
   const u = U.creeGenerique('milicien', 1)
+  u.batailles = 200
   for (let i = 0; i < 200; i++) U.gagneXp(u, 400, 40)
   assert.equal(u.grade, 3)
 })
