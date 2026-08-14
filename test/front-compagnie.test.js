@@ -9,6 +9,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 
 import * as C from '../src/massif/front/compagnie.js'
+import * as V from '../src/massif/front/ville.js'
 import * as B from '../src/massif/front/bataille.js'
 import * as IA from '../src/massif/front/ia.js'
 import * as U from '../src/massif/front/unites.js'
@@ -228,7 +229,9 @@ test('une victoire paie, fait monter, et ramasse les tombés', () => {
   const combien = c.troupes.length
   const r = C.bilan(c, bat)
   assert.ok(r.gagne && r.or > 0 && r.renom > 0)
-  assert.equal(c.or, orAvant + r.or)
+  // La prime, moins la journée que la bataille a prise : depuis la ville, un
+  // jour se paie en vivres, et celui du combat ne fait pas exception.
+  assert.equal(c.or, orAvant + r.or - V.coutJour(c))
   assert.equal(c.troupes.length, combien, 'une troupe a disparu après une victoire')
   assert.ok(C.trouve(c, tombe.ref).pv > 0, 'le ramassé n’est pas rentré')
   assert.equal(C.trouve(c, tombe.ref).blesse, 1)

@@ -16,6 +16,7 @@ import { CLASSES, CL, GRADES } from './donnees/classes.js'
 import { UNIQUES, UQ, RAR } from './donnees/uniques.js'
 import { BIOMES } from './terrain.js'
 import * as U from './unites.js'
+import * as V from './ville.js'
 import * as A from './adversaire.js'
 import * as B from './bataille.js'
 import { genereCarte, zoneDeploiement, pointsCapture, placeLibre, OBJECTIFS, OBJ, biomePour } from './carte.js'
@@ -72,6 +73,7 @@ export function nouvelle(graine) {
     plan: null,
     choix: null,
     dernier: null,
+    ville: V.villeNeuve(),
   }
   c.escouades = [{ nom: 'PREMIÈRE', chef: c.troupes[0].id, membres: c.troupes.map((t) => t.id) }]
   rafraichit(c)
@@ -89,6 +91,7 @@ export function migre(brut) {
   if (!brut || brut.v !== VERSION || !brut.c?.troupes) return null
   const c = brut.c
   U.cale(c.troupes)
+  V.cale(c)
   c.escouades ??= []
   c.uniquesVus ??= []
   if (!c.plan) planifie(c)
@@ -426,6 +429,10 @@ function pose(carte, troupes, camp, occupe, c) {
       u.esc = e ? c.escouades.indexOf(e) : -1
       // Un chef d'escouade tient les siens avant même le premier coup.
       if (e && e.chef && e.chef !== t.id) u.moral = Math.min(B.MORAL_PLEIN, u.moral + 8)
+      // Et le moral de la compagnie entre en bataille avec elle : c'est le
+      // même nombre qui vit en ville et qui se joue ici, pour qu'il n'y ait
+      // pas deux morals à expliquer.
+      u.moral = Math.max(1, Math.min(B.MORAL_PLEIN, u.moral + V.bonusMoral(c)))
     }
     occupe.add(cle(place.q, place.r))
     sortie.push(u)
@@ -471,6 +478,14 @@ export function bilan(c, bat) {
     c.troupes = c.troupes.filter((t) => t.id !== u.id)
     c.pertes++
   }
+
+  // La bataille a pris une journée : elle marque la date, et c'est elle qui
+  // repousse l'oubli. Le moral suit le résultat — une déroute se paie
+  // au-delà des pertes.
+  V.cale(c)
+  c.ville.dernierCombat = c.ville.jour
+  V.passeJour(c)
+  V.ajusteMoral(c, gagne ? 8 : rompu ? -4 : -10)
 
   repos(c)
 

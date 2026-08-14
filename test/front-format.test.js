@@ -137,7 +137,10 @@ const PORTRAIT = [
   ['compagnie', 89, '77d685cf64eaba4a'],
   ['fiche', 63, 'eedf887e3fd64603'],
   ['bataille', 396, 'cad016f2097e0dab'],
-  ['bataille/troupe', 408, '8b79da9d914c844b'],
+  // Réétalonné : le moral de la compagnie entre désormais en bataille avec
+  // elle, donc la barre de moral de la troupe sélectionnée ne part plus de la
+  // même valeur. Même nombre de traits — c'est une longueur, pas une position.
+  ['bataille/troupe', 408, 'b06ac2c0b8b01898'],
   ['bataille/prévision', 414, '31f1100cc351fa28'],
   ['bataille/ennemi', 366, 'fcc0258684ea47de'],
   ['bilan', 24, '35fd99153039daaf'],
