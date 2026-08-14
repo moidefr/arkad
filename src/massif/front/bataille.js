@@ -688,6 +688,60 @@ export function lanceOrdre(bat, u, apt, cible) {
   return r
 }
 
+/**
+ * Ce que l'écran montre avant de confirmer un ordre actif : les mêmes
+ * calculs que `lanceOrdre()`, mais rien ne mute — même règle que
+ * `prevision()` pour un coup ordinaire. « Aucun coup à l'aveugle » vaut
+ * aussi pour une grenade : avant ce miroir, un ordre partait dès qu'on
+ * tapait la case, sans jamais montrer les dégâts ni la riposte qu'il allait
+ * coûter.
+ */
+export function previsionOrdre(bat, u, apt, cible) {
+  const e = apt.ordre.effets
+  const zone = e.rayon != null ? rayon(cible.q, cible.r, e.rayon) : [{ q: cible.q, r: cible.r }]
+  const r = { cibles: [], soignes: [], moralTouches: [], etatTouches: 0 }
+
+  if (e.degats != null) {
+    for (const h of zone) {
+      const c = uniteA(bat, h.q, h.r)
+      if (!c || c.camp === u.camp) continue
+      const coup = calcule(bat, u, c, { mult: e.degats, perce: !!e.perce })
+      const rip = e.sansRiposte ? null : riposteDe(bat, u, c, coup)
+      r.cibles.push({ cible: c, degats: coup.final, mortelle: coup.mortelle, riposte: rip ? rip.final : 0 })
+    }
+  }
+
+  if (e.soin) {
+    const vise = e.cible === 'allies' ? zone : [{ q: cible.q, r: cible.r }]
+    for (const h of vise) {
+      const c = uniteA(bat, h.q, h.r)
+      if (!c || c.camp !== u.camp) continue
+      r.soignes.push({ cible: c, soin: Math.min(e.soin, c.pvMax - c.pv) })
+    }
+  }
+
+  if (e.moral != null) {
+    for (const c of bat.unites) {
+      if (c.pv <= 0) continue
+      const amis = e.cible === 'ennemis' ? c.camp !== u.camp : c.camp === u.camp
+      if (!amis) continue
+      if (distance(u.q, u.r, c.q, c.r) > (e.rayon ?? 0)) continue
+      const v = e.moral < 0 ? Math.round(e.moral * (1 - passif(c, 'discipline'))) : e.moral
+      r.moralTouches.push({ cible: c, delta: v })
+    }
+  }
+
+  if (e.etat) {
+    const vise =
+      e.cible === 'allies' ? vivantes(bat, u.camp).filter((c) => distance(u.q, u.r, c.q, c.r) <= (e.rayon ?? 0)) : [u]
+    r.etatTouches = vise.length
+  }
+
+  if (e.terrain) r.terrain = e.terrain
+  if (e.piege) r.piege = e.piege
+  return r
+}
+
 // --- Tours ---------------------------------------------------------------------------
 
 /** Remet le camp qui prend la main en état de jouer. */
@@ -743,9 +797,17 @@ export function finTour(bat) {
 
 // --- Objectifs et fin ------------------------------------------------------------------
 
+/**
+ * L'embuscade réutilise exactement la mécanique de TENIR LES POINTS — un
+ * seul point (le goulet) au lieu de plusieurs, l'adversaire renforcé en face
+ * (`surnombre` dans `compagnie.js prepare()`) : ce n'est pas une nouvelle
+ * règle, c'est le même comptage à un paramètre près.
+ */
+const TENUE = ['capture', 'embuscade']
+
 function compteObjectif(bat, camp) {
   const o = bat.objectif
-  if (o.id === 'capture') {
+  if (TENUE.includes(o.id)) {
     const pris = (o.points ?? []).filter((p) => {
       const u = uniteA(bat, p.q, p.r)
       return u && u.camp === camp
@@ -808,9 +870,22 @@ export function verifieFin(bat) {
     const mien = miens.find((u) => u.ref === o.chefAllie)
     if (o.chefAllie && !mien) return ((bat.cause = 'objectif'), (bat.fini = 'perdu'))
   }
-  if (o.id === 'capture' && bat.tenus[0] >= (o.besoin ?? 3)) return ((bat.cause = 'objectif'), (bat.fini = 'gagne'))
-  if (o.id === 'capture' && bat.tenus[1] >= (o.besoin ?? 3)) return ((bat.cause = 'objectif'), (bat.fini = 'perdu'))
+  if (TENUE.includes(o.id) && bat.tenus[0] >= (o.besoin ?? 3)) return ((bat.cause = 'objectif'), (bat.fini = 'gagne'))
+  if (TENUE.includes(o.id) && bat.tenus[1] >= (o.besoin ?? 3)) return ((bat.cause = 'objectif'), (bat.fini = 'perdu'))
   if (o.id === 'percee' && bat.perces >= (o.besoin ?? 2)) return ((bat.cause = 'objectif'), (bat.fini = 'gagne'))
+
+  // L'escorte est l'inverse de PERCER : au lieu de faire passer n'importe
+  // quelles deux troupes, il faut faire passer **celles-là**, vivantes.
+  // Perdre toutes les troupes escortées referme la bataille tout de suite —
+  // inutile d'attendre le chronomètre pour dire que la mission a échoué.
+  if (o.id === 'escorte') {
+    const escortes = (o.escortes ?? []).map((ref) => parRef(bat, ref))
+    const vivants = escortes.filter((u) => u && u.pv > 0)
+    if (escortes.length && !vivants.length) return ((bat.cause = 'objectif'), (bat.fini = 'perdu'))
+    if (vivants.length && vivants.every((u) => versOffset(u.q, u.r).col >= bat.carte.cols - 1)) {
+      return ((bat.cause = 'objectif'), (bat.fini = 'gagne'))
+    }
+  }
   return null
 }
 
@@ -835,7 +910,7 @@ export function retraite(bat) {
 export function etatObjectif(bat) {
   const o = bat.objectif
   const nom = OBJ[o.id]?.court ?? o.id
-  if (o.id === 'capture') {
+  if (TENUE.includes(o.id)) {
     const pris = (o.points ?? []).filter((p) => uniteA(bat, p.q, p.r)?.camp === 0).length
     return `${nom} ${pris}/${(o.points ?? []).length} · ${bat.tenus[0]}/${o.besoin ?? 3}`
   }
@@ -845,6 +920,12 @@ export function etatObjectif(bat) {
   if (o.id === 'decapitation') {
     const chef = vivantes(bat, 1).find((u) => u.ref === o.chef)
     return `${nom} · ${chef ? 'DEBOUT' : 'ABATTU'}`
+  }
+  if (o.id === 'escorte') {
+    const escortes = (o.escortes ?? []).map((ref) => parRef(bat, ref))
+    const vivants = escortes.filter((u) => u && u.pv > 0).length
+    const arrivees = escortes.filter((u) => u && u.pv > 0 && versOffset(u.q, u.r).col >= bat.carte.cols - 1).length
+    return `${nom} ${arrivees}/${escortes.length} · ${vivants}V`
   }
   return `${nom} ${vivantes(bat, 1).length}`
 }

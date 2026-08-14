@@ -159,17 +159,13 @@ const PORTRAIT = [
   // seul qui ait quelque chose de propre à montrer — ses sessions).
   ['ville', 81, 'fe41f50755b1fcff'],
   ['batiment', 54, '72fb57b86857024c'],
-  ['bataille', 396, 'cad016f2097e0dab'],
-  // Réétalonné : le moral de la compagnie entre désormais en bataille avec
-  // elle, donc la barre de moral de la troupe sélectionnée ne part plus de la
-  // même valeur. Même nombre de traits — c'est une longueur, pas une position.
-  ['bataille/troupe', 408, 'b06ac2c0b8b01898'],
-  // Réétalonné avec la caserne et les uniques ci-dessus : à graine égale, une
-  // armée composée d'un vivier de classes plus large n'aligne plus les mêmes
-  // troupes, donc ni la prévision de tir ni la fiche adverse inspectée ne
-  // portent les mêmes chiffres. Toujours le même nombre de traits.
-  ['bataille/prévision', 414, '836fe1f95832306e'],
-  ['bataille/ennemi', 366, 'e3de531b52a5acc7'],
+  // Réétalonné au lot 5 : ZOOM et FIN DE TOUR passent de 26 à 30 px de haut
+  // dans le bandeau, commun aux quatre états — même nombre de traits, le
+  // bouton bouge de deux pixels.
+  ['bataille', 396, '0026a4679b1d45a9'],
+  ['bataille/troupe', 408, 'efac87fa29a5f1f7'],
+  ['bataille/prévision', 414, '60ac62ce0f8d6e5d'],
+  ['bataille/ennemi', 366, '533c94270d6d6930'],
   ['bilan', 24, '35fd99153039daaf'],
 ]
 

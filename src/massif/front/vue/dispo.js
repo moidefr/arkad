@@ -481,6 +481,9 @@ export function bataille(j) {
         maxPm: 90,
         maxSous: pw - 102,
         maxCouvert: 94,
+        // Le journal, sous les trois rangées de boutons : 44 px de reste
+        // après elles, largement de quoi montrer deux lignes.
+        journal: { y: 268, n: 2 },
       },
       prevision: {
         nom: 20,
@@ -514,6 +517,8 @@ export function bataille(j) {
         maxPv: pw,
         fermer: 250,
         hFermer: 36,
+        // Dix-huit pixels de reste seulement : une ligne, pas deux.
+        journal: { y: 290, n: 1 },
       },
     }
   }
@@ -524,8 +529,10 @@ export function bataille(j) {
     bandeau: { x: 0, y: 56, w: 360, h: 32 },
     objectif: { x: 8, dy: 11, max: 118 },
     tour: { x: 8, dy: 25, max: 118 },
-    zoom: { x: 136, y: 59, w: 52, h: 26, quoi: 'zoom' },
-    fin: { x: 194, y: 59, w: 158, h: 26, quoi: 'finTour' },
+    // Deux pixels d'inset, jusqu'au bas du bandeau (88) : les 30 px
+    // réglementaires du doigt tiennent tout juste sous les 32 du bandeau.
+    zoom: { x: 136, y: 58, w: 52, h: 30, quoi: 'zoom' },
+    fin: { x: 194, y: 58, w: 158, h: 30, quoi: 'finTour' },
     champ,
     panneau,
     px: panneau.x + 8,
@@ -535,6 +542,10 @@ export function bataille(j) {
     // Debout, les deux compteurs tiennent sur la même ligne : 210 + 130 font
     // les 344 px du panneau, au pixel près.
     repos: { compte: 16, reste: 16, maxCompte: 210, maxReste: 130, vignettes: 26 },
+    // 188 px de panneau, et douze de reste une fois les trois rangées
+    // posées : juste assez pour une ligne de journal, pas les deux ou trois
+    // que couché se permet. h2/h3 descendent à 30 (le plancher du doigt,
+    // pas moins) pour les dégager.
     unite: {
       nom: 18,
       sous: 34,
@@ -544,14 +555,15 @@ export function bataille(j) {
       moralTexte: 61,
       y1: 70,
       pas2: 40,
-      pas3: 40,
+      pas3: 36,
       h1: 36,
-      h2: 34,
-      h3: 34,
+      h2: 30,
+      h3: 30,
       maxNom: 210,
       maxPm: 90,
       maxSous: 230,
       maxCouvert: 110,
+      journal: { y: 180, n: 1 },
     },
     prevision: {
       nom: 16,
@@ -581,7 +593,8 @@ export function bataille(j) {
       maxStats: 250,
       maxPv: 80,
       fermer: 148,
-      hFermer: 34,
+      hFermer: 30,
+      journal: { y: 182, n: 1 },
     },
   }
 }

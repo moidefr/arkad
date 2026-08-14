@@ -456,8 +456,9 @@ export function prepare(c, k) {
   // « Tenir le choc » veut dire être en dessous, et pas seulement affronter un
   // compteur : sur cet objectif l'adversaire a moitié plus de moyens et jusqu'à
   // trois troupes de plus. En échange, le compte à rebours est nettement plus
-  // court que celui d'une bataille ordinaire.
-  const surnombre = e.objectif === 'survie'
+  // court que celui d'une bataille ordinaire. L'embuscade partage exactement
+  // ce déséquilibre : une vague adverse renforcée contre un goulet qu'on tient.
+  const surnombre = e.objectif === 'survie' || e.objectif === 'embuscade'
   const adverses = A.armee(
     e.graine,
     rang,
@@ -473,12 +474,29 @@ export function prepare(c, k) {
 
   const objectif = { id: e.objectif, besoin: 3 }
   if (OBJ[e.objectif]?.points) {
-    objectif.points = pointsCapture(e.graine, carte, c.niveau >= 10 ? 5 : 3)
-    objectif.besoin = 3
+    // L'embuscade ne marque qu'un seul point — le goulet — et le tient plus
+    // longtemps qu'on ne tiendrait une majorité de points épars.
+    const embuscade = e.objectif === 'embuscade'
+    objectif.points = pointsCapture(e.graine, carte, embuscade ? 1 : c.niveau >= 10 ? 5 : 3)
+    objectif.besoin = embuscade ? 5 : 3
   }
   if (e.objectif === 'decapitation') {
     const chef = sien.reduce((a, b) => (b.grade > a.grade || (b.grade === a.grade && b.niv > a.niv) ? b : a))
     objectif.chef = chef.ref
+  }
+  if (e.objectif === 'escorte') {
+    // L'inverse de PERCER : ce ne sont pas deux troupes au choix qui doivent
+    // traverser, ce sont les plus fragiles — celles qu'on aurait laissées à
+    // l'arrière sur n'importe quel autre engagement. La force se lit sur la
+    // troupe persistante (U.fiche) : la copie de bataille ne porte pas att/def.
+    const faibles = [...troupes].sort((a, b) => {
+      const fa = U.fiche(a)
+      const fb = U.fiche(b)
+      return fa.att + fa.def - (fb.att + fb.def)
+    })
+    const combien = Math.min(2, troupes.length)
+    objectif.escortes = faibles.slice(0, combien).map((t) => t.id)
+    objectif.besoin = combien
   }
   const tours = surnombre ? Math.round(e.toursMax * 0.62) : e.toursMax
   const bat = B.commence(carte, objectif, mien, sien, { toursMax: tours })

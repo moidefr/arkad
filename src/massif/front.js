@@ -310,9 +310,13 @@ function appuiChamp(j, p) {
   if (!h) return
   const sous = B.uniteA(bat, h.q, h.r)
 
-  // Un ordre en attente de cible : on le pose, ou on renonce.
+  // Un ordre en attente de cible : on ouvre sa prévision, on ne le lance pas
+  // encore. « Aucun coup à l'aveugle » vaut aussi pour une grenade.
   if (sel.mode === 'ordre' && sel.unite && sel.apt) {
-    if (sel.casesOrdre?.has(cle(h.q, h.r))) return joueOrdre(j, h)
+    if (sel.casesOrdre?.has(cle(h.q, h.r))) {
+      sel.previsionOrdre = h
+      return j.son.clic()
+    }
     sel.mode = null
     sel.casesOrdre = null
     return j.son.rate()
@@ -345,6 +349,11 @@ function appuiChamp(j, p) {
     }
     return
   }
+  // Un tap qui ne touche rien de jouable, alors qu'une troupe était choisie
+  // ou un ennemi inspecté : ce n'est pas un geste neutre, c'est une
+  // sélection perdue — contrairement à toute autre action invalide du jeu,
+  // ce point de chute ne jouait aucun son.
+  if (sel.unite || sel.inspect) j.son.rate()
   deselectionne(j)
 }
 
@@ -354,6 +363,7 @@ function joueOrdre(j, h) {
   const r = B.lanceOrdre(e.bat, sel.unite, sel.apt, h)
   sel.mode = null
   sel.casesOrdre = null
+  sel.previsionOrdre = null
   if (!r) return j.son.rate()
   j.son.niveau()
   const somme = (r.degats ?? []).reduce((s, x) => s + x.degats, 0)
@@ -367,6 +377,14 @@ function joueOrdre(j, h) {
   sauve(j)
 }
 
+/**
+ * Une fois FRAPPER (ou LANCER, pour un ordre) confirmé, il n'y a plus de
+ * retour arrière — choix assumé, pas un oubli. CONFIRMER/RENONCER couvre
+ * déjà l'erreur avant l'engagement, puisque la prévision montre exactement
+ * ce qui va tomber ; l'irréversibilité après est cohérente avec la promesse
+ * du jeu (« la résolution n'a aucun aléa »), et un REVENIR après coup
+ * romprait cette promesse en laissant annuler un résultat déjà connu.
+ */
 function frappe(j) {
   const e = j.e
   const sel = e.sel
@@ -564,9 +582,11 @@ function actions(j, z) {
       if (!apt || B.froidDe(u, apt.id) > 0 || u.aAgi) return j.son.rate()
       const legales = B.ciblesOrdre(e.bat, u, apt)
       if (!legales.length) return j.son.rate()
+      // joueOrdre() lit sel.apt : il doit être posé avant qu'un ordre à soi
+      // ne parte tout de suite, sinon lanceOrdre() reçoit un apt indéfini.
+      e.sel.apt = apt
       if (apt.ordre.forme === 'soi') return joueOrdre(j, legales[0])
       e.sel.mode = 'ordre'
-      e.sel.apt = apt
       e.sel.casesOrdre = new Set(legales.map((h) => cle(h.q, h.r)))
       j.son.clic()
     },
@@ -574,6 +594,13 @@ function actions(j, z) {
     ferme: () => (deselectionne(j), j.son.clic()),
     confirme: () => frappe(j),
     annuleCible: () => ((e.sel.visee = null), j.son.clic()),
+    confirmeOrdre: () => joueOrdre(j, e.sel.previsionOrdre),
+    renonceOrdre: () => {
+      e.sel.previsionOrdre = null
+      e.sel.mode = null
+      e.sel.casesOrdre = null
+      j.son.clic()
+    },
   }
   // La vignette d'une troupe, dans le panneau du bas, choisit **et** recentre.
   if (z.quoi === 'troupe' && e.vue === 'bataille') {

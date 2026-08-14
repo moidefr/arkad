@@ -428,6 +428,47 @@ test('chaque ordre change réellement quelque chose', () => {
   }
 })
 
+test('la prévision d’un ordre annonce exactement ce que lanceOrdre applique', () => {
+  for (const a of APTITUDES.filter((x) => x.ordre)) {
+    const carte = plat(13, 7)
+    met(carte, 6, 3, 'riviere')
+    const u = troupe('fantassin', 0, 5, 3, 6, { apt: [a.id], grade: 2, pv: 30 })
+    const ami = troupe('milicien', 0, 5, 2, 3, { pv: 5, moral: 40 })
+    const ennemi = troupe('milicien', 1, 6, 3, 3)
+    const ennemi2 = troupe('milicien', 1, 7, 3, 3)
+    const bat = monte(carte, [u, ami], [ennemi, ennemi2])
+    const cibles = B.ciblesOrdre(bat, u, a)
+    if (!cibles.length) continue
+    const cible =
+      cibles.find((h) => B.uniteA(bat, h.q, h.r) && B.uniteA(bat, h.q, h.r).camp !== 0) ??
+      cibles.find((h) => B.uniteA(bat, h.q, h.r)) ??
+      cibles[0]
+
+    const avant = new Map(bat.unites.map((x) => [x.ref, x.pv]))
+    const p = B.previsionOrdre(bat, u, a, cible)
+    // La prévision ne mute rien — la même règle que prevision() pour un coup ordinaire.
+    for (const x of bat.unites) assert.equal(x.pv, avant.get(x.ref), `${a.id} : previsionOrdre a muté ${x.ref}`)
+
+    const r = B.lanceOrdre(bat, u, a, cible)
+    assert.ok(r, `${a.id} : refusé`)
+
+    assert.equal(p.cibles.length, r.degats.length, `${a.id} : nombre de cibles annoncé`)
+    p.cibles.forEach((pc, i) => {
+      assert.equal(pc.cible, r.degats[i].cible, `${a.id} : cible ${i} ne correspond pas`)
+      assert.equal(
+        pc.degats,
+        r.degats[i].degats,
+        `${a.id} : dégâts annoncés ${pc.degats} ≠ réels ${r.degats[i].degats}`,
+      )
+    })
+    assert.equal(p.soignes.length, r.soignes.length, `${a.id} : nombre de soignés annoncé`)
+    p.soignes.forEach((ps, i) => {
+      assert.equal(ps.cible, r.soignes[i].cible, `${a.id} : soigné ${i} ne correspond pas`)
+      assert.equal(ps.soin, r.soignes[i].soin, `${a.id} : soin annoncé ${ps.soin} ≠ réel ${r.soignes[i].soin}`)
+    })
+  }
+})
+
 test('un ordre en refroidissement n’est pas jouable, et se recharge au fil des tours', () => {
   const carte = plat(11, 5)
   const u = troupe('fantassin', 0, 2, 2, 4, { apt: ['retranchement'] })
@@ -522,6 +563,59 @@ test('tenir les points : il faut les occuper trois tours de suite', () => {
   for (let i = 0; i < 6 && !B.fini(bat); i++) B.finTour(bat)
   assert.equal(B.fini(bat), 'gagne')
   assert.ok(bat.tour <= 5, `gagné au tour ${bat.tour}`)
+})
+
+test('embuscade : tenir le goulet cinq tours de suite gagne la bataille', () => {
+  const carte = plat(11, 5)
+  const point = [versAxial(4, 2)]
+  const u = troupe('fantassin', 0, 4, 2, 4)
+  const bat = monte(carte, [u], [troupe('fantassin', 1, 10, 0, 1)], { id: 'embuscade', points: point, besoin: 5 })
+  for (let i = 0; i < 12 && !B.fini(bat); i++) B.finTour(bat)
+  assert.equal(B.fini(bat), 'gagne')
+})
+
+test('embuscade : sans troupe sur le goulet, le décompte ne progresse pas', () => {
+  const carte = plat(11, 5)
+  const point = [versAxial(4, 2)]
+  const u = troupe('fantassin', 0, 1, 2, 4)
+  const bat = monte(carte, [u], [troupe('fantassin', 1, 10, 0, 1)], { id: 'embuscade', points: point, besoin: 2 })
+  B.finTour(bat)
+  B.finTour(bat)
+  assert.equal(bat.tenus[0], 0, 'le décompte a avancé sans personne sur le goulet')
+  assert.equal(B.fini(bat), null)
+})
+
+test('escorte : la troupe protégée qui atteint le bord adverse gagne la bataille', () => {
+  const carte = plat(9, 5)
+  const a = troupe('milicien', 0, 7, 2)
+  const bat = monte(carte, [a], [troupe('fantassin', 1, 0, 0)], { id: 'escorte', escortes: [a.ref], besoin: 1 })
+  B.deplace(bat, a, versAxial(8, 2).q, versAxial(8, 2).r)
+  B.finTour(bat)
+  assert.equal(B.fini(bat), 'gagne')
+})
+
+test('escorte : perdre toutes les troupes protégées perd la bataille tout de suite', () => {
+  const carte = plat(11, 5)
+  const escortee = troupe('milicien', 0, 5, 2, 1, { pv: 4 })
+  const tueur = troupe('brise_ligne', 1, 6, 2, 14)
+  const bat = monte(carte, [escortee], [tueur], { id: 'escorte', escortes: [escortee.ref], besoin: 1 })
+  B.attaque(bat, tueur, escortee)
+  assert.equal(escortee.pv, 0, 'la troupe protégée n’est pas tombée : le scénario ne teste rien')
+  assert.equal(B.fini(bat), 'perdu')
+})
+
+test('escorte : un survivant qui arrive suffit si l’autre est déjà tombée', () => {
+  const carte = plat(9, 5)
+  const a = troupe('milicien', 0, 7, 2)
+  const tombee = troupe('milicien', 0, 3, 2, 1, { pv: 0 })
+  const bat = monte(carte, [a, tombee], [troupe('fantassin', 1, 0, 0)], {
+    id: 'escorte',
+    escortes: [a.ref, tombee.ref],
+    besoin: 2,
+  })
+  B.deplace(bat, a, versAxial(8, 2).q, versAxial(8, 2).r)
+  B.finTour(bat)
+  assert.equal(B.fini(bat), 'gagne')
 })
 
 test('le temps qui s’épuise fait perdre, sauf quand l’objectif est de durer', () => {

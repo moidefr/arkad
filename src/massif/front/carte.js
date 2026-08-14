@@ -174,6 +174,21 @@ export const OBJECTIFS = [
     texte: 'Tenir jusqu’au dernier tour. L’ennemi est en force.',
     rang: 9,
   },
+  {
+    id: 'embuscade',
+    nom: 'EMBUSCADE',
+    court: 'GOULET',
+    texte: 'Tenir le goulet marqué contre une vague adverse renforcée.',
+    rang: 6,
+    points: true,
+  },
+  {
+    id: 'escorte',
+    nom: 'ESCORTE',
+    court: 'ESCORTE',
+    texte: 'Faire traverser une ou deux troupes fragiles jusqu’au bord adverse, vivantes.',
+    rang: 8,
+  },
 ]
 
 export const OBJ = Object.fromEntries(OBJECTIFS.map((o) => [o.id, o]))

@@ -18,6 +18,7 @@ import * as VC from '../src/massif/front/vue/champ.js'
 import * as VD from '../src/massif/front/vue/dispo.js'
 import { cle } from '../src/massif/front/hex.js'
 import { OBJECTIFS } from '../src/massif/front/carte.js'
+import { APT } from '../src/massif/front/donnees/aptitudes.js'
 import { largeurTexte } from '../src/dessin.js'
 
 /** La fenêtre du champ, telle que le jeu la calcule lui-même. */
@@ -288,6 +289,130 @@ test('viser affiche exactement les dégâts que la frappe inflige', () => {
   tape(j, 'confirme')
   assert.equal(sien.pv, Math.max(0, pvAvant - prevu.final), 'les dégâts annoncés ne sont pas ceux qui tombent')
   assert.ok(mien.aAgi, 'la troupe a frappé sans dépenser son action')
+})
+
+test('un ordre à soi part réellement, par le vrai chemin d’appui — régression', () => {
+  // L'éclaireur du départ porte SPRINT (forme « soi ») depuis le lot 2 : ce
+  // chemin plantait, sel.apt n'étant posé qu'après le court-circuit qui
+  // lance l'ordre self-target tout de suite.
+  const j = jusquAuFeu()
+  const eclaireur = B.vivantes(j.e.bat, 0).find((u) => u.cl === 'eclaireur')
+  assert.ok(eclaireur, 'la compagnie de départ n’a pas d’éclaireur')
+  tape(j, 'troupe', (z) => z.ref === eclaireur.ref)
+  assert.ok(B.ordresJouables(j.e.bat, eclaireur).some((a) => a.id === 'sprint'))
+  const avant = eclaireur.pm
+  dessine(j)
+  const zOrdre = j.e.zones.find((z) => z.quoi === 'ordre' && z.id === 'sprint')
+  assert.ok(zOrdre, 'le bouton SPRINT n’apparaît pas')
+  const p = { x: zOrdre.x + zOrdre.w / 2, y: zOrdre.y + zOrdre.h / 2 }
+  front.appui(j, p)
+  front.relache(j, p)
+  assert.ok(eclaireur.pm > avant, 'sprint n’a donné aucun point de mouvement')
+  assert.ok(B.froidDe(eclaireur, 'sprint') > 0, 'sprint n’a pas pris son refroidissement')
+})
+
+test('un ordre ciblé montre sa prévision avant de partir, et RENONCER annule tout', () => {
+  const j = jusquAuFeu(11)
+  const bat = j.e.bat
+  const archer = B.vivantes(bat, 0).find((u) => u.cl === 'archer')
+  assert.ok(archer, 'la compagnie de départ n’a pas d’archer')
+  const ennemi = B.vivantes(bat, 1)[0]
+  ennemi.q = archer.q + 1
+  ennemi.r = archer.r
+  tape(j, 'troupe', (z) => z.ref === archer.ref)
+  dessine(j)
+  const zOrdre = j.e.zones.find((z) => z.quoi === 'ordre')
+  assert.ok(zOrdre, 'aucun bouton d’ordre pour l’archer')
+  const p1 = { x: zOrdre.x + zOrdre.w / 2, y: zOrdre.y + zOrdre.h / 2 }
+  front.appui(j, p1)
+  front.relache(j, p1)
+  assert.equal(j.e.sel.mode, 'ordre')
+
+  tapeHex(j, ennemi.q, ennemi.r)
+  assert.ok(j.e.sel.previsionOrdre, 'la case choisie n’ouvre pas la prévision — l’ordre est parti tout de suite')
+  const pvAvant = ennemi.pv
+  dessine(j)
+  assert.ok(
+    j.e.zones.some((z) => z.quoi === 'confirmeOrdre'),
+    'aucun bouton LANCER',
+  )
+  assert.ok(
+    j.e.zones.some((z) => z.quoi === 'renonceOrdre'),
+    'aucun bouton RENONCER',
+  )
+
+  tape(j, 'renonceOrdre')
+  assert.equal(ennemi.pv, pvAvant, 'renoncer a quand même changé des points de vie')
+  assert.equal(j.e.sel.previsionOrdre, null)
+  assert.equal(j.e.sel.unite, archer, 'renoncer a perdu la troupe choisie')
+})
+
+test('CONFIRMER un ordre applique exactement ce que la prévision annonçait', () => {
+  const j = jusquAuFeu(19)
+  const bat = j.e.bat
+  const archer = B.vivantes(bat, 0).find((u) => u.cl === 'archer')
+  assert.ok(archer)
+  const ennemi = B.vivantes(bat, 1)[0]
+  ennemi.q = archer.q + 1
+  ennemi.r = archer.r
+  tape(j, 'troupe', (z) => z.ref === archer.ref)
+  dessine(j)
+  const zOrdre = j.e.zones.find((z) => z.quoi === 'ordre')
+  const p1 = { x: zOrdre.x + zOrdre.w / 2, y: zOrdre.y + zOrdre.h / 2 }
+  front.appui(j, p1)
+  front.relache(j, p1)
+  tapeHex(j, ennemi.q, ennemi.r)
+
+  const prevu = B.previsionOrdre(bat, archer, APT.tir_rapide, j.e.sel.previsionOrdre)
+  const pvAvant = ennemi.pv
+  tape(j, 'confirmeOrdre')
+  assert.equal(
+    ennemi.pv,
+    Math.max(0, pvAvant - prevu.cibles[0].degats),
+    'les dégâts annoncés ne sont pas ceux qui tombent',
+  )
+  assert.ok(B.froidDe(archer, 'tir_rapide') > 0, 'l’ordre n’a pas pris son refroidissement')
+  // Un ordre qui termine le tour désélectionne la troupe (elle a fini de
+  // jouer) : sel.previsionOrdre disparaît alors avec tout sel, pas mis à
+  // null explicitement — les deux disent « plus rien en attente ».
+  assert.ok(!j.e.sel.previsionOrdre, 'la prévision reste ouverte après confirmation')
+})
+
+test('un tap qui ne touche rien perd la sélection choisie', () => {
+  const j = jusquAuFeu(23)
+  const u = B.vivantes(j.e.bat, 0)[0]
+  tape(j, 'troupe', (z) => z.ref === u.ref)
+  assert.equal(j.e.sel.unite, u)
+  dessine(j)
+  const ch = champDe(j)
+  let cible = null
+  for (let q = -10; q <= 10 && !cible; q++) {
+    for (let r = -10; r <= 10 && !cible; r++) {
+      if (j.e.sel.deplacements.has(cle(q, r)) || B.uniteA(j.e.bat, q, r)) continue
+      const p = VC.place(ch, j.e.vueChamp, q, r)
+      if (visible(j, p)) cible = p
+    }
+  }
+  assert.ok(cible, 'aucun hexagone vide visible pour ce test')
+  front.appui(j, cible)
+  front.relache(j, cible)
+  assert.equal(j.e.sel.unite, undefined, 'la sélection survit à un tap dans le vide')
+})
+
+test('le journal reste visible pendant la sélection d’une troupe', () => {
+  const j = jusquAuFeu(29)
+  const u = B.vivantes(j.e.bat, 0)[0]
+  const cible = B.vivantes(j.e.bat, 1)[0]
+  u.q = cible.q + 1
+  u.r = cible.r
+  B.attaque(j.e.bat, u, cible)
+  assert.ok(j.e.bat.journal.length, 'l’attaque n’a rien écrit au journal')
+  const autre = B.vivantes(j.e.bat, 0).find((x) => x.ref !== u.ref)
+  tape(j, 'troupe', (z) => z.ref === autre.ref)
+  const ctx = dessine(j)
+  const dernier = j.e.bat.journal.at(-1)
+  const vu = ctx.ops.some((o) => o.type === 'texte' && dernier.startsWith(o.s.replace('…', '')))
+  assert.ok(vu, 'le journal a disparu pendant la sélection d’une troupe')
 })
 
 test('rompre le combat demande deux appuis', () => {

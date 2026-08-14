@@ -15,9 +15,11 @@ import { C, ton } from '../../../palette.js'
 import { rect, cadre, texte, largeurTexte, lueur, px, PX } from '../../../dessin.js'
 import * as B from '../bataille.js'
 import { CL, GRADES, TYPE } from '../donnees/classes.js'
+import { APT } from '../donnees/aptitudes.js'
 import { nomComplet, titre as titreDe, fiche as ficheBase } from '../unites.js'
 import { terrainA } from '../carte.js'
 import { panneau, bouton, barre, teinteVie, tronque, paragraphe } from './pieces.js'
+import { descriptionApt } from './aptitudes-ui.js'
 
 // --- Bandeau du haut ---------------------------------------------------------------
 
@@ -60,9 +62,23 @@ export function panneauBas(ctx, d, bat, sel) {
   // Couché, le panneau est une colonne : son liseré de gauche remplace celui
   // du haut, qui ne borde plus rien.
   if (p.x > 0) rect(ctx, p.x, p.y, PX, p.h, C.bord)
+  if (sel.previsionOrdre) return previsionOrdrePanneau(ctx, d, bat, sel)
   if (sel.visee) return previsionPanneau(ctx, d, bat, sel)
-  if (sel.unite) return unitePanneau(ctx, d, bat, sel)
-  if (sel.inspect) return inspectPanneau(ctx, d, bat, sel)
+  // Le journal reste visible pendant la sélection et l'inspection — avant ce
+  // correctif, il ne s'affichait qu'au repos et disparaissait pile au
+  // moment où « qu'est-ce qui vient de se passer » compte le plus. La
+  // prévision, elle (d'un coup ou d'un ordre), n'a pas la place et n'en a
+  // pas vraiment besoin : elle dure une confirmation, pas un tour.
+  if (sel.unite) {
+    const zones = unitePanneau(ctx, d, bat, sel)
+    journal(ctx, d, bat, d.panneau.y + d.unite.journal.y, d.unite.journal.n)
+    return zones
+  }
+  if (sel.inspect) {
+    const zones = inspectPanneau(ctx, d, bat, sel)
+    journal(ctx, d, bat, d.panneau.y + d.inspect.journal.y, d.inspect.journal.n)
+    return zones
+  }
   return reposPanneau(ctx, d, bat, sel)
 }
 
@@ -248,8 +264,13 @@ function unitePanneau(ctx, d, bat, sel) {
     texte(ctx, 'CHOISIS UNE CIBLE SUR LE CHAMP', M, y0 + 12, 12, C.rouge, 700, LARGE)
   }
   if (sel.mode === 'ordre') {
-    rect(ctx, d.panneau.x, y0, d.panneau.w, 22, ton(C.violet, -0.6))
-    texte(ctx, `${sel.apt?.nom ?? ''} : CHOISIS UN HEXAGONE`, M, y0 + 12, 12, C.violet, 700, LARGE)
+    // Le bouton d'ordre ne porte qu'un code à trois lettres — le plafond de
+    // place sur trois boutons par rangée ne laisse rien de plus. Le rappel
+    // du nom entier, plus sa description tronquée, vit ici : c'est le seul
+    // endroit qui a la place de le dire.
+    rect(ctx, d.panneau.x, y0, d.panneau.w, 34, ton(C.violet, -0.6))
+    texte(ctx, `${sel.apt?.nom ?? ''} — CHOISIS UN HEXAGONE`, M, y0 + 13, 12, C.violet, 700, LARGE)
+    texte(ctx, tronque(ctx, descriptionApt(sel.apt?.id), 10, LARGE), M, y0 + 27, 10, C.faible, 700, LARGE)
   }
   return zones
 }
@@ -322,6 +343,67 @@ function previsionPanneau(ctx, d, bat, sel) {
   return zones
 }
 
+/**
+ * La prévision d'un ordre actif — mêmes chiffres que `previsionOrdre()`
+ * dans `bataille.js`, avant qu'il ne parte. « Aucun coup à l'aveugle » vaut
+ * aussi pour une grenade : avant ce panneau, un ordre partait dès qu'on
+ * tapait la case, sans jamais montrer ce qu'il allait faire. Réutilise la
+ * géométrie du panneau de prévision d'un coup — les deux ne s'affichent
+ * jamais en même temps, et le bouton CONFIRMER reste sous le même pouce.
+ */
+function previsionOrdrePanneau(ctx, d, bat, sel) {
+  const u = sel.unite
+  const apt = sel.apt
+  const p = B.previsionOrdre(bat, u, apt, sel.previsionOrdre)
+  const zones = []
+  const { px: M, pw: LARGE } = d
+  const y0 = d.panneau.y
+  const g = d.prevision
+  const plafond = y0 + g.boutons - 16
+
+  ctx.textAlign = 'left'
+  texte(ctx, tronque(ctx, `${nomComplet(u)} · ${apt.nom}`, 13, LARGE), M, y0 + g.nom, 13, C.violet, 700)
+
+  let y = y0 + g.panneau
+  const ligne = (gauche, droite, teinte) => {
+    if (y > plafond) return
+    texte(ctx, tronque(ctx, gauche, 12, LARGE - 140), M, y, 12, C.texte, 700)
+    ctx.textAlign = 'right'
+    texte(ctx, droite, M + LARGE, y, 11, teinte, 700, 140)
+    ctx.textAlign = 'left'
+    y += 18
+  }
+  for (const c of p.cibles) {
+    const riposte = c.riposte ? ` · riposte −${c.riposte}` : ''
+    ligne(nomComplet(c.cible), c.mortelle ? 'HORS DE COMBAT' : `−${c.degats}${riposte}`, c.mortelle ? C.vert : C.rouge)
+  }
+  for (const s of p.soignes) ligne(nomComplet(s.cible), `+${s.soin}`, C.vert)
+  if (p.moralTouches.length && y <= plafond) {
+    texte(ctx, `${p.moralTouches.length} troupe(s) touchée(s) au moral`, M, y, 11, C.faible, 700, LARGE)
+    y += 18
+  }
+  if (p.etatTouches && y <= plafond) {
+    texte(ctx, `${p.etatTouches} troupe(s) sous effet`, M, y, 11, C.faible, 700, LARGE)
+    y += 18
+  }
+  if (p.terrain && y <= plafond) {
+    texte(ctx, `terrain transformé en ${p.terrain}`, M, y, 11, C.cyan, 700, LARGE)
+    y += 18
+  }
+  if (p.piege && y <= plafond) texte(ctx, `piège posé : ${p.piege} dégâts`, M, y, 11, C.cyan, 700, LARGE)
+  if (!p.cibles.length && !p.soignes.length && !p.moralTouches.length && !p.etatTouches && !p.terrain && !p.piege)
+    texte(ctx, 'AUCUN EFFET IMMÉDIAT', M, y, 12, C.faible, 700, LARGE)
+
+  const yb = y0 + g.boutons
+  const demi = Math.floor((LARGE - 6) / 2)
+  const zOk = { x: M, y: yb, w: demi, h: g.hBouton, quoi: 'confirmeOrdre' }
+  bouton(ctx, zOk, 'LANCER', { primaire: true, teinte: C.violet })
+  const zNon = { x: M + demi + 6, y: yb, w: demi, h: g.hBouton, quoi: 'renonceOrdre' }
+  bouton(ctx, zNon, 'RENONCER', {})
+  zones.push(zOk, zNon)
+  return zones
+}
+
 /** Une troupe adverse qu'on regarde : tout ce qu'on peut savoir avant de décider. */
 function inspectPanneau(ctx, d, bat, sel) {
   const u = sel.inspect
@@ -368,7 +450,8 @@ function inspectPanneau(ctx, d, bat, sel) {
     700,
     LARGE,
   )
-  const apts = (u.apt ?? []).map((id) => id.toUpperCase().replace(/_/g, ' ')).join(' · ')
+  // Le nom complet, pas l'identifiant brut : « CHARGE », pas « charge_lourde ».
+  const apts = (u.apt ?? []).map((id) => APT[id]?.nom ?? id).join(' · ')
   paragraphe(ctx, apts || 'AUCUNE APTITUDE', M, y0 + g.apt, 10, LARGE, C.violet, 13)
 
   const z = { x: M, y: y0 + g.fermer, w: LARGE, h: g.hFermer, quoi: 'ferme' }
