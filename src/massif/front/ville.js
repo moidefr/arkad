@@ -32,6 +32,7 @@
  * à expliquer pourquoi il y en a deux.
  */
 import * as U from './unites.js'
+import { CL, TYPES } from './donnees/classes.js'
 
 export const MORAL_MAX = 100
 export const MORAL_DEPART = 70
@@ -74,18 +75,62 @@ export const BATIMENTS = [
     rang: 4,
     cout: (n) => Math.round(180 * Math.pow(2.1, n)),
   },
+  {
+    id: 'fortifications',
+    nom: 'FORTIFICATIONS',
+    quoi: 'La compagnie part chaque bataille mieux défendue.',
+    rang: 2,
+    cout: (n) => Math.round(220 * Math.pow(2.3, n)),
+  },
+  {
+    id: 'marche',
+    nom: 'MARCHÉ',
+    quoi: 'Un étal d’objets à l’achat, renouvelé à chaque engagement.',
+    rang: 3,
+    cout: (n) => Math.round(260 * Math.pow(2.3, n)),
+  },
+  {
+    id: 'guet',
+    nom: 'POSTE DE GUET',
+    quoi: 'Un engagement de plus proposé, et son penchant connu d’avance.',
+    rang: 4,
+    cout: (n) => Math.round(300 * Math.pow(2.3, n)),
+  },
+  {
+    id: 'forge',
+    nom: 'FORGE',
+    quoi: 'Améliore un objet équipé, contre or. Demande un marché.',
+    rang: 5,
+    cout: (n) => Math.round(320 * Math.pow(2.4, n)),
+  },
+  {
+    id: 'entrainement',
+    nom: "TERRAIN D'ENTRAÎNEMENT",
+    quoi: 'Choisit un type de troupe : sa réserve progresse plus vite. Demande une caserne aguerrie.',
+    rang: 6,
+    cout: (n) => Math.round(360 * Math.pow(2.4, n)),
+  },
 ]
 
 export const BAT = Object.fromEntries(BATIMENTS.map((b) => [b.id, b]))
 export const NIVEAU_MAX = 3
 
+/**
+ * Deux bâtiments neufs demandent qu'un autre soit déjà construit à un
+ * certain niveau — la forge n'a rien à vendre sans marché pour l'alimenter,
+ * et le terrain d'entraînement double le travail d'une caserne qui n'existe
+ * pas encore vraiment. Première fois que `constructible()` lit un prérequis.
+ */
+export const PREREQUIS = { forge: [['marche', 1]], entrainement: [['caserne', 2]] }
+
 /** Le niveau d'un bâtiment. Zéro veut dire : pas encore construit. */
 export const niveauBat = (c, id) => c.ville?.bat?.[id] ?? 0
 
-/** Un bâtiment est constructible quand la compagnie a le rang et l'or. */
+/** Un bâtiment est constructible quand la compagnie a le rang, l'or, et ses prérequis. */
 export const constructible = (c, id) => {
   const b = BAT[id]
   if (!b || c.niveau < b.rang) return false
+  if ((PREREQUIS[id] ?? []).some(([bid, niv]) => niveauBat(c, bid) < niv)) return false
   const n = niveauBat(c, id)
   return n < NIVEAU_MAX && c.or >= b.cout(n)
 }
@@ -163,11 +208,18 @@ export function passeJour(c) {
   //     C'est la réponse à une réserve qui ne servait à rien : une troupe
   //     laissée au dépôt dormait, donc la garder était une pure perte. Elle
   //     progresse maintenant — lentement, et seulement si elle a mangé.
+  //
+  //     Le terrain d'entraînement ne remplace rien : il ajoute un accent sur
+  //     un type choisi, par-dessus le goutte-à-goutte de la caserne — jamais
+  //     l'inverse, sinon il faudrait expliquer deux courbes de progression
+  //     au lieu d'une.
   const cas = niveauBat(c, 'caserne')
+  const foc = focusEntrainement(c)
   if (cas > 0 && bilan.mange) {
     for (const u of reserve(c)) {
       const avant = u.niv
-      U.gagneXp(u, 6 * cas, c.niveau)
+      const accent = foc && CL[u.cl].type === foc ? 1 + 0.3 * niveauBat(c, 'entrainement') : 1
+      U.gagneXp(u, 6 * cas * accent, c.niveau)
       if (u.niv > avant) bilan.entraines++
     }
   }
@@ -221,6 +273,27 @@ export function ajusteMoral(c, delta) {
  * sinon la seule décision du jeu devient « aller à la taverne ».
  */
 export const bonusMoral = (c) => Math.round((((c.ville?.moral ?? MORAL_DEPART) - 55) / 45) * 10)
+
+/**
+ * Ce que les fortifications valent en bataille : un bonus de défense posé
+ * une fois pour toute la troupe engagée, en fraction — la même mécanique
+ * qu'un ordre « SE RETRANCHER », sauf qu'elle ne coûte ni tour ni recharge.
+ * Chaque niveau vaut 5 % ; trois niveaux plafonnent à 15 %, l'échelle d'un
+ * ordre de mêlée ordinaire.
+ */
+export const bonusDefense = (c) => niveauBat(c, 'fortifications') * 0.05
+
+// --- Le terrain d'entraînement --------------------------------------------------
+
+/** Le type sur lequel le terrain d'entraînement est réglé, ou `null` : aucun accent choisi. */
+export const focusEntrainement = (c) => c.ville?.focus ?? null
+
+/** Choisit l'accent. Refusé sans le bâtiment, ou pour un type qui n'existe pas. */
+export function choisisFocus(c, type) {
+  if (niveauBat(c, 'entrainement') <= 0 || !TYPES.some((t) => t.id === type)) return false
+  c.ville.focus = type
+  return true
+}
 
 // --- Les sessions d'entraînement --------------------------------------------------
 

@@ -27,6 +27,7 @@ import * as B from './front/bataille.js'
 import * as IA from './front/ia.js'
 import * as Cie from './front/compagnie.js'
 import * as U from './front/unites.js'
+import * as V from './front/ville.js'
 import { APT } from './front/donnees/aptitudes.js'
 import * as VC from './front/vue/champ.js'
 import * as VB from './front/vue/bataille.js'
@@ -168,6 +169,8 @@ export default {
     else if (e.vue === 'caserne') e.zones = defilante(e, VM.caserne(ctx, j, e.c, e.defile))
     else if (e.vue === 'uniques') e.zones = defilante(e, VM.uniques(ctx, j, e.c, e.defile))
     else if (e.vue === 'compagnie') e.zones = defilante(e, VM.compagnie(ctx, j, e.c, e.selTroupe, e.defile))
+    else if (e.vue === 'ville') e.zones = defilante(e, VM.ville(ctx, j, e.c, e.defile))
+    else if (e.vue === 'batiment') e.zones = defilante(e, VM.batiment(ctx, j, e.c, e.batimentId, e.defile))
     else if (e.vue === 'fiche') e.zones = ficheOuRetour(j, ctx)
     else if (e.vue === 'bilan') e.zones = VM.bilan(ctx, j, e.c, e.rapport)
     ctx.textAlign = 'center'
@@ -421,7 +424,17 @@ function actions(j, z) {
     caserne: () => va(j, 'caserne'),
     uniques: () => va(j, 'uniques'),
     compagnie: () => va(j, 'compagnie'),
-    retour: () => va(j, e.vue === 'fiche' ? 'compagnie' : 'camp'),
+    ville: () => va(j, 'ville'),
+    retour: () => va(j, e.vue === 'fiche' ? 'compagnie' : e.vue === 'batiment' ? 'ville' : 'camp'),
+
+    // La ville et ses bâtiments
+    batiment: () => ((e.batimentId = z.id), va(j, 'batiment')),
+    construire: () => (V.construit(c, e.batimentId) ? (j.son.record(), sauve(j)) : j.son.rate()),
+    entraine: () => (V.entraine(c, z.id) ? (j.son.record(), sauve(j)) : j.son.rate()),
+    achete: () => (Cie.acheteObjet(c, z.id) ? (j.son.record(), sauve(j)) : j.son.rate()),
+    ameliore: () =>
+      Cie.ameliore(c, z.id, z.emp, V.niveauBat(c, 'forge') + 1) ? (j.son.record(), sauve(j)) : j.son.rate(),
+    focus: () => (V.choisisFocus(c, z.id) ? (j.son.clic(), sauve(j)) : j.son.rate()),
 
     // Engagements
     offre: () => ((e.choix = e.choix === z.k ? null : z.k), j.son.clic()),

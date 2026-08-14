@@ -80,12 +80,29 @@ test('on lève une compagnie et on arrive au camp en un appui', () => {
 test('chaque écran du camp s’ouvre et se referme', () => {
   const j = fauxJeu(front, { graine: 2, neuve: true })
   tape(j, 'nouvelle')
-  for (const ecran of ['campagne', 'caserne', 'uniques', 'compagnie']) {
+  for (const ecran of ['campagne', 'caserne', 'uniques', 'compagnie', 'ville']) {
     tape(j, ecran)
     assert.equal(j.e.vue, ecran, `${ecran} ne s’ouvre pas`)
     tape(j, 'retour')
     assert.equal(j.e.vue, 'camp', `${ecran} ne se referme pas`)
   }
+})
+
+test('la ville ouvre le détail d’un bâtiment, qui se construit et se referme', () => {
+  const j = fauxJeu(front, { graine: 8, neuve: true })
+  tape(j, 'nouvelle')
+  j.e.c.or = 999999
+  j.e.c.niveau = 8
+  tape(j, 'ville')
+  const z = tape(j, 'batiment', (x) => x.id === 'caserne')
+  assert.equal(j.e.vue, 'batiment')
+  assert.equal(j.e.batimentId, z.id)
+  tape(j, 'construire')
+  assert.equal(j.e.c.ville.bat.caserne, 1, 'construire ne construit rien')
+  tape(j, 'retour')
+  assert.equal(j.e.vue, 'ville', 'le détail ne revient pas à la liste des bâtiments')
+  tape(j, 'retour')
+  assert.equal(j.e.vue, 'camp', 'la liste des bâtiments ne revient pas au camp')
 })
 
 test('recruter à la caserne coûte de l’or et ajoute vraiment une troupe', () => {
@@ -302,6 +319,17 @@ function tousLesEcrans() {
   }
   j.e.vue = 'fiche'
   ecrans.push(['fiche', dessine(j), j.e.zones.slice()])
+
+  // La ville, et un bâtiment de chaque genre : un sans rien de propre
+  // (l'infirmerie), un avec une fenêtre en plus (la caserne, ses sessions).
+  j.e.vue = 'ville'
+  ecrans.push(['ville', dessine(j), j.e.zones.slice()])
+  j.e.c.ville.bat.caserne = 2
+  j.e.vue = 'batiment'
+  j.e.batimentId = 'caserne'
+  ecrans.push(['batiment/caserne', dessine(j), j.e.zones.slice()])
+  j.e.batimentId = 'infirmerie'
+  ecrans.push(['batiment/infirmerie', dessine(j), j.e.zones.slice()])
 
   const k = jusquAuFeu(37)
   ecrans.push(['bataille', dessine(k), k.e.zones.slice()])

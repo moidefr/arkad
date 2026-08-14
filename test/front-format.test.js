@@ -75,6 +75,13 @@ function tousLesEcrans(format) {
   j.e.vue = 'fiche'
   ecrans.push(['fiche', dessine(j), j.e.zones.slice()])
 
+  j.e.vue = 'ville'
+  ecrans.push(['ville', dessine(j), j.e.zones.slice()])
+  j.e.c.ville.bat.caserne = 2
+  j.e.vue = 'batiment'
+  j.e.batimentId = 'caserne'
+  ecrans.push(['batiment', dessine(j), j.e.zones.slice()])
+
   const k = jusquAuFeu(37, format)
   ecrans.push(['bataille', dessine(k), k.e.zones.slice()])
   const u = B.vivantes(k.e.bat, 0)[0]
@@ -130,7 +137,10 @@ const PORTRAIT = [
   // non à celui de la compagnie, donc le chiffre porté par les cartes du camp a
   // changé. Le nombre de traits, lui, est identique — c'est du texte, pas de la
   // disposition.
-  ['camp', 59, '3051a123754d48ab'],
+  // Réétalonné : le lot 3 ajoute un cinquième bouton au camp, vers les
+  // bâtiments — en attendant le village vivant du lot 6, qui remplacera cet
+  // écran entier.
+  ['camp', 70, '6d3df41c9de4d3e5'],
   ['campagne', 54, '3b9b04d51ab6a423'],
   // Réétalonné : le lot 2 ajoute dix classes au vivier générique, donc le
   // même tirage à la même graine ne pioche plus les mêmes six cartes à la
@@ -141,6 +151,10 @@ const PORTRAIT = [
   ['uniques', 65, 'f9eb2366a6a79c11'],
   ['compagnie', 89, '77d685cf64eaba4a'],
   ['fiche', 63, 'eedf887e3fd64603'],
+  // Neufs au lot 3 : la liste des bâtiments, et le détail de la caserne (le
+  // seul qui ait quelque chose de propre à montrer — ses sessions).
+  ['ville', 81, 'fe41f50755b1fcff'],
+  ['batiment', 54, '72fb57b86857024c'],
   ['bataille', 396, 'cad016f2097e0dab'],
   // Réétalonné : le moral de la compagnie entre désormais en bataille avec
   // elle, donc la barre de moral de la troupe sélectionnée ne part plus de la

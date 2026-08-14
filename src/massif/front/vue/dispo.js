@@ -114,31 +114,94 @@ export function titre(j, reprise) {
 
 const QUATRE = ['campagne', 'caserne', 'uniques', 'compagnie']
 
+/**
+ * Le cinquième bouton, vers les bâtiments, ne rejoint pas la grille des
+ * quatre premiers : sa forme (une bande large et basse) est différente, et
+ * la ligne le fait tenir sous 360 px de haut couché. C'est un pis-aller —
+ * le lot 6 remplace cet écran entier par le village vivant — mais tant
+ * qu'il n'existe pas, les bâtiments ont besoin d'une porte.
+ */
 export function camp(j) {
   const c = chassis(j)
   const resume = { x: c.M, y: 100, w: c.L, h: 66 }
   if (c.large) {
-    // Deux colonnes de deux : quatre boutons empilés demandent 272 px, et
-    // couché il n'en reste que 200 sous l'entête.
+    // Deux colonnes de deux, rangées resserrées à 46 pour laisser la place à
+    // la bande « BÂTIMENTS » sous elles, et encore deux lignes de texte.
     const w = Math.floor((c.L - 10) / 2)
+    const items = QUATRE.map((quoi, i) => ({
+      x: c.M + (i % 2) * (w + 10),
+      y: 180 + Math.floor(i / 2) * 54,
+      w,
+      h: 46,
+      quoi,
+    }))
+    items.push({ x: c.M, y: 288, w: c.L, h: 40, quoi: 'ville' })
     return {
       resume,
-      items: QUATRE.map((quoi, i) => ({
-        x: c.M + (i % 2) * (w + 10),
-        y: 180 + Math.floor(i / 2) * 68,
-        w,
-        h: 58,
-        quoi,
-      })),
-      dernier: { x: c.M, y: 322 },
-      alerte: { x: c.M, y: 340 },
+      items,
+      dernier: { x: c.M, y: 340 },
+      alerte: { x: c.M, y: 354 },
     }
   }
+  const items = QUATRE.map((quoi, i) => ({ x: c.M, y: 180 + i * 68, w: c.L, h: 58, quoi }))
+  items.push({ x: c.M, y: 180 + 4 * 68, w: c.L, h: 46, quoi: 'ville' })
   return {
     resume,
-    items: QUATRE.map((quoi, i) => ({ x: c.M, y: 180 + i * 68, w: c.L, h: 58, quoi })),
-    dernier: { x: c.M, y: 476 },
-    alerte: { x: c.M, y: 496 },
+    items,
+    dernier: { x: c.M, y: 512 },
+    alerte: { x: c.M, y: 530 },
+  }
+}
+
+// --- Les bâtiments ------------------------------------------------------------------
+
+/** La liste des neuf bâtiments : même fenêtre défilante que la caserne. */
+export function ville(j) {
+  const c = chassis(j)
+  if (c.large)
+    return {
+      legende: { x: c.M, y: c.legende },
+      zone: { x: c.M, y: 112, w: c.L, h: 170 },
+      cols: 2,
+      ligne: 62,
+      retour: { x: c.M, y: 304, w: c.L, h: 36, quoi: 'retour' },
+    }
+  return {
+    legende: { x: c.M, y: c.legende },
+    zone: { x: c.M, y: 118, w: c.L, h: 396 },
+    cols: 1,
+    ligne: 62,
+    retour: { x: c.M, y: 544, w: c.L, h: 38, quoi: 'retour' },
+  }
+}
+
+/**
+ * Le détail d'un bâtiment : la fiche (nom, niveau, coût) en tête, et une
+ * fenêtre défilante en dessous pour ce qui est propre à chacun — les
+ * sessions de la caserne, l'étal du marché, les objets de la forge, les
+ * types du terrain d'entraînement. Un bâtiment qui n'a rien de propre laisse
+ * la fenêtre vide : sa fiche et son bouton CONSTRUIRE suffisent.
+ */
+export function batiment(j) {
+  const c = chassis(j)
+  if (c.large)
+    return {
+      fiche: { x: c.M, y: 98, w: c.L, h: 92 },
+      construire: { x: c.M, y: 196, w: c.L, h: 36, quoi: 'construire' },
+      legende: { x: c.M, y: 246 },
+      zone: { x: c.M, y: 252, w: c.L, h: 60 },
+      cols: 3,
+      ligne: 56,
+      retour: { x: c.M, y: 316, w: c.L, h: 30, quoi: 'retour' },
+    }
+  return {
+    fiche: { x: c.M, y: 98, w: c.L, h: 110 },
+    construire: { x: c.M, y: 216, w: c.L, h: 44, quoi: 'construire' },
+    legende: { x: c.M, y: 274 },
+    zone: { x: c.M, y: 280, w: c.L, h: 258 },
+    cols: 1,
+    ligne: 56,
+    retour: { x: c.M, y: 544, w: c.L, h: 38, quoi: 'retour' },
   }
 }
 

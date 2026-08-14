@@ -5,7 +5,7 @@
  * qu'aucun test binaire ne dit : combien de tours dure un engagement, quelle
  * classe rapporte, quel objectif est trop dur, où la campagne s'essouffle.
  *
- * C'est le seul moyen de tenir un jeu de trente-cinq classes et quarante-deux
+ * C'est le seul moyen de tenir un jeu de quarante-cinq classes et quarante
  * uniques : ASCENSION, avant lui, est mort de n'avoir jamais été mesuré.
  *
  *   node test/front-banc.mjs [campagnes] [engagements]
@@ -20,6 +20,7 @@ import * as B from '../src/massif/front/bataille.js'
 import * as IA from '../src/massif/front/ia.js'
 import * as Cie from '../src/massif/front/compagnie.js'
 import * as U from '../src/massif/front/unites.js'
+import * as V from '../src/massif/front/ville.js'
 import { CLASSES, TYPES } from '../src/massif/front/donnees/classes.js'
 import { OBJECTIFS } from '../src/massif/front/carte.js'
 import { melange32 } from '../src/massif/front/rng.js'
@@ -55,6 +56,28 @@ function joue(bat, replierSous = 0.3) {
 
 /** Ce que fait un joueur entre deux engagements : recruter, soigner, aligner. */
 function auCamp(c) {
+  // Bâtiments d'abord : recruter est vorace (la boucle qui suit dépense tout
+  // ce qui reste dès qu'une recrue est abordable), donc un bâtiment qui
+  // n'attend que les restes n'est jamais construit — mesuré une première
+  // fois : zéro bâtiment construit en 120 tours de camp, malgré une caisse
+  // qui finissait bien remplie. Le moins cher d'abord, jusqu'à 60 % de la
+  // caisse du moment à chaque achat.
+  for (let essai = 0; essai < 20; essai++) {
+    const dispo = V.BATIMENTS.filter(
+      (b) => V.constructible(c, b.id) && b.cout(V.niveauBat(c, b.id)) <= c.or * 0.6,
+    ).sort((a, b) => a.cout(V.niveauBat(c, a.id)) - b.cout(V.niveauBat(c, b.id)))
+    if (!dispo.length || !V.construit(c, dispo[0].id)) break
+  }
+  // Le terrain d'entraînement ne sert à rien tant que personne n'a choisi son
+  // accent : on le règle sur le type le plus représenté dans la compagnie,
+  // sinon le banc mesurerait un bâtiment construit mais jamais utilisé.
+  if (V.niveauBat(c, 'entrainement') > 0 && !V.focusEntrainement(c)) {
+    const compte = {}
+    for (const t of c.troupes) compte[U.fiche(t).type] = (compte[U.fiche(t).type] ?? 0) + 1
+    const meilleur = Object.entries(compte).sort((a, b) => b[1] - a[1])[0]
+    if (meilleur) V.choisisFocus(c, meilleur[0])
+  }
+
   while (c.troupes.length < Cie.places(c.niveau) && c.offre.caserne.length) {
     const abordable = c.offre.caserne.filter((l) => l.prix <= c.or).sort((a, b) => b.prix - a.prix)[0]
     if (!abordable) break
@@ -161,6 +184,7 @@ for (let n = 0; n < CAMPAGNES; n++) {
     victoires: c.victoires,
     engagements: c.engagements,
     or: c.or,
+    batiments: Object.fromEntries(V.BATIMENTS.map((b) => [b.id, V.niveauBat(c, b.id)])),
   })
 }
 
@@ -228,6 +252,13 @@ console.log(
     `${moy((x) => x.troupes).toFixed(1)} troupes · ${moy((x) => x.or).toFixed(0)} or`,
 )
 console.log(`    plus haut niveau atteint : ${Math.max(...finals.map((x) => x.niveau))}`)
+
+console.log('\n  bâtiments, niveau moyen en fin de campagne (sur 3) —')
+for (const b of V.BATIMENTS) {
+  const niv = moy((x) => x.batiments[b.id])
+  const jamais = niv === 0 ? ' ⚠ jamais construit' : ''
+  console.log(`    ${b.nom.padEnd(24)} ${niv.toFixed(2)}${jamais}`)
+}
 if (sansFin) console.log(`    ⚠ ${sansFin} bataille(s) sans fin`)
 
 // --- Le duel des types ---------------------------------------------------------------

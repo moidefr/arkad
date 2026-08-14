@@ -100,6 +100,7 @@ export function migre(brut) {
   for (const u of c.troupes) u.equip ??= U.equipVide()
   if (!c.plan) planifie(c)
   if (!c.offre) rafraichit(c)
+  c.offre.objets ??= []
   return brut
 }
 
@@ -213,6 +214,11 @@ export function rafraichit(c) {
   const nivRecrue = niveauRecrue(c)
   const bassin = UNIQUES.map((u) => u.id)
   const offerts = U.tireUniques(rng, bassin, c.niveau, 3, c.uniquesVus)
+  // Le marché : sans lui, l'étal est vide — un bâtiment qui ne change rien
+  // tant qu'on ne l'a pas construit, comme la caserne ou l'infirmerie.
+  const marche = V.niveauBat(c, 'marche')
+  const objetsDispo = OBJETS.filter((o) => o.rang <= c.niveau)
+  const stockObjets = marche > 0 ? melange(rng, objetsDispo).slice(0, Math.min(2 + marche, objetsDispo.length)) : []
   c.offre = {
     caserne: stock.map((x) => ({ cl: x.id, prix: U.prixGenerique(x.id, nivRecrue), niv: nivRecrue })),
     uniques: offerts.map((id) => ({
@@ -221,7 +227,18 @@ export function rafraichit(c) {
       niv: Math.max(UQ[id].rang, c.niveau),
       taux: U.tauxDrop(id, c.niveau, bassin, c.uniquesVus),
     })),
+    objets: stockObjets.map((o) => ({ id: o.id, prix: prixObjet(o, c.niveau, U.echelle) })),
   }
+}
+
+/** Achète un objet neuf (tier 1) à l'étal du marché : il rejoint le dépôt. */
+export function acheteObjet(c, index) {
+  const ligne = c.offre.objets?.[index]
+  if (!ligne || c.or < ligne.prix) return false
+  c.or -= ligne.prix
+  c.objets.push({ id: ligne.id, tier: 1 })
+  c.offre.objets = c.offre.objets.filter((x, i) => i !== index)
+  return true
 }
 
 export function recruteGenerique(c, clId) {
@@ -378,7 +395,11 @@ export const toursMaxDe = (niveau) => 16 + Math.floor(niveau * 0.8)
  */
 export function planifie(c) {
   const rng = melange32(derive(c.graine, 202, c.engagements))
-  const combien = c.niveau >= 3 ? 3 : 2
+  // Le poste de guet ajoute une offre par niveau, et lève le doute sur son
+  // penchant : les autres offres restent un tirage à pile ou face, celles
+  // du guet ne le sont jamais.
+  const guet = V.niveauBat(c, 'guet')
+  const combien = (c.niveau >= 3 ? 3 : 2) + guet
   const objs = OBJECTIFS.filter((o) => o.rang <= c.niveau)
   const { cols, rows } = dimensions(c.niveau)
   const biomes = melange(
@@ -392,6 +413,7 @@ export function planifie(c) {
     const difficulte = 0.78 + i * 0.16 + (rng() - 0.5) * 0.1
     const obj = parmi(rng, objs)
     const biome = biomes[i % biomes.length]
+    const veille = i >= combien - guet
     plan.push({
       k: i,
       nom: `${BIOMES.find((b) => b.id === biome).nom} ${lieux[i % lieux.length]}`,
@@ -400,7 +422,11 @@ export function planifie(c) {
       cols,
       rows,
       difficulte: Math.round(difficulte * 100) / 100,
-      penchant: rng() < 0.5 ? null : parmi(rng, ['INF', 'LEG', 'MON', 'TIR', 'ENG']),
+      penchant: veille
+        ? parmi(rng, ['INF', 'LEG', 'MON', 'TIR', 'ENG'])
+        : rng() < 0.5
+          ? null
+          : parmi(rng, ['INF', 'LEG', 'MON', 'TIR', 'ENG']),
       or: Math.round((110 + 58 * c.niveau) * difficulte),
       renom: Math.round((18 + 4 * c.niveau) * difficulte),
       toursMax: toursMaxDe(c.niveau),
@@ -486,6 +512,13 @@ function pose(carte, troupes, camp, occupe, c) {
       // même nombre qui vit en ville et qui se joue ici, pour qu'il n'y ait
       // pas deux morals à expliquer.
       u.moral = Math.max(1, Math.min(B.MORAL_PLEIN, u.moral + V.bonusMoral(c)))
+      // Les fortifications posent un état permanent plutôt qu'un bonus de
+      // fiche : c'est la même mécanique qu'un ordre « SE RETRANCHER », sauf
+      // que sa durée infinie ne redescend jamais à zéro (`Infinity - 1` reste
+      // `Infinity`), donc elle tient jusqu'au bout de la bataille sans code
+      // à part.
+      const def = V.bonusDefense(c)
+      if (def > 0) u.etats.push({ def, duree: Infinity, nom: 'FORTIFIÉ' })
     }
     occupe.add(cle(place.q, place.r))
     sortie.push(u)

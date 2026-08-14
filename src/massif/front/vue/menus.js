@@ -12,9 +12,11 @@ import { C, ton } from '../../../palette.js'
 import { rect, cadre, texte, largeurTexte, lueur, ombre, px, PX, bandeTramee } from '../../../dessin.js'
 import * as U from '../unites.js'
 import * as Cie from '../compagnie.js'
+import * as V from '../ville.js'
 import { CL, TYPE, TYPES, EFFICACITE, GRADES } from '../donnees/classes.js'
 import { UQ, RAR } from '../donnees/uniques.js'
 import { APT } from '../donnees/aptitudes.js'
+import { OBJ as OBJET, nomObjet, prixAmelioration, TIER_MAX } from '../donnees/objets.js'
 import { BIOMES } from '../terrain.js'
 import { OBJ } from '../carte.js'
 import { panneau, bouton, barre, teinteVie, tronque, paragraphe, entete, bourse, lignes } from './pieces.js'
@@ -133,11 +135,13 @@ export function camp(ctx, j, c) {
   )
   ctx.textAlign = 'left'
 
+  const construits = V.BATIMENTS.filter((b) => V.niveauBat(c, b.id) > 0).length
   const libelles = {
     campagne: { nom: 'PARTIR EN ENGAGEMENT', sous: c.plan?.length ? `${c.plan.length} offres` : '', primaire: true },
     caserne: { nom: 'CASERNE', sous: `${c.offre?.caserne.length ?? 0} recrues à l’étal` },
     uniques: { nom: 'ÉTAT-MAJOR', sous: `${c.offre?.uniques.length ?? 0} dossiers`, teinte: C.violet },
     compagnie: { nom: 'LA COMPAGNIE', sous: `${c.troupes.length} troupes au dépôt`, teinte: C.cyan },
+    ville: { nom: 'BÂTIMENTS', sous: `${construits}/${V.BATIMENTS.length} construits`, teinte: C.accent },
   }
   for (const z of d.items) {
     const it = libelles[z.quoi]
@@ -164,6 +168,200 @@ export function camp(ctx, j, c) {
 
   bourse(ctx, c, D.bourse(j))
   return d.items
+}
+
+// --- Les bâtiments ----------------------------------------------------------------------
+
+export function ville(ctx, j, c, defile) {
+  const ch = D.chassis(j)
+  const d = D.ville(j)
+  entete(
+    ctx,
+    ch.entete,
+    'LA VILLE',
+    `${V.BATIMENTS.filter((b) => V.niveauBat(c, b.id) > 0).length}/${V.BATIMENTS.length}`,
+  )
+  texte(
+    ctx,
+    'neuf lieux, chacun fait une seule chose — tapez pour construire',
+    d.legende.x,
+    d.legende.y,
+    10,
+    C.faible,
+    700,
+    ch.L,
+  )
+
+  const r = liste(
+    ctx,
+    d.zone,
+    V.BATIMENTS,
+    d.ligne,
+    defile,
+    (ctx, z, b) => {
+      const n = V.niveauBat(c, b.id)
+      const bloque = c.niveau < b.rang
+      const a = ctx.globalAlpha
+      if (bloque) ctx.globalAlpha = a * 0.4
+      panneau(ctx, z.x, z.y, z.w, z.h, n > 0 ? C.accent : C.bord)
+      texte(ctx, b.nom, z.x + 12, z.y + 20, 13, C.texte, 700, z.w - 90)
+      texte(
+        ctx,
+        bloque ? `RANG ${b.rang} REQUIS` : n > 0 ? `NIVEAU ${n}/${V.NIVEAU_MAX}` : 'PAS ENCORE CONSTRUIT',
+        z.x + 12,
+        z.y + 38,
+        10,
+        n > 0 ? C.vert : C.faible,
+        700,
+        z.w - 24,
+      )
+      for (let i = 0; i < V.NIVEAU_MAX; i++) {
+        rect(ctx, z.x + z.w - 70 + i * 16, z.y + 16, 10, 10, i < n ? C.accent : C.bord)
+      }
+      ctx.globalAlpha = a
+    },
+    d.cols,
+  )
+  const zones = r.zones.map((z) => ({ ...z, quoi: 'batiment', id: z.el.id }))
+  bouton(ctx, d.retour, 'RETOUR', { petit: true })
+  zones.push(d.retour)
+  bourse(ctx, c, D.bourse(j))
+  return { zones, max: r.max, rect: d.zone }
+}
+
+/**
+ * Ce qu'un bâtiment ajoute à sa fiche : une liste propre à lui, dans le même
+ * moule que la caserne ou l'état-major — une ligne, un prix, un bouton.
+ * Un bâtiment qui n'a rien de propre (l'infirmerie, la taverne, le grenier,
+ * le poste de guet, les fortifications) rend une liste vide : sa fiche et
+ * son bouton CONSTRUIRE suffisent à raconter ce qu'il fait.
+ */
+function extrasDe(c, id) {
+  if (id === 'caserne') {
+    return V.SESSIONS.filter((s) => V.sessionOuverte(c, s)).map((s) => ({
+      id: s.id,
+      nom: s.nom,
+      sous: `${s.jours} JOURS · +${s.xp} XP CHACUN`,
+      prix: s.prix,
+      quoi: 'entraine',
+    }))
+  }
+  if (id === 'marche') {
+    return (c.offre.objets ?? []).map((l, i) => {
+      const o = OBJET[l.id]
+      return {
+        id: i,
+        nom: o.nom,
+        sous: `${o.emplacement.toUpperCase()} · RANG ${o.rang}`,
+        prix: l.prix,
+        quoi: 'achete',
+      }
+    })
+  }
+  if (id === 'forge') {
+    const plafond = V.niveauBat(c, 'forge') + 1
+    const lignes = []
+    for (const t of c.troupes) {
+      for (const emp of ['arme', 'armure', 'accessoire']) {
+        const inst = t.equip[emp]
+        if (!inst) continue
+        const tierVise = (inst.tier ?? 1) + 1
+        if (tierVise > TIER_MAX) continue
+        const objet = OBJET[inst.id]
+        const prix = prixAmelioration(objet, tierVise, c.niveau, U.echelle)
+        lignes.push({
+          id: t.id,
+          emp,
+          nom: `${U.nomComplet(t)} · ${nomObjet(inst)}`,
+          sous: tierVise > plafond ? `→ TIER ${tierVise} · FORGE TROP FAIBLE` : `→ TIER ${tierVise}`,
+          prix,
+          quoi: 'ameliore',
+          hors: tierVise > plafond,
+        })
+      }
+    }
+    return lignes
+  }
+  if (id === 'entrainement') {
+    const foc = V.focusEntrainement(c)
+    return TYPES.map((t) => ({
+      id: t.id,
+      nom: t.nom,
+      sous: foc === t.id ? 'ACCENT ACTUEL — TAPEZ POUR CHANGER' : 'TAPEZ POUR CHOISIR CET ACCENT',
+      prix: 0,
+      quoi: 'focus',
+    }))
+  }
+  return []
+}
+
+export function batiment(ctx, j, c, id, defile) {
+  const ch = D.chassis(j)
+  const d = D.batiment(j)
+  const b = V.BAT[id]
+  const n = V.niveauBat(c, id)
+  entete(ctx, ch.entete, b.nom, n > 0 ? `NIVEAU ${n}/${V.NIVEAU_MAX}` : 'PAS ENCORE CONSTRUIT')
+
+  panneau(ctx, d.fiche.x, d.fiche.y, d.fiche.w, d.fiche.h)
+  paragraphe(ctx, b.quoi, d.fiche.x + 12, d.fiche.y + 20, 11, d.fiche.w - 24, C.faible, 14)
+  for (let i = 0; i < V.NIVEAU_MAX; i++) {
+    rect(ctx, d.fiche.x + 12 + i * 20, d.fiche.y + d.fiche.h - 20, 14, 14, i < n ? C.accent : C.bord)
+  }
+  const manque = (V.PREREQUIS[id] ?? []).filter(([bid, niv]) => V.niveauBat(c, bid) < niv)
+  const peut = V.constructible(c, id)
+  if (manque.length) {
+    ctx.textAlign = 'right'
+    texte(
+      ctx,
+      `REQUIERT ${manque.map(([bid, niv]) => `${V.BAT[bid].nom} ${niv}`).join(', ')}`,
+      d.fiche.x + d.fiche.w - 12,
+      d.fiche.y + d.fiche.h - 14,
+      10,
+      C.rouge,
+      700,
+      d.fiche.w - 40,
+    )
+    ctx.textAlign = 'left'
+  }
+
+  const complet = n >= V.NIVEAU_MAX
+  bouton(ctx, d.construire, complet ? 'NIVEAU MAXIMUM' : `CONSTRUIRE — ${b.cout(n)} OR`, {
+    primaire: peut,
+    actif: peut,
+  })
+
+  const extras = extrasDe(c, id)
+  texte(ctx, extras.length ? 'PROPRE À CE BÂTIMENT' : '', d.legende.x, d.legende.y, 10, C.faible, 700, ch.L)
+  const r = liste(
+    ctx,
+    d.zone,
+    extras,
+    d.ligne,
+    defile,
+    (ctx, z, l) => {
+      const cher = l.prix > c.or
+      const a = ctx.globalAlpha
+      if (cher || l.hors) ctx.globalAlpha = a * 0.45
+      panneau(ctx, z.x, z.y, z.w, z.h)
+      texte(ctx, tronque(ctx, l.nom, 12, z.w - 24), z.x + 12, z.y + 20, 12, C.texte, 700, z.w - 24)
+      texte(ctx, l.sous, z.x + 12, z.y + 38, 9, C.faible, 700, z.w - 24)
+      if (l.prix) {
+        ctx.textAlign = 'right'
+        texte(ctx, `${l.prix} OR`, z.x + z.w - 12, z.y + 24, 12, cher ? C.rouge : C.accent, 700, 100)
+        ctx.textAlign = 'left'
+      }
+      ctx.globalAlpha = a
+    },
+    d.cols,
+  )
+  const zones = r.zones.map((z) => ({ ...z, quoi: z.el.quoi, id: z.el.id, emp: z.el.emp }))
+  if (!extras.length && !manque.length)
+    texte(ctx, 'RIEN DE PLUS À FAIRE ICI — LE NIVEAU SUFFIT', d.zone.x, d.zone.y + 20, 10, C.faible, 700, ch.L)
+
+  bouton(ctx, d.retour, 'RETOUR', { petit: true })
+  zones.push(d.construire, d.retour)
+  bourse(ctx, c, D.bourse(j))
+  return { zones, max: r.max, rect: d.zone }
 }
 
 // --- Les engagements ------------------------------------------------------------------
