@@ -165,8 +165,13 @@ const PORTRAIT = [
   // bouton bouge de deux pixels.
   ['bataille', 396, '0026a4679b1d45a9'],
   ['bataille/troupe', 408, 'efac87fa29a5f1f7'],
-  ['bataille/prévision', 414, '60ac62ce0f8d6e5d'],
-  ['bataille/ennemi', 366, '533c94270d6d6930'],
+  // Réétalonné au lot 8 : `adversaire.js` recrutait un rang de classe
+  // d'avance (`niveau + 1`) sur la caserne du joueur, plafonnée à `niveau`
+  // sans le « + 1 » — corrigé pour aligner les deux plafonds. À graine
+  // égale, l'armée adverse tire d'autres classes : la troupe visée par la
+  // prévision et l'ennemi inspecté changent de contenu, pas de disposition.
+  ['bataille/prévision', 414, 'e987a480288d0ae4'],
+  ['bataille/ennemi', 366, '660dfecfeebb2bce'],
   // Réétalonné au lot 6 : le bouton du bilan dit désormais AU VILLAGE, plus
   // « AU CAMP » — même bouton, même nombre de traits, texte différent.
   // Réétalonné au lot 7 : le titre porte le carnet de guerre quand ce bilan

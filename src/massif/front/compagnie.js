@@ -522,6 +522,16 @@ export function prepare(c, k) {
     const chef = sien.reduce((a, b) => (b.grade > a.grade || (b.grade === a.grade && b.niv > a.niv) ? b : a))
     objectif.chef = chef.ref
   }
+  if (e.objectif === 'percee') {
+    // Le défaut (3) ne descendait jamais : `?? 2` dans `bataille.js` promettait
+    // deux troupes, `besoin: 3` posé ici en amont en exigeait trois — mesuré
+    // au banc, PERCER se résolvait à 0 % par sa propre règle, tout venait du
+    // chronomètre. Trois troupes simultanément vivantes au bord adverse, sous
+    // le feu tout du long, est une traversée bien plus dure que ce que le
+    // reste du jeu demande ailleurs (ESCORTE, la même traversée, n'en exige
+    // que deux et se résout à 90 %).
+    objectif.besoin = 2
+  }
   if (e.objectif === 'escorte') {
     // L'inverse de PERCER : ce ne sont pas deux troupes au choix qui doivent
     // traverser, ce sont les plus fragiles — celles qu'on aurait laissées à

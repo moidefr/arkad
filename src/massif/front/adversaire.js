@@ -52,10 +52,16 @@ export const forceDe = (troupes) => troupes.reduce((s, u) => s + valeur(u), 0)
  * Compose une armée. `penchant` pousse vers un type dominant : une bande de
  * cavalerie ne se joue pas comme une ligne d'arbalétriers, et c'est ce qui
  * rend le choix de l'engagement intéressant sur l'écran de campagne.
+ *
+ * Le vivier de classes est plafonné exactement comme celui de la caserne du
+ * joueur (`compagnie.js`, `x.rang <= c.niveau`) — un `+ 1` ici donnait à
+ * l'adversaire une classe d'avance **permanente**, jamais rattrapable, quel
+ * que soit le niveau. Mesuré au banc, c'était la cause la plus probable des
+ * montagnes russes du taux de victoire plutôt qu'une pente cohérente.
  */
 export function armee(graine, niveau, budget, penchant = null, combien = null) {
   const rng = melange32(derive(graine, 401, niveau, Math.round(budget)))
-  const dispo = CLASSES.filter((c) => c.rang <= niveau + 1)
+  const dispo = CLASSES.filter((c) => c.rang <= niveau)
   const max = combien ?? Math.min(14, 3 + Math.floor(niveau * 0.7))
 
   const troupes = []
