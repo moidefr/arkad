@@ -151,6 +151,8 @@ export function creeGenerique(clId, niveau, nom, initiale) {
     batailles: 0,
     tues: 0,
     equip: equipVide(),
+    cicatrices: [],
+    ramasse: 0,
   }
   u.grade = gradeAtteint(u)
   u.pv = fiche(u).pvMax
@@ -178,6 +180,8 @@ export function creeUnique(uqId, niveau) {
     batailles: 0,
     tues: 0,
     equip: equipVide(),
+    cicatrices: [],
+    ramasse: 0,
   }
   // Le grade de la fiche est un **plancher**, pas un plafond : sans ce
   // rappel, un unique sergent recruté au niveau 12 sortait moins gradé — donc
@@ -224,22 +228,25 @@ export const ENDURANCE = 1.7
 
 /**
  * Les aptitudes que porte réellement une unité : celles de sa classe/de son
- * unique, **plus** les passives que son équipement ajoute.
+ * unique, **plus** les passives que son équipement ajoute, **plus** ses
+ * cicatrices de vétéran (lot 7 — gagnées à force d'être ramassée sur le
+ * terrain, jamais choisies).
  *
- * Un seul endroit lit `u.equip` pour en tirer des aptitudes — exactement
- * comme un seul endroit lit `u.uq`. `passif()`, `fichePassif()` et `ordres()`
- * passent tous par ici, ce qui suffit à ce qu'un objet à passif se comporte
- * en tout point comme si la classe elle-même le portait. Un objet ne porte
- * jamais d'ordre (règle de `donnees/objets.js`), donc `ordres()` n'en verra
- * jamais sortir d'ici — mais il lit quand même cette liste, pour ne pas
- * dupliquer la fusion à un deuxième endroit.
+ * Un seul endroit lit `u.equip` et `u.cicatrices` pour en tirer des
+ * aptitudes — exactement comme un seul endroit lit `u.uq`. `passif()`,
+ * `fichePassif()` et `ordres()` passent tous par ici, ce qui suffit à ce
+ * qu'une source secondaire de passif se comporte en tout point comme si la
+ * classe elle-même le portait. Ni un objet ni une cicatrice ne portent
+ * jamais d'ordre (règle de `donnees/objets.js` et de `CICATRICES`), donc
+ * `ordres()` n'en verra jamais sortir d'ici — mais il lit quand même cette
+ * liste, pour ne pas dupliquer la fusion à un deuxième endroit.
  */
 export function aptEffectives(u) {
   const dEquip = Object.values(u.equip ?? {})
     .filter(Boolean)
     .map((inst) => OBJ[inst.id]?.passif)
     .filter(Boolean)
-  return [...new Set([...(u.apt ?? []), ...dEquip])]
+  return [...new Set([...(u.apt ?? []), ...dEquip, ...(u.cicatrices ?? [])])]
 }
 
 /** La somme des bonus chiffrés de l'équipement, chaque tier multipliant le bonus de base. */

@@ -137,7 +137,9 @@ const PORTRAIT = [
   ['titre', 18, 'ec969a079f2d16e6'],
   // Neuf au lot 6 : le camp aux boutons empilés est remplacé par le village
   // vivant — huit emplacements réactifs, un ciel qui suit l'heure du jour.
-  ['village', 100, '6bfdb08783e68e50'],
+  // Réétalonné au lot 7 : l'entête porte désormais la saison, cosmétique
+  // (« JOUR 1 · PRINTEMPS ») — même nombre de traits, texte différent.
+  ['village', 100, '8529507f475f8d20'],
   ['campagne', 54, '3b9b04d51ab6a423'],
   // Réétalonné : le lot 2 ajoute dix classes au vivier générique, donc le
   // même tirage à la même graine ne pioche plus les mêmes six cartes à la
@@ -151,7 +153,9 @@ const PORTRAIT = [
   // « FORT/FAIBLE CONTRE » textuel pour des pastilles, trois emplacements
   // d'équipement et des puces hexagonales — plus de traits, même plancher
   // tactile.
-  ['fiche', 136, '6f2302147b44086a'],
+  // Réétalonné au lot 7 : la ligne de classe porte désormais le compteur
+  // cosmétique (« · 1 PIQUIER ») — même nombre de traits, texte différent.
+  ['fiche', 136, '87bab8d653658400'],
   // Neufs au lot 3 : la liste des bâtiments, et le détail de la caserne (le
   // seul qui ait quelque chose de propre à montrer — ses sessions).
   ['ville', 81, 'fe41f50755b1fcff'],
@@ -165,7 +169,9 @@ const PORTRAIT = [
   ['bataille/ennemi', 366, '533c94270d6d6930'],
   // Réétalonné au lot 6 : le bouton du bilan dit désormais AU VILLAGE, plus
   // « AU CAMP » — même bouton, même nombre de traits, texte différent.
-  ['bilan', 24, '57c4aca6a720fec9'],
+  // Réétalonné au lot 7 : le titre porte le carnet de guerre quand ce bilan
+  // en a un (ici « victoire sans perte ») — même nombre de traits.
+  ['bilan', 24, 'ea3641bdcabb13c6'],
 ]
 
 test('le portrait n’a pas bougé d’un pixel', () => {

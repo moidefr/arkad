@@ -88,14 +88,31 @@ export function village(ctx, j, c) {
   const t = j.t ?? 0
   const jour = phaseJour(c, t)
   const nuit = jour < 0.22 || jour > 0.85
+  const saison = V.saison(c)
+  const hiver = saison.id === 'hiver'
 
-  entete(ctx, ch.entete, 'LE VILLAGE', `JOUR ${c.ville?.jour ?? 1}`)
+  entete(ctx, ch.entete, 'LE VILLAGE', `JOUR ${c.ville?.jour ?? 1} · ${saison.nom}`)
 
   // Le ciel : la même bande tramée que partout ailleurs dans le jeu, teintée
-  // par l'heure — sombre la nuit, ambrée au levant, claire en plein jour.
-  const teinteCiel = nuit ? ton(C.violet, -0.6) : jour < 0.3 || jour > 0.75 ? C.accent : ton(C.cyan, -0.3)
+  // par l'heure — sombre la nuit, ambrée au levant, claire en plein jour. En
+  // hiver la même bande vire au froid, jamais une deuxième palette à tenir.
+  const teinteCiel = nuit
+    ? ton(C.violet, -0.6)
+    : hiver
+      ? ton(C.cyan, -0.5)
+      : jour < 0.3 || jour > 0.75
+        ? C.accent
+        : ton(C.cyan, -0.3)
   bandeTramee(ctx, d.ciel.x, d.ciel.y, d.ciel.w, d.ciel.h, teinteCiel, nuit ? 0.5 : 0.2, 0)
   rect(ctx, d.ciel.x, d.ciel.y + d.ciel.h - 2, d.ciel.w, 2, ton(C.panneau, -0.3))
+  // Une neige légère, seule trace au sol de la saison — rien qui ne bouge ni
+  // ne se lise en combat, juste le village qui s'habille.
+  if (hiver) {
+    for (let k = 0; k < 6; k++) {
+      const x = d.ciel.x + ((k + 0.5) / 6) * d.ciel.w
+      pastille(ctx, x, d.ciel.y + d.ciel.h - 5, 1.5, ton(C.texte, 0.55))
+    }
+  }
 
   const zones = []
   const aligne = Cie.alignees(c)
@@ -192,16 +209,10 @@ export function village(ctx, j, c) {
     r.w,
   )
   if (c.dernier) {
-    texte(
-      ctx,
-      `DERNIER : ${c.dernier.gagne ? 'VICTOIRE' : 'REVERS'} · ${c.dernier.titre ?? ''}`,
-      r.x,
-      r.y + 16,
-      10,
-      c.dernier.gagne ? C.vert : C.rouge,
-      700,
-      r.w,
-    )
+    // Le carnet de guerre, quand ce dernier engagement a laissé une ligne à
+    // raconter — sinon le résumé nu, comme avant lui.
+    const recit = c.dernier.carnet ?? `${c.dernier.gagne ? 'VICTOIRE' : 'REVERS'} · ${c.dernier.titre ?? ''}`
+    texte(ctx, `DERNIER : ${recit}`, r.x, r.y + 16, 10, c.dernier.gagne ? C.vert : C.rouge, 700, r.w)
   }
   if (!aligne.length) texte(ctx, 'AUCUNE TROUPE EN LIGNE — VOIR LE CAMPEMENT', r.x, r.y + 32, 10, C.rouge, 700, r.w)
 

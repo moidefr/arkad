@@ -326,9 +326,12 @@ export function campagne(ctx, j, c, choix) {
     paragraphe(ctx, o.texte, z.x + 12, z.y + d.dy.para, 10, z.w - 24, C.faible, 12)
 
     texte(ctx, `${dims.cols}×${dims.rows} · ${e.toursMax} TOURS`, z.x + 12, z.y + d.dy.dims, 10, C.cyan, 700, 150)
+    // Un contrat du babillard (poste de guet) a une échéance ; les offres
+    // ordinaires n'en ont pas, et ce fragment reste vide pour elles.
+    const echeance = e.expire != null ? ` · J-${Math.max(0, e.expire - c.ville.jour)}` : ''
     texte(
       ctx,
-      `${difficulteNom(e.difficulte)}${e.penchant ? ' · ' + TYPE[e.penchant].nom : ''}`,
+      `${difficulteNom(e.difficulte)}${e.penchant ? ' · ' + TYPE[e.penchant].nom : ''}${echeance}`,
       z.x + 12,
       z.y + d.dy.diff,
       10,
@@ -607,7 +610,22 @@ export function fiche(ctx, j, c, u, defile, selEquip, aptOuvertes) {
   const droite = p.x + p.w - 10
   panneau(ctx, p.x, p.y, p.w, p.h)
   texte(ctx, U.titre(u), ix, p.y + 18, 12, C.accent, 700, iw)
-  texte(ctx, `${GRADES[u.grade].nom} · ${TYPE[f.type].nom} · ${CL[u.cl].nom}`, ix, p.y + 34, 11, C.faible, 700, iw)
+  // Le compteur cosmétique par classe — « 12 GARDES, 4 TOMBÉS » — texte pur,
+  // à partir de données déjà tenues (lot 7) : aucune décision de plus.
+  const h = c.historique?.[u.cl]
+  const compteur = h
+    ? ` · ${h.recrutees} ${CL[u.cl].nom}${h.recrutees > 1 ? 'S' : ''}${h.tombees ? `, ${h.tombees} TOMBÉ${h.tombees > 1 ? 'S' : ''}` : ''}`
+    : ''
+  texte(
+    ctx,
+    `${GRADES[u.grade].nom} · ${TYPE[f.type].nom} · ${CL[u.cl].nom}${compteur}`,
+    ix,
+    p.y + 34,
+    11,
+    C.faible,
+    700,
+    iw,
+  )
 
   const k = u.pv / f.pvMax
   barre(ctx, ix, p.y + 44, iw, 10, k, teinteVie(k), C.bord)
@@ -753,7 +771,10 @@ export function bilan(ctx, j, c, r) {
   ctx.textAlign = 'center'
   lueur(ctx, d.lueur.x, d.lueur.y, d.lueur.w, d.lueur.h, teinte, 3, 0.7)
   texte(ctx, mot, d.mot.x, d.mot.y, 28, teinte, 700, d.mot.max, 2)
-  texte(ctx, r.titre ?? '', d.titre.x, d.titre.y, 12, C.faible, 700, d.titre.max)
+  // Le carnet de guerre, quand ce bilan a une ligne à raconter — sinon le
+  // titre de l'engagement seul, comme avant lui.
+  const recit = r.carnet ? `${r.titre ?? ''} · ${r.carnet.toUpperCase()}` : (r.titre ?? '')
+  texte(ctx, recit, d.titre.x, d.titre.y, 12, C.faible, 700, d.titre.max)
   ctx.textAlign = 'left'
 
   const p = d.panneau
@@ -790,6 +811,13 @@ export function bilan(ctx, j, c, r) {
       teinte: C.accent,
       couleur: C.accent,
       lignes: r.lignes.slice(0, 4).map((l) => U.nomComplet(l.u)),
+    })
+  if (r.cicatrices?.length)
+    sections.push({
+      nom: 'CICATRICES GAGNÉES',
+      teinte: C.violet,
+      couleur: C.violet,
+      lignes: r.cicatrices.slice(0, 4).map((x) => `${U.nomComplet(x.u)} : ${APT[x.id].nom}`),
     })
   if (r.perdus.length)
     sections.push({

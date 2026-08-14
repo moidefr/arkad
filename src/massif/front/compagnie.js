@@ -14,6 +14,7 @@
 import { melange32, derive, entre, parmi, melange, pondere } from './rng.js'
 import { CLASSES, CL, GRADES } from './donnees/classes.js'
 import { UNIQUES, UQ, RAR } from './donnees/uniques.js'
+import { APT } from './donnees/aptitudes.js'
 import { OBJETS, OBJ as OBJET, TIER_MAX, prixObjet, prixAmelioration } from './donnees/objets.js'
 import { BIOMES } from './terrain.js'
 import * as U from './unites.js'
@@ -67,6 +68,7 @@ export function nouvelle(graine) {
     engagements: 0,
     victoires: 0,
     pertes: 0,
+    serie: 0,
     troupes: depart.map((cl) => U.creeGenerique(cl.id, 1, parmi(rng, U.NOMS), parmi(rng, U.INITIALES))),
     escouades: [],
     uniquesVus: [],
@@ -76,11 +78,29 @@ export function nouvelle(graine) {
     dernier: null,
     ville: V.villeNeuve(),
     objets: [],
+    historique: {},
   }
+  c.troupes.forEach((u) => enregistreRecrue(c, u.cl))
   c.escouades = [{ nom: 'PREMIÈRE', chef: c.troupes[0].id, membres: c.troupes.map((t) => t.id) }]
   rafraichit(c)
   planifie(c)
   return c
+}
+
+/**
+ * Le compteur cosmétique par classe — « 12 GARDES, 4 TOMBÉS ». Aucune
+ * décision de plus, pure présentation : combien la compagnie en a levé
+ * depuis le début, combien ne sont pas rentrés.
+ */
+function enregistreRecrue(c, clId) {
+  c.historique ??= {}
+  const h = (c.historique[clId] ??= { recrutees: 0, tombees: 0 })
+  h.recrutees++
+}
+function enregistreTombee(c, clId) {
+  c.historique ??= {}
+  const h = (c.historique[clId] ??= { recrutees: 0, tombees: 0 })
+  h.tombees++
 }
 
 export const sauvegarde = (c, bat) => ({ v: VERSION, c, bat: bat ?? null })
@@ -97,7 +117,20 @@ export function migre(brut) {
   c.escouades ??= []
   c.uniquesVus ??= []
   c.objets ??= []
-  for (const u of c.troupes) u.equip ??= U.equipVide()
+  c.serie ??= 0
+  for (const u of c.troupes) {
+    u.equip ??= U.equipVide()
+    u.cicatrices ??= []
+    u.ramasse ??= 0
+  }
+  // Une sauvegarde d'avant le carnet n'a pas d'historique : on le repart du
+  // vivant plutôt que de mentir avec des zéros — les tombés d'avant restent
+  // hors de portée, mais « 3 GARDES » vaut mieux que « 0 GARDES » pour une
+  // compagnie qui en a trois sous les armes.
+  if (!c.historique) {
+    c.historique = {}
+    for (const u of c.troupes) enregistreRecrue(c, u.cl)
+  }
   if (!c.plan) planifie(c)
   if (!c.offre) rafraichit(c)
   c.offre.objets ??= []
@@ -248,6 +281,7 @@ export function recruteGenerique(c, clId) {
   c.or -= ligne.prix
   const u = U.creeGenerique(clId, ligne.niv, parmi(rng, U.NOMS), parmi(rng, U.INITIALES))
   c.troupes.push(u)
+  enregistreRecrue(c, u.cl)
   c.offre.caserne = c.offre.caserne.filter((x) => x !== ligne)
   return u
 }
@@ -258,6 +292,7 @@ export function recruteUnique(c, uqId) {
   c.or -= ligne.prix
   const u = U.creeUnique(uqId, ligne.niv)
   c.troupes.push(u)
+  enregistreRecrue(c, u.cl)
   c.uniquesVus.push(uqId)
   c.offre.uniques = c.offre.uniques.filter((x) => x !== ligne)
   return u
@@ -431,6 +466,9 @@ export function planifie(c) {
       renom: Math.round((18 + 4 * c.niveau) * difficulte),
       toursMax: toursMaxDe(c.niveau),
       graine: derive(c.graine, 303, c.engagements, i),
+      // Le babillard : un contrat du guet retombe si on s'attarde trop —
+      // les offres ordinaires, elles, n'ont pas de date de péremption.
+      expire: veille ? c.ville.jour + V.DELAI_GUET : null,
     })
   }
   c.plan = plan
@@ -547,6 +585,27 @@ function pose(carte, troupes, camp, occupe, c) {
 // --- Après la bataille -------------------------------------------------------------
 
 /**
+ * Le carnet de guerre : une ligne composée à partir du rapport déjà calculé,
+ * jamais une donnée de plus à tenir. Pure présentation — l'esprit d'un
+ * journal qui raconte ce qui vient de se passer plutôt que d'empiler des
+ * compteurs. `null` quand rien ne mérite une ligne à soi.
+ */
+function carnetDeGuerre(c, rapport) {
+  const montee = rapport.montees.find((m) => m.grade != null) ?? rapport.montees[0]
+  if (montee) {
+    const atteint = montee.grade != null ? GRADES[montee.grade].nom : `NIVEAU ${montee.u.niv}`
+    return `${U.nomComplet(montee.u)} atteint ${atteint}`
+  }
+  if (rapport.cicatrices.length) {
+    const x = rapport.cicatrices[0]
+    return `${U.nomComplet(x.u)} porte une nouvelle cicatrice : ${APT[x.id].nom}`
+  }
+  if (rapport.gagne && c.serie >= 3) return `${c.serie}e victoire consécutive`
+  if (rapport.gagne && !rapport.perdus.length && !rapport.lignes.length) return 'victoire sans perte'
+  return null
+}
+
+/**
  * Le report. C'est ici que la persistance se paie : l'expérience monte, les
  * blessures restent, et **une défaite coûte les tombés**. Une victoire les
  * ramène — mal en point, mais vivants.
@@ -554,7 +613,8 @@ function pose(carte, troupes, camp, occupe, c) {
 export function bilan(c, bat) {
   const gagne = bat.fini === 'gagne'
   const rompu = bat.fini === 'retraite'
-  const rapport = { gagne, rompu, or: 0, renom: 0, lignes: [], perdus: [], montees: [] }
+  const rapport = { gagne, rompu, or: 0, renom: 0, lignes: [], cicatrices: [], perdus: [], montees: [] }
+  const rngCicatrice = melange32(derive(c.graine, 888, c.engagements))
 
   for (const cu of B.unitesDe(bat, 0)) {
     const u = trouve(c, cu.ref)
@@ -567,7 +627,10 @@ export function bilan(c, bat) {
       // Ramassé sur le terrain : il repart, à un quart de ses forces.
       u.pv = Math.max(1, Math.round(U.fiche(u).pvMax * 0.25))
       u.blesse = 1
+      u.ramasse = (u.ramasse ?? 0) + 1
       rapport.lignes.push({ u, texte: 'RAMASSÉ', teinte: 'rouge' })
+      const cicatrice = V.cicatriceGagnee(u, rngCicatrice)
+      if (cicatrice) rapport.cicatrices.push({ u, id: cicatrice })
     } else {
       rapport.perdus.push(u)
       continue
@@ -581,6 +644,7 @@ export function bilan(c, bat) {
     retireDe(c, u.id)
     c.troupes = c.troupes.filter((t) => t.id !== u.id)
     c.pertes++
+    enregistreTombee(c, u.cl)
   }
 
   // La bataille a pris une journée : elle marque la date, et c'est elle qui
@@ -599,6 +663,7 @@ export function bilan(c, bat) {
   c.renom += rapport.renom
   c.engagements++
   if (gagne) c.victoires++
+  c.serie = gagne ? (c.serie ?? 0) + 1 : 0
 
   // Le butin ne tombe que sur une victoire — une retraite ou une défaite ne
   // laisse personne fouiller le champ. La chance monte doucement avec le
@@ -626,7 +691,8 @@ export function bilan(c, bat) {
 
   rafraichit(c)
   planifie(c)
-  c.dernier = { gagne, or: rapport.or, renom: rapport.renom, titre: bat.titre }
+  rapport.carnet = carnetDeGuerre(c, rapport)
+  c.dernier = { gagne, or: rapport.or, renom: rapport.renom, titre: bat.titre, carnet: rapport.carnet }
   return rapport
 }
 

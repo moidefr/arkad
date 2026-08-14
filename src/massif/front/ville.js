@@ -41,6 +41,39 @@ export const MORAL_DEPART = 70
 export const JOURS_AVANT_OUBLI = 30
 
 /**
+ * Le babillard du poste de guet : un contrat au penchant connu d'avance
+ * n'attend pas indéfiniment. Passé ce délai sans être pris, il retombe —
+ * une vraie raison de ne pas s'attarder en entraînement plutôt qu'une autre
+ * jauge à surveiller.
+ */
+export const DELAI_GUET = 4
+
+/**
+ * Les cicatrices de vétéran : une troupe ramassée plusieurs fois sur le
+ * terrain en garde quelque chose, sans qu'on l'ait choisi. Aucune mécanique
+ * neuve — chaque cicatrice est une passive déjà interprétée par
+ * `donnees/aptitudes.js`, prise dans un pool volontairement minuscule pour
+ * ne jamais devenir un arbre de talents à gérer par troupe.
+ */
+export const CICATRICES = ['tenace', 'discipline', 'fanatique', 'aguerri']
+export const SEUIL_CICATRICE = 3
+
+/**
+ * Une troupe ramassée un multiple de `SEUIL_CICATRICE` fois gagne la
+ * prochaine cicatrice disponible, jamais deux fois la même, jamais plus que
+ * le pool. Rend l'id gagné, ou `null` s'il n'y avait rien à gagner ce
+ * coup-ci — à `bilan()` de décider quoi en faire (une ligne dans le rapport).
+ */
+export function cicatriceGagnee(u, rng) {
+  if ((u.ramasse ?? 0) % SEUIL_CICATRICE !== 0) return null
+  const dispo = CICATRICES.filter((id) => !(u.cicatrices ?? []).includes(id))
+  if (!dispo.length) return null
+  const id = dispo[Math.floor(rng() * dispo.length)]
+  u.cicatrices = [...(u.cicatrices ?? []), id]
+  return id
+}
+
+/**
  * Les bâtiments. Chacun a trois niveaux, et **fait une seule chose** — un
  * bâtiment qui en ferait deux serait impossible à évaluer d'un coup d'œil.
  *
@@ -149,6 +182,26 @@ export function construit(c, id) {
 export const besoinVivres = (c) => c.troupes.length + 1
 
 /**
+ * Les saisons — cosmétiques, jamais une règle de combat : elles habillent le
+ * village (déjà vivant) et pèsent un peu sur le seul chiffre auquel « rester
+ * » se mesure déjà, le coût du jour. Aucun coût cognitif en bataille, ce
+ * qui exclurait la météo elle-même (voir le plan : violerait « aucun coup à
+ * l'aveugle » cachée, ou ajouterait une règle à mémoriser visible).
+ */
+export const SAISONS = [
+  { id: 'printemps', nom: 'PRINTEMPS' },
+  { id: 'ete', nom: 'ÉTÉ' },
+  { id: 'automne', nom: 'AUTOMNE' },
+  { id: 'hiver', nom: 'HIVER' },
+]
+export const JOURS_PAR_SAISON = 20
+
+export const saison = (c) => SAISONS[Math.floor(((c.ville?.jour ?? 1) - 1) / JOURS_PAR_SAISON) % SAISONS.length]
+
+/** L'hiver coûte plus cher — une bouche à nourrir ne l'est jamais moins par grand froid. */
+export const coutSaison = (c) => (saison(c).id === 'hiver' ? 1.25 : 1)
+
+/**
  * Ce que coûte une journée. Volontairement petit : à douze troupes et au
  * niveau 10, une semaine au chaud coûte environ ce que rapporte un quart de
  * bataille. On sent passer un mois de flânerie, pas trois jours de soins.
@@ -157,7 +210,10 @@ export const besoinVivres = (c) => c.troupes.length + 1
  * septième par niveau.
  */
 export const coutJour = (c) =>
-  Math.max(1, Math.round(besoinVivres(c) * 1.6 * U.echelle(c.niveau) * (1 - niveauBat(c, 'grenier') * 0.15)))
+  Math.max(
+    1,
+    Math.round(besoinVivres(c) * 1.6 * U.echelle(c.niveau) * (1 - niveauBat(c, 'grenier') * 0.15) * coutSaison(c)),
+  )
 
 /** Combien de jours on peut tenir avec l'or qu'on a. */
 export const joursTenables = (c) => Math.floor(c.or / Math.max(1, coutJour(c)))
@@ -235,6 +291,13 @@ export function passeJour(c) {
   if (depuis > JOURS_AVANT_OUBLI && c.renom > 0) {
     bilan.renom = -Math.max(1, Math.round(c.renom * 0.01))
     c.renom = Math.max(0, c.renom + bilan.renom)
+  }
+
+  // --- Le babillard. Un contrat du guet non pris à temps disparaît — la
+  //     seule offre de `c.plan` qui puisse se retirer sans qu'on ait combattu.
+  if (c.plan?.some((e) => e.expire != null)) {
+    bilan.expires = c.plan.filter((e) => e.expire != null && e.expire < v.jour).length
+    if (bilan.expires) c.plan = c.plan.filter((e) => e.expire == null || e.expire >= v.jour)
   }
 
   ajusteMoral(c, bilan.moral)
