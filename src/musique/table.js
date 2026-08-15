@@ -118,7 +118,6 @@ export const JEUX = [
   t('demineur', 'CE QU’ON DÉDUIT', 74, 'mineur', 10, 'calme', 0x404455),
   t('mille', 'MILLE', 90, 'pentaMaj', 3, 'veille', 0x505566),
   t('taquin', 'REMETTRE EN ORDRE', 86, 'dorien', 8, 'veille', 0x606677),
-  t('donjon', 'SOUS LA PIERRE', 78, 'harmonique', 1, 'nocturne', 0x707788),
   t('usine', 'LA GRANDE MACHINE', 108, 'dorien', 6, 'mecanique', 0x808899),
   t('expedition', 'NEUF CENTS KILOMÈTRES', 70, 'mineur', 11, 'calme', 0x9099aa),
   t('front', 'LA COMPAGNIE', 96, 'harmonique', 4, 'martial', 0xa0aabb),

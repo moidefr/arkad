@@ -29,7 +29,6 @@ import demineur from './moyen/demineur.js'
 import mille from './moyen/mille.js'
 import taquin from './moyen/taquin.js'
 
-import donjon from './long/donjon.js'
 import usine from './long/usine/index.js'
 import expedition from './long/expedition.js'
 import breche from './long/breche/index.js'
@@ -82,7 +81,7 @@ export const CATEGORIES = [
     duree: '20 minutes à 10 heures',
     detail: 'ça continue quand on ferme',
     couleur: C.violet,
-    jeux: [donjon, usine, expedition, breche, ruee],
+    jeux: [usine, expedition, breche, ruee],
   },
   {
     id: 'massif',

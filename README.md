@@ -101,12 +101,6 @@ se termine dans la séance.
 
 ### LONG — 20 minutes à 10 heures (4 jeux)
 
-**DONJON** — roguelike au tour par tour. Huit bêtes qui n'ont pas la même
-façon d'être pénibles : l'archer tire dans les lignes dégagées, donc les
-couloirs cessent d'être des refuges ; le spectre traverse les murs ; le golem
-ne bouge qu'un tour sur deux mais encaisse tout. Épées, plaques, fioles,
-parchemins, or, et un gardien tous les cinq étages.
-
 **USINE** — incrémental, et un atelier qui tourne vraiment. La moitié haute de
 l'écran est une scène : un front de taille qu'on frappe pour creuser, deux
 étages de machines qui battent et soufflent à la cadence de leur ligne, des
@@ -231,7 +225,7 @@ l'inverse : le jeu marche debout mais respire couché, et l'écran de
 suggestion le dit — avec un **NE PLUS PROPOSER** qui se retient, parce qu'une
 suggestion qu'on ne peut pas faire taire est une nuisance.
 
-Aujourd'hui : VOLTIGE, DÉMINEUR, DONJON, USINE et BRÈCHE sont mieux couchés ;
+Aujourd'hui : VOLTIGE, DÉMINEUR, USINE et BRÈCHE sont mieux couchés ;
 SERPENT sait l'être sans y gagner, donc il ne le propose pas. Les autres
 restent debout — un jeu de chute ou d'empilement n'a rien à faire dans un
 écran large.
@@ -327,9 +321,9 @@ Le moteur dessine tout par-dessus le jeu, dans son repère, et secoue l'image
 sans jamais bouger le bandeau du haut. Il ajoute lui-même la gerbe et la
 secousse au moment de la mort.
 
-**Attention aux jeux qui ont une caméra** (GRIMPE, DONJON) : les grains
-vivent dans le repère de l'écran, il faut donc leur passer des coordonnées
-déjà décalées.
+**Attention aux jeux qui ont une caméra** (GRIMPE) : les grains vivent dans
+le repère de l'écran, il faut donc leur passer des coordonnées déjà
+décalées.
 
 ## Le son
 
@@ -464,8 +458,8 @@ d'un `.find()`, et trois combats qui ne se terminaient jamais.
 ## La suite
 
 - d'autres jeux massifs — la catégorie n'en a qu'un
-- des bandes-son pour les mondes de DONJON et les pays d'EXPÉDITION, sur le
-  modèle des cinquante de BRÈCHE
+- des bandes-son pour les pays d'EXPÉDITION, sur le modèle des cinquante de
+  BRÈCHE
 - FRONT : des sièges et des objectifs à plusieurs étapes, et une campagne
   qui se souvient des compagnies adverses qu'on a croisées
 - une interface pour publier des jeux sans passer par git
