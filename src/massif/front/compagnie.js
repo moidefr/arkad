@@ -433,8 +433,9 @@ export function planifie(c) {
   // Le poste de guet ajoute une offre par niveau, et lève le doute sur son
   // penchant : les autres offres restent un tirage à pile ou face, celles
   // du guet ne le sont jamais.
+  const base = c.niveau >= 3 ? 3 : 2
   const guet = V.niveauBat(c, 'guet')
-  const combien = (c.niveau >= 3 ? 3 : 2) + guet
+  const combien = base + guet
   const objs = OBJECTIFS.filter((o) => o.rang <= c.niveau)
   const { cols, rows } = dimensions(c.niveau)
   const biomes = melange(
@@ -445,7 +446,16 @@ export function planifie(c) {
   const lieux = melange(rng, LIEUX)
   const plan = []
   for (let i = 0; i < combien; i++) {
-    const difficulte = 0.78 + i * 0.16 + (rng() - 0.5) * 0.1
+    // Le palier de difficulté boucle sur `base`, pas sur `combien` : sans
+    // ça, chaque offre du guet s'ajoutait au bout du tableau avec un `i`
+    // toujours plus grand, donc toujours plus dure — le guet, censé lever le
+    // doute sur le terrain, devenait de fait l'offre la plus punitive dès
+    // qu'on le construisait, et de pire en pire à mesure qu'on l'améliorait.
+    // Mesuré au banc : la difficulté moyenne d'une campagne qui tourne
+    // toutes ses offres montait de ×0,85 au niveau 1 à ×1,2 vers le niveau
+    // 20, rien que par ce couplage — la vraie cause de la « courbe de
+    // progression incohérente », au-delà du chef adverse non budgété.
+    const difficulte = 0.78 + (i % base) * 0.16 + (rng() - 0.5) * 0.1
     const obj = parmi(rng, objs)
     const biome = biomes[i % biomes.length]
     const veille = i >= combien - guet
