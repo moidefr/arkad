@@ -30,7 +30,7 @@ import mille from './moyen/mille.js'
 import taquin from './moyen/taquin.js'
 
 import usine from './long/usine/index.js'
-import expedition from './long/expedition.js'
+import expedition from './long/expedition/index.js'
 import breche from './long/breche/index.js'
 import ruee from './long/ruee/index.js'
 
