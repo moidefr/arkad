@@ -216,6 +216,11 @@ test('un ouvrier coûte toujours entre 3 secondes et 3 minutes de production', (
   joueur(10, {
     surveille: (e, t) => {
       if (t % 1800 || t < 1800 || !e.ouvriers) return
+      // Juste après une refonte, la production repart de zéro le temps d'un
+      // relevé alors que l'équipe, elle, a survécu aux trois quarts — un
+      // ratio qui s'affole sur cet instant précis n'est pas un régime
+      // permanent, seulement une photo prise au mauvais moment.
+      if (e.n.every((n) => n === 0)) return
       releves.push({ t, s: L.coutOuvrier(e) / Math.max(1, L.production(e)) })
     },
   })
@@ -280,12 +285,15 @@ test('une recherche verrouillée reste hors de portée même avec tout le minera
 })
 
 test('un contrat se mesure en secondes de production, pas en nombres absolus', () => {
+  // Bornes réétalonnées avec le troisième palier de contrats (lot USINE) :
+  // DEMANDE URGENTE (charge 15) et RÉSERVE D’ÉTAT (charge 3600) élargissent
+  // volontairement l’éventail au-delà des huit gabarits d’origine.
   const e = L.neuve()
   e.rech = ['r0', 'c0']
   e.n[5] = 100
   const c = L.tire(e, graine(2))
   const secondes = c.cible / L.production(e)
-  assert.ok(secondes > 20 && secondes < 2000, `un contrat demande ${secondes.toFixed(0)} s de production`)
+  assert.ok(secondes > 10 && secondes < 4000, `un contrat demande ${secondes.toFixed(0)} s de production`)
 })
 
 // --- Le jeu entier ------------------------------------------------------------------------
@@ -304,12 +312,31 @@ test('dix heures de jeu ne laissent ni NaN, ni contenu épuisé', () => {
   assert.ok(e.minerai >= 0, 'du minerai négatif')
   assert.ok(Number.isFinite(L.production(e)), 'la production est devenue NaN')
 
-  // Le reproche d'origine : « trop vite lassant ». Il reste du contenu.
+  // Le reproche d'origine : « trop vite lassant ». Il reste du contenu — les
+  // bornes suivent `RECHERCHES.length`/`AMELIORATIONS.length` directement,
+  // donc le troisième palier (lot USINE, 32 recherches et 48 améliorations)
+  // n'a rien demandé de plus ici.
   assert.ok(e.rech.length < RECHERCHES.length, `les ${RECHERCHES.length} recherches sont trouvées en dix heures`)
   assert.ok(e.ame.length < AMELIORATIONS.length, 'toutes les améliorations sont achetées en dix heures')
-  // Mais pas au point que le joueur piétine.
-  assert.ok(e.rech.length >= 8, `seulement ${e.rech.length} recherches en dix heures, le jeu est trop lent`)
+  // Mais pas au point que le joueur piétine. Mesuré au banc avant de figer
+  // ce plancher (`joueur(10)` en trouve 14 avec le troisième palier) :
+  // relevé un cran au-dessus de l'ancien « >= 8 », qui datait des vingt
+  // recherches d'avant.
+  assert.ok(e.rech.length >= 10, `seulement ${e.rech.length} recherches en dix heures, le jeu est trop lent`)
   assert.ok(e.fontes >= 1, 'jamais l’occasion de refondre en dix heures')
+  // Le second capstone (`x0`) est hors de portée à ce stade — sinon le
+  // plafond de contenu n'a pas vraiment bougé, juste son étiquette.
+  assert.equal(L.su(e, 'x0'), false, 'x0 est atteint en dix heures, le second capstone ne plafonne plus rien')
+})
+
+test('le second capstone (x0) devient atteignable passé un temps de jeu long, mais pas avant', () => {
+  // m11→m14→x0 forment une chaîne strictement séquentielle : aucun
+  // parallélisme de recherche ne raccourcit l'attente, contrairement au
+  // reste de l'arbre. Mesuré au banc (`node test/usine-banc.mjs 60`) avant
+  // de choisir ce point de contrôle — x0 tombe vers la cinquantième heure,
+  // jamais avant la quarantième.
+  assert.equal(L.su(joueur(40), 'x0'), false, 'x0 est atteint en quarante heures')
+  assert.equal(L.su(joueur(60), 'x0'), true, 'x0 reste hors de portée après soixante heures')
 })
 
 /**

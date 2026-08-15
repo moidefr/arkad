@@ -21,8 +21,17 @@ import * as L from './logique.js'
 
 const JOUR = 300 // une journée complète en cinq minutes
 
-/** Cinq machines par étage, à la queue leu leu. */
-const posteX = (d, i) => d.poste.x0 + (i % 5) * d.poste.pas
+/**
+ * Cinq machines de front au sol, dix au premier étage — les cinq d'origine
+ * puis les cinq du troisième palier, à la queue leu leu sur des postes plus
+ * étroits (`posteHaut`) pour tenir dans la même largeur d'étage.
+ */
+const posteDe = (d, i) => (etageDe(i) === 0 ? d.poste : d.posteHaut)
+const posteX = (d, i) => {
+  const p = posteDe(d, i)
+  const idx = etageDe(i) === 0 ? i : i - 5
+  return p.x0 + idx * p.pas
+}
 
 /** Les zones tactiles de la scène. Le dessin et l'appui lisent la même table. */
 export function zones(j) {
@@ -36,7 +45,7 @@ export function zones(j) {
       i,
       x: posteX(d, i),
       y: et.haut - 4,
-      w: d.poste.w,
+      w: posteDe(d, i).w,
       h: et.sol - et.haut + 8,
     })
   })
@@ -146,7 +155,7 @@ function passerelle(ctx, d, jour) {
 function machine(ctx, d, e, i, t) {
   const m = MACHINES[i]
   const et = d.etages[etageDe(i)]
-  const larg = d.poste.w
+  const larg = posteDe(d, i).w
   const x = posteX(d, i)
   const h = et.sol - et.haut
   const y = et.haut

@@ -158,10 +158,13 @@ export function multiplicateur(e, i) {
   return AMELIORATIONS.filter((x) => x.cible === i && a(e, x.id)).reduce((m, x) => m * x.facteur, 1)
 }
 
+/** Le taux par lingot dans le multiplicateur global — `x0` le renforce, définitivement. */
+const tauxLingot = (e) => (su(e, 'x0') ? 0.35 : 0.25)
+
 /** Le multiplicateur global : améliorations, lingots, recherche, prime en cours. */
 export function global(e) {
   const ame = AMELIORATIONS.filter((x) => x.global && a(e, x.id)).reduce((m, x) => m * x.global, 1)
-  return ame * (1 + e.lingots * 0.25) * (su(e, 'h9') ? 3 : 1) * (e.boost > 0 ? 2 : 1)
+  return ame * (1 + e.lingots * tauxLingot(e)) * (su(e, 'h9') ? 3 : 1) * (e.boost > 0 ? 2 : 1)
 }
 
 /** Les postes à pourvoir : plus l'usine grandit, plus il faut de monde. */
@@ -169,7 +172,7 @@ export const postes = (e) => MACHINES.reduce((s, m, i) => s + m.postes * Math.po
 
 /** Ce qu'un ouvrier couvre : formation et primes rendent chacun plus utile. */
 export const rendement = (e) =>
-  (su(e, 'o4') ? 1.6 : 1) *
+  (su(e, 'o5') ? 2.2 : su(e, 'o4') ? 1.6 : 1) *
   (1 + AMELIORATIONS.filter((x) => x.ouvrier && a(e, x.id)).reduce((s, x) => s + x.ouvrier, 0))
 
 export function couverture(e) {
@@ -228,9 +231,9 @@ export function ameliorationsVisibles(e) {
 
 export const rechercheOuverte = (e, r) => !su(e, r.id) && r.requis.every((id) => su(e, id))
 export const recherchesVisibles = (e) => RECHERCHES.filter((r) => rechercheOuverte(e, r))
-export const placesRecherche = (e) => (su(e, 'b0') ? 2 : 1)
-export const placesContrat = (e) => (su(e, 'c1') ? 2 : su(e, 'c0') ? 1 : 0)
-export const horsLigneMax = (e) => (su(e, 'r1') ? 24 : su(e, 'r0') ? 12 : 8) * 3600
+export const placesRecherche = (e) => (su(e, 'b1') ? 3 : su(e, 'b0') ? 2 : 1)
+export const placesContrat = (e) => (su(e, 'c3') ? 3 : su(e, 'c1') ? 2 : su(e, 'c0') ? 1 : 0)
+export const horsLigneMax = (e) => (su(e, 'r2') ? 48 : su(e, 'r1') ? 24 : su(e, 'r0') ? 12 : 8) * 3600
 
 // --- Achats -------------------------------------------------------------------
 
@@ -292,11 +295,13 @@ export function repare(e, i) {
  */
 const PENTE = 0.22
 
-export const lingotsSi = (e) =>
-  Math.max(0, Math.floor(Math.pow(Math.max(0, e.total) / SEUIL_LINGOT, PENTE) * (su(e, 'f0') ? 1.25 : 1)))
+/** `f0` puis `f2` : chacun stack sur l'autre, jamais sur le taux du multiplicateur global (`tauxLingot`). */
+const fonteBonus = (e) => (su(e, 'f0') ? 1.25 : 1) * (su(e, 'f2') ? 1.15 : 1)
 
-export const coutProchainLingot = (e) =>
-  Math.pow((lingotsSi(e) + 1) / (su(e, 'f0') ? 1.25 : 1), 1 / PENTE) * SEUIL_LINGOT
+export const lingotsSi = (e) =>
+  Math.max(0, Math.floor(Math.pow(Math.max(0, e.total) / SEUIL_LINGOT, PENTE) * fonteBonus(e)))
+
+export const coutProchainLingot = (e) => Math.pow((lingotsSi(e) + 1) / fonteBonus(e), 1 / PENTE) * SEUIL_LINGOT
 
 /**
  * Tout ce qui est extrait passe par ici, et par nulle part ailleurs.
@@ -373,7 +378,7 @@ function majPannes(e, dt, hasard, ev) {
 
   e.usure -= dt
   if (e.usure > 0) return
-  e.usure = PANNE_PERIODE * (su(e, 'p0') ? 2 : 1) * (0.6 + hasard() * 0.8)
+  e.usure = PANNE_PERIODE * (su(e, 'p0') ? 2 : 1) * (su(e, 'p3') ? 2 : 1) * (0.6 + hasard() * 0.8)
   if (e.pannes.length >= PANNE_MAX) return
 
   const libres = lignes.filter((i) => !enPanne(e, i))

@@ -52,6 +52,10 @@ function debout() {
       { sol: 218, haut: 176 },
     ],
     poste: { x0: 62, pas: 58, w: 40 },
+    // L'étage du haut loge deux volées de cinq machines (les cinq d'origine,
+    // et les cinq du troisième palier) au lieu d'une seule : postes plus
+    // étroits, même largeur d'étage, aucun changement vertical à risquer.
+    posteHaut: { x0: 64, pas: 28, w: 22 },
     passerelle: { x: 48, w: 306, piliers: [64, 158, 252, 340] },
     lampes: [70, 170, 270, 330],
     ouvriers: { x0: 50, larg: 268 },
@@ -95,6 +99,7 @@ function couche(j) {
       { sol: 250, haut: 186 },
     ],
     poste: { x0: 68, pas: 50, w: 40 },
+    posteHaut: { x0: 66, pas: 25, w: 20 },
     passerelle: { x: 54, w: 258, piliers: [70, 148, 226, 298] },
     lampes: [70, 150, 230, 290],
     ouvriers: { x0: 50, larg: 220 },

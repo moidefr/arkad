@@ -99,9 +99,63 @@ export const MACHINES = [
     couleur: C.rouge,
     recherche: 'm9',
   },
+  // Le troisième palier — cinq lignes de plus, débloquées à la queue leu leu
+  // (m10→m14, chacune exige la précédente) plutôt que par un embranchement :
+  // la même progression linéaire que m6→m9, poussée plus loin.
+  {
+    nom: 'FOUR À ARC',
+    cout: 2e12,
+    taux: 1.21,
+    prod: 1.1e9,
+    postes: 7,
+    couleur: C.accent,
+    recherche: 'm10',
+  },
+  {
+    nom: 'SÉPARATEUR ISOTOPIQUE',
+    cout: 2.8e13,
+    taux: 1.21,
+    prod: 1.2e10,
+    postes: 8,
+    couleur: C.accent,
+    recherche: 'm11',
+  },
+  {
+    nom: 'EXTRACTEUR À VIDE',
+    cout: 4e14,
+    taux: 1.22,
+    prod: 1.3e11,
+    postes: 9,
+    couleur: C.rouge,
+    recherche: 'm12',
+  },
+  {
+    nom: 'FORGE ORBITALE',
+    cout: 6e15,
+    taux: 1.22,
+    prod: 1.5e12,
+    postes: 10,
+    couleur: C.rouge,
+    recherche: 'm13',
+  },
+  {
+    nom: 'CŒUR DE FUSION',
+    cout: 9e16,
+    taux: 1.23,
+    prod: 1.7e13,
+    postes: 12,
+    couleur: C.rouge,
+    recherche: 'm14',
+  },
 ]
 
-/** L'étage sur lequel une machine est dessinée. Zéro en bas. */
+/**
+ * L'étage sur lequel une machine est dessinée. Zéro en bas, un pour tout le
+ * reste — le troisième palier (10-14) rejoint le premier étage plutôt que
+ * d'en réclamer un troisième : `scene.js` y loge dix postes plus étroits
+ * (`posteHaut` dans `dispo.js`) au lieu de cinq, sans toucher à la hauteur
+ * de l'écran.
+ */
 export const etageDe = (i) => (i < 5 ? 0 : 1)
 
 /**
@@ -315,6 +369,29 @@ export const AMELIORATIONS = [
     cible: 9,
     facteur: 5,
   },
+  // Le troisième palier d'améliorations : deux par machine neuve (comme
+  // partout ailleurs), quatre globales de plus, et un cran de plus pour la
+  // main et pour les ouvriers. `h9` est déjà pris par la recherche
+  // « CHAÎNE INTÉGRÉE » (capstone) : les globales neuves sautent ce numéro
+  // plutôt que de partager un identifiant avec une tout autre table.
+  { id: 'g10a', nom: 'ÉLECTRODES LONGUES', dit: 'FOUR À ARC ×3', cout: 2e13, cible: 10, facteur: 3 },
+  { id: 'h7', nom: 'CHAÎNE DOUBLÉE', dit: 'tout ×5', cout: 3e18, global: 5 },
+  { id: 'g10b', nom: 'ARC PULSÉ', dit: 'FOUR À ARC ×5', cout: 1.2e14, cible: 10, facteur: 5 },
+  { id: 'g11a', nom: 'CENTRIFUGEUSES', dit: 'SÉPARATEUR ×3', cout: 2.8e14, cible: 11, facteur: 3 },
+  { id: 'm3', nom: 'FORET À MAIN', dit: 'creuser à la main ×80', cout: 5e9, main: 80 },
+  { id: 'o6', nom: 'ÉQUIPES RELAIS', dit: 'ouvriers +55 %', cout: 2e12, ouvrier: 0.55 },
+  { id: 'g11b', nom: 'CASCADE ISOTOPIQUE', dit: 'SÉPARATEUR ×5', cout: 1.7e15, cible: 11, facteur: 5 },
+  { id: 'h8', nom: 'RÉSEAU REDONDANT', dit: 'tout ×6', cout: 2e19, global: 6 },
+  { id: 'g12a', nom: 'POMPES CRYOGÉNIQUES', dit: 'EXTRACTEUR À VIDE ×3', cout: 4e15, cible: 12, facteur: 3 },
+  { id: 'g12b', nom: 'VIDE POUSSÉ', dit: 'EXTRACTEUR À VIDE ×5', cout: 2.4e16, cible: 12, facteur: 5 },
+  { id: 'm4', nom: 'PERFORATEUR THERMIQUE', dit: 'creuser à la main ×300', cout: 8e12, main: 300 },
+  { id: 'o7', nom: 'ROULEMENT CONTINU', dit: 'ouvriers +75 %', cout: 4e15, ouvrier: 0.75 },
+  { id: 'g13a', nom: 'BRAS TÉLÉGUIDÉS', dit: 'FORGE ORBITALE ×3', cout: 6e16, cible: 13, facteur: 3 },
+  { id: 'h10', nom: 'SYNCHRONISATION TOTALE', dit: 'tout ×8', cout: 1.5e20, global: 8 },
+  { id: 'g13b', nom: 'ASSEMBLAGE EN VOL', dit: 'FORGE ORBITALE ×5', cout: 3.6e17, cible: 13, facteur: 5 },
+  { id: 'g14a', nom: 'CONFINEMENT MAGNÉTIQUE', dit: 'CŒUR DE FUSION ×3', cout: 9e17, cible: 14, facteur: 3 },
+  { id: 'g14b', nom: 'IGNITION SOUTENUE', dit: 'CŒUR DE FUSION ×5', cout: 5.4e18, cible: 14, facteur: 5 },
+  { id: 'h11', nom: 'USINE PARFAITE', dit: 'tout ×10', cout: 1e21, global: 10 },
 ]
 
 /**
@@ -483,6 +560,77 @@ export const RECHERCHES = [
     duree: 14400,
     requis: ['f1', 'm9'],
   },
+  // Le troisième palier de recherches : cinq déblocages de machine à la
+  // queue leu leu (m10→m14, chacune exige la précédente, comme m6→m9), un
+  // cran de plus sur chaque branche existante, et un second capstone —
+  // `x0`, pas `h10`, pour ne jamais partager un identifiant avec les
+  // globales neuves d'`AMELIORATIONS` qui vivent dans une tout autre table.
+  { id: 'm10', nom: 'ARC ÉLECTRIQUE', dit: 'débloque le FOUR À ARC', cout: 1.5e14, duree: 12600, requis: ['m9'] },
+  {
+    id: 'r2',
+    nom: 'ROTATION CONTINUE',
+    dit: 'crédit hors ligne : 48 h',
+    cout: 3e14,
+    duree: 14400,
+    requis: ['r1'],
+  },
+  {
+    id: 'p3',
+    nom: 'CAPTEURS PRÉDICTIFS',
+    dit: 'pannes encore deux fois plus rares',
+    cout: 6e14,
+    duree: 16200,
+    requis: ['p2'],
+  },
+  { id: 'o5', nom: 'POLYVALENCE', dit: 'un ouvrier tient 2,2 postes', cout: 1.2e15, duree: 18000, requis: ['o4'] },
+  { id: 'c3', nom: 'ENTREPÔT AVANCÉ', dit: 'trois contrats à la fois', cout: 2.5e15, duree: 19800, requis: ['c2'] },
+  {
+    id: 'b1',
+    nom: 'ANNEXE DE RECHERCHE',
+    dit: 'trois recherches en parallèle',
+    cout: 5e15,
+    duree: 21600,
+    requis: ['b0'],
+  },
+  { id: 'f2', nom: 'CREUSET RAFFINÉ', dit: 'lingots encore +15 %', cout: 1e16, duree: 23400, requis: ['f1'] },
+  // m11→m14 sont une chaîne strictement séquentielle (chacune exige la
+  // précédente) : le parallélisme de recherche (b0/b1) ne raccourcit rien
+  // ici, contrairement au reste de l'arbre où plusieurs branches peuvent
+  // avancer de front. Des `duree` à l'échelle de m10 les rendrait
+  // inatteignables avant 80 h passées — mesuré au banc, retenu plus court.
+  {
+    id: 'm11',
+    nom: 'ULTRACENTRIFUGATION',
+    dit: 'débloque le SÉPARATEUR ISOTOPIQUE',
+    cout: 2e16,
+    duree: 7200,
+    requis: ['m10'],
+  },
+  { id: 'm12', nom: 'VIDE ABSOLU', dit: 'débloque l’EXTRACTEUR À VIDE', cout: 8e16, duree: 9000, requis: ['m11'] },
+  {
+    id: 'm13',
+    nom: 'MÉTALLURGIE ORBITALE',
+    dit: 'débloque la FORGE ORBITALE',
+    cout: 3e17,
+    duree: 10800,
+    requis: ['m12'],
+  },
+  {
+    id: 'm14',
+    nom: 'CONFINEMENT MAGNÉTIQUE STABLE',
+    dit: 'débloque le CŒUR DE FUSION',
+    cout: 1.2e18,
+    duree: 12600,
+    requis: ['m13'],
+  },
+  {
+    id: 'x0',
+    nom: 'RÉSONANCE DES LINGOTS',
+    dit: 'chaque lingot vaut 40 % de plus',
+    cout: 1e19,
+    duree: 18000,
+    requis: ['h9', 'm14'],
+  },
 ]
 
 /**
@@ -500,6 +648,13 @@ export const CONTRATS = [
   { nom: 'STOCK STRATÉGIQUE', charge: 1800, delai: 10800, prime: 'lingot' },
   { nom: 'RÉASSORT', charge: 70, delai: 300, prime: 'minerai' },
   { nom: 'GROS ŒUVRE', charge: 300, delai: 1800, prime: 'multi' },
+  // Le charge/délai reste en secondes de production courante, pas en
+  // nombres absolus (voir `tire()`) : ces quatre-là élargissent juste
+  // l'éventail, du contrat éclair à la commande de fond.
+  { nom: 'DEMANDE URGENTE', charge: 15, delai: 60, prime: 'multi' },
+  { nom: 'EXPORT LOURD', charge: 550, delai: 3000, prime: 'minerai' },
+  { nom: 'CONTRAT CADRE', charge: 2500, delai: 14400, prime: 'lingot' },
+  { nom: 'RÉSERVE D’ÉTAT', charge: 3600, delai: 21600, prime: 'lingot' },
 ]
 
 /** Ce qu'il faut d'extrait pour un premier lingot, et la platitude de la courbe. */
