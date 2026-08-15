@@ -96,6 +96,17 @@ export function armee(graine, niveau, budget, penchant = null, combien = null) {
   const grade = Math.min(4, 1 + Math.floor(niveau / 6))
   chef.grade = grade
   chef.pv = fiche(chef).pvMax
+
+  // La promotion du chef n'était pas payée : mesurée au banc, la force
+  // réelle de l'armée adverse dérivait au-dessus du budget d'engagement à
+  // mesure que le grade plafond (`niveau / 6`) montait, jusqu'à ×1,2 vers le
+  // niveau 20 — sans qu'aucun chiffre affiché n'ait bougé, la « courbe de
+  // progression cohérente » de l'un des six axes de la refonte s'effondrait
+  // en silence. On retire les moins chers, jamais le chef, jusqu'à revenir
+  // sous le budget qui a servi à composer l'armée du joueur en face.
+  troupes.sort((a, b) => (a === chef ? 1 : b === chef ? -1 : valeur(a) - valeur(b)))
+  while (troupes.length > 1 && forceDe(troupes) > budget) troupes.shift()
+
   return troupes
 }
 
