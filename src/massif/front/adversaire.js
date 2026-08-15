@@ -31,10 +31,24 @@ export const BANNIERES = [
   'LES BOUCLIERS DE PONS',
 ]
 
-/** Ce que « vaut » une troupe pour le budget adverse : sa fiche, pas son prix. */
+/**
+ * Ce que « vaut » une troupe pour le budget adverse : sa fiche, pas son prix.
+ *
+ * Le point de vie compte **actuel**, pas le maximum — une troupe qui sort
+ * d'une bataille au quart de ses forces n'apporte pas la même force au
+ * combat suivant, même si sa fiche ne bouge pas. Prise sur le maximum, la
+ * mesure prétendait « rapport de forces réel » (voir `budgetDe`) sans
+ * jamais refléter ce qui se passe vraiment entre deux batailles : le repos
+ * ne rend qu'un plancher (`PLAFOND_REPOS`, 70 %), donc une compagnie qui
+ * enchaîne entrait presque toujours sous-soignée, budgétée comme si elle
+ * était fraîche. Une troupe de dépôt fraîchement créée (`creeGenerique`) a
+ * déjà `pv === pvMax`, donc l'armée adverse elle-même — toujours neuve — ne
+ * change pas de valeur : seul le calcul de force du joueur s'ajuste.
+ */
 export const valeur = (u) => {
   const f = fiche(u)
-  return Math.round(f.pvMax * 0.9 + f.att * 4 + f.def * 2.5 + f.mvt * 2 + f.portee[1] * 5)
+  const pv = u.pv ?? f.pvMax
+  return Math.round(pv * 0.9 + f.att * 4 + f.def * 2.5 + f.mvt * 2 + f.portee[1] * 5)
 }
 
 /**
