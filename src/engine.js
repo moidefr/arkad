@@ -18,6 +18,7 @@
  * bouton décalé de huit pixels.
  */
 import { CATEGORIES } from './catalogue.js'
+import { depuisChemin, cheminDe } from './route.js'
 import { Input } from './input.js'
 import { C, ton } from './palette.js'
 import { son } from './son.js'
@@ -145,7 +146,7 @@ const MENU_PAUSE = ['REPRENDRE', 'RECOMMENCER', 'QUITTER', 'SON', 'IMAGE']
 const dans = (p, z) => p.x >= z.x && p.x <= z.x + z.w && p.y >= z.y && p.y <= z.y + z.h
 
 export class Moteur {
-  constructor(canvas) {
+  constructor(canvas, arrivee = null) {
     this.canvas = canvas
     this.ctx = canvas.getContext('2d')
 
@@ -178,6 +179,11 @@ export class Moteur {
     this._redim()
     addEventListener('resize', () => this._redim())
     addEventListener('orientationchange', () => this._redim())
+
+    // Arrivée directe depuis l'URL (une page de catégorie ou de jeu), et
+    // retour du navigateur en cours de session.
+    this._appliqueRoute(arrivee)
+    addEventListener('popstate', () => this._appliqueRoute(depuisChemin(location.pathname)))
   }
 
   demarre() {
@@ -378,6 +384,33 @@ export class Moteur {
     this.j = null
     this.suggere = null
     this._redim()
+    history.pushState(null, '', cheminDe(this.cat, null))
+  }
+
+  /**
+   * Fait correspondre l'état du moteur à { cat, def } — au chargement ou
+   * après un précédent/suivant du navigateur. `null` (chemin inconnu) ne
+   * bouge rien : `main.js` a déjà nettoyé l'adresse au chargement, et en
+   * plein jeu on ne va pas interrompre une partie pour un lien fantaisiste.
+   *
+   * Si une partie tourne et que la route mène ailleurs, elle est quittée
+   * proprement d'abord — mais sans repousser d'entrée d'historique : c'est
+   * précisément en réponse à un changement d'historique qu'on est appelé.
+   */
+  _appliqueRoute(arrivee) {
+    if (!arrivee) return
+    if (this.def && this.def !== arrivee.def) {
+      this.def.quitte?.(this.j)
+      musique.arrete()
+      this.j = null
+    }
+    this.cat = arrivee.cat
+    this.def = null
+    this.phase = this.cat ? 'categorie' : 'accueil'
+    this.phaseT = 0
+    this.suggere = null
+    this._redim()
+    if (arrivee.def) this.lance(arrivee.def)
   }
 
   _bascullePause() {
@@ -451,6 +484,7 @@ export class Moteur {
         this.cat = CATEGORIES[i]
         this.phase = 'categorie'
         this.phaseT = 0
+        history.pushState(null, '', cheminDe(this.cat, null))
       }
       return
     }
@@ -461,12 +495,15 @@ export class Moteur {
         this.cat = null
         this.phase = 'accueil'
         this.phaseT = 0
+        history.pushState(null, '', '/')
         return
       }
       const i = this._indexJeu(p)
       if (i !== null && i < this.cat.jeux.length) {
         son.clic()
-        this.lance(this.cat.jeux[i])
+        const def = this.cat.jeux[i]
+        this.lance(def)
+        history.pushState(null, '', cheminDe(this.cat, def))
       }
       return
     }
