@@ -1,8 +1,8 @@
 # ARKAD
 
-Une borne d'arcade rangée par durée de partie : vingt-six jeux, de trois
-minutes à sans fin. Une seule action pour jouer, et un seul code pour le web
-et pour Android.
+Une borne d'arcade rangée par durée de partie : quarante-quatre jeux, de
+trois minutes à sans fin. Une seule action pour jouer, et un seul code pour
+le web et pour Android.
 
 ## L'identité
 
@@ -58,34 +58,37 @@ npm run dev      # assemble www/ et sert sur http://localhost:8000
 Ils sont rangés par **durée de partie**, et c'est la seule hiérarchie du
 projet. Un dossier par catégorie, sous `src/`.
 
-### COURT — 2 à 3 minutes (18 jeux)
+### COURT — 2 à 3 minutes (24 jeux)
 
 *Adresse* — **ESQUIVE** survivre sous les blocs · **VOLTIGE** monter dans un
 tunnel (mieux couché) · **GRIMPE** rebondir de plateforme en plateforme ·
 **SLALOM** zigzaguer entre les portes · **FUSÉE** se poser en douceur ·
-**BRIQUES** casse-brique
+**BRIQUES** casse-brique · **VISÉE** charger, viser, lâcher · **TRACÉ** ne pas
+sortir du tube · **DÉDALE** le doigt est le mur, le point suit sans le toucher
 
 *Réflexe* — **SERPENT** · **ORBITE** inverser son sens · **BALANCE** redresser
 un mât · **PILE** empiler sans dépasser · **CORDE** sauter quand le sol s’allume ·
-**CIBLES** · **RYTHME** · **GARDIEN** plonger du bon côté
+**CIBLES** · **RYTHME** · **GARDIEN** plonger du bon côté · **GESTE** un signe
+rapide, dans le bon sens · **ÉCLAIR** un flash à reproduire aussitôt
 
-*Tête* — **TRI** · **MÉMOIRE** · **COULEUR** l'encre, pas le mot · **CALCUL**
+*Tête* — **TRI** · **MÉMOIRE** · **COULEUR** l'encre, pas le mot · **CALCUL** ·
+**PAIRES** retourne deux cases, matche
 
 Un décompte de trois temps précède chaque partie, et un palier s'affiche
 toutes les trente secondes.
 
-**Onze de ces jeux ont trois vies.** Une mort remet le jeu en place, garde le
+**Seize de ces jeux ont trois vies.** Une mort remet le jeu en place, garde le
 score et repart : c'est ce qui fait passer une partie de quarante secondes à
 deux ou trois minutes sans toucher à la difficulté. Les jeux qui avaient déjà
-leurs propres vies (BRIQUES, RYTHME, GARDIEN, TRI, COULEUR, CALCUL) n'en
-reçoivent pas.
+leurs propres vies (BRIQUES, RYTHME, GARDIEN, TRI, COULEUR, CALCUL, PAIRES)
+n'en reçoivent pas.
 
 Un jeu déclare `vies: 3` et, s'il a besoin d'une reprise particulière,
 `reprend(j)` — MÉMOIRE conserve sa séquence, FUSÉE garde la largeur de sa
 piste. Sans ça, une faute au dixième coup effacerait deux minutes de
 mémorisation.
 
-### MOYEN — 5 à 15 minutes (3 jeux)
+### MOYEN — 5 à 15 minutes (9 jeux)
 
 **DÉMINEUR** — appui court pour creuser, appui long pour marquer. Ce n'est pas
 une grille mais une **série** : chaque grille déminée en amène une plus lourde,
@@ -96,26 +99,44 @@ Couché, la grille passe de 9×12 à 16×7 — et les mines sont posées à *den
 **2048** — on glisse pour tout pousser · **TAQUIN** — remettre les nombres dans
 l'ordre, mélangé par coups légaux donc toujours résoluble.
 
+**PICROSS** — noircir les cases d'après les indices en marge ; une case fausse
+se revide, ce n'est jamais une erreur qui termine la partie. **SUDOKU** —
+grille 6×6, générée par remplissage puis retrait symétrique en garantissant
+**une solution unique**, vérifiée par un solveur. **LUMIÈRES** — éteindre
+toute la grille ; une case en éteint aussi ses voisines, et le départ est
+toujours résoluble par construction. **CODE** — un mastermind à quatre pions
+parmi cinq couleurs, dix essais qui se resserrent en série. **SOLITAIRE** —
+plateau anglais à trente-trois trous, un saut capture le pion sauté, partie
+perdue dès qu'aucun saut ne reste. **FLUX** — relier les paires de couleur en
+traçant au doigt, sans laisser une seule case vide.
+
 Une grille, une solution, on y réfléchit. Rien ne se sauvegarde : une partie
 se termine dans la séance.
 
-### LONG — 20 minutes à 10 heures (4 jeux)
+### LONG — 20 minutes à 10 heures (10 jeux)
 
 **USINE** — incrémental, et un atelier qui tourne vraiment. La moitié haute de
 l'écran est une scène : un front de taille qu'on frappe pour creuser, deux
 étages de machines qui battent et soufflent à la cadence de leur ligne, des
 ouvriers qui font la navette, un convoyeur qui se remplit à mesure, un ciel
-qui bascule du jour à la nuit. Dix machines, trente améliorations, vingt
-recherches — la seule dépense en temps réel, et la seule chose qui survit à
-une refonte —, des pannes qu'on répare en tapant la machine, des contrats à
-livrer avant l'heure, et des ouvriers à embaucher dont dépend le rendement.
+qui bascule du jour à la nuit. Quinze machines sur deux étages, quarante-huit
+améliorations, trente-deux recherches — la seule dépense en temps réel, et la
+seule chose qui survit à une refonte —, des pannes qu'on répare en tapant la
+machine, douze contrats à livrer avant l'heure, et des ouvriers à embaucher
+dont dépend le rendement.
 La courbe se vérifie au banc : `node test/usine-banc.mjs 10` joue dix heures
 en une seconde et imprime quand chaque contenu tombe.
 
-**EXPÉDITION** — 900 km à travers quatre pays, chacun avec ses propres
-journées. Trois objets se trouvent en route et ouvrent des options qui
-n'existent pas sans eux. Et quand une jauge tombe bas, ce ne sont plus les
-journées ordinaires qui sortent, mais les urgences.
+**EXPÉDITION** — 900 km à travers quatre pays, chacun avec un pool de
+journées assez large pour ne pas se répéter d'une traversée à l'autre. Les
+issues sont probabilistes — une chance de succès, un revers si elle échoue —
+donc lire une option une fois ne suffit plus à connaître le meilleur choix.
+Enchaîner les journées dures accumule une fatigue qui ampute les gains tant
+qu'on ne lève pas le pied, et chaque frontière de pays offre un embranchement
+de route, sûre et longue ou risquée et plus courte. Trois objets se trouvent
+en route et ouvrent des options qui n'existent pas sans eux, garantis par une
+journée-balise si on tarde trop à tomber dessus. Et quand une jauge tombe bas,
+ce ne sont plus les journées ordinaires qui sortent, mais les urgences.
 
 **BRÈCHE** — trois pièces en main, une grille à remplir, des lignes qui
 partent. Pas de rotation : ce qu'on tire est ce qu'on pose, et toute la
@@ -134,11 +155,47 @@ autour, le rayon nettoie une ligne entière, la teinte change la couleur d'une
 zone, la prime double les points, le dur pose une case qui résiste à un
 effacement. Plus deux outils qu'on économise, MARTEAU et ÉCHANGE.
 
-Ces quatre-là **écrivent leur état à chaque tour**. On ferme l'application au
+**RUÉE** — un cube qui court tout droit, et une seule décision : sauter ou
+non. Le jeu s'apprend par cœur : la mort relance au pas suivant l'appui, et un
+entraînement pose des repères pour recommencer au dernier plutôt qu'au début.
+
+**COLONIE** — une population qui mange, construit, grandit. La différence
+avec USINE tient en une phrase : USINE ne meurt jamais, COLONIE le peut. Pas
+une chaîne linéaire mais un réseau (nourriture → population → main-d'œuvre →
+construction → nouvelles ressources), et une famine qui dure éteint
+vraiment la colonie.
+
+**ABYME** — le successeur pensé de DONJON : on descend étage par étage, un
+bestiaire à IA variées en travers de la route, et ce qui change une run, ce
+sont des reliques qui modifient des règles plutôt que des chiffres — plus
+quelques synergies à combiner entre elles.
+
+**GRIMOIRE** — un deck-builder : un petit deck au départ, une carte de plus
+après chaque combat gagné, choisie parmi deux ou trois jamais imposées. Le
+risque, c'est la dilution — un deck trop gros noie ses bonnes cartes dans la
+pioche.
+
+**CARAVANE** — un graphe de marchés reliés par des routes, où on achète bas
+et revend haut. Les prix bougent avec ce qu'on achète et vend puis dérivent
+vers leur référence, et le risque est financier — vol, taxe, banqueroute —
+jamais une jauge qui descend.
+
+**REMPART** — un tower defense d'apparence classique, sauf qu'une monnaie
+gagnée à chaque vague survécue débloque, entre deux défenses, de nouvelles
+tours et des améliorations permanentes : chaque défense laisse quelque chose
+à la suivante.
+
+**VIVIER** — le seul jeu long sans combat ni défaite possible. Un bassin de
+créatures qui se reproduisent toutes seules, même hors-ligne, avec des traits
+qui se combinent façon dominant/récessif — une collection à compléter, à son
+rythme.
+
+Ces dix-là **écrivent leur état à chaque tour**. On ferme l'application au
 milieu d'un couloir, on la rouvre trois jours plus tard au même endroit.
 
 `node test/breche-banc.mjs 200` fait jouer un automate et imprime, monde par
-monde, la part de parties qui franchissent l'objectif.
+monde, la part de parties qui franchissent l'objectif ; chacun des dix a
+maintenant son propre `<jeu>-banc.mjs` sur ce modèle.
 
 ### MASSIF — sans fin (1 jeu)
 
@@ -225,10 +282,10 @@ l'inverse : le jeu marche debout mais respire couché, et l'écran de
 suggestion le dit — avec un **NE PLUS PROPOSER** qui se retient, parce qu'une
 suggestion qu'on ne peut pas faire taire est une nuisance.
 
-Aujourd'hui : VOLTIGE, DÉMINEUR, USINE et BRÈCHE sont mieux couchés ;
-SERPENT sait l'être sans y gagner, donc il ne le propose pas. Les autres
-restent debout — un jeu de chute ou d'empilement n'a rien à faire dans un
-écran large.
+Aujourd'hui : VOLTIGE, DÉMINEUR, USINE, RUÉE et REMPART sont mieux couchés ;
+SERPENT et BRÈCHE savent l'être sans y gagner, donc ils ne le proposent pas.
+Les autres restent debout — un jeu de chute ou d'empilement n'a rien à faire
+dans un écran large.
 
 Ce que ça demande à un jeu : ne jamais écrire 360 ni 640 en dur. `j.W` et
 `j.H` sont des **getters** sur le moteur, ils changent, et tout ce qui se
@@ -354,9 +411,9 @@ charge), et l'interrupteur latéral de silence coupe tout.
 
 ## Les bandes-son
 
-**Soixante-quinze morceaux, et pas un seul fichier audio.** Cinquante pour
-BRÈCHE — cinq par monde, on les entend au fil des cycles — et un par jeu pour
-le reste de la borne.
+**Cent-un morceaux, et pas un seul fichier audio.** Cinquante pour BRÈCHE —
+cinq par monde, on les entend au fil des cycles —, huit pour les niveaux de
+RUÉE, et un par jeu pour le reste de la borne.
 
 Un morceau enregistré pèse deux mégaoctets. Cinquante en pèsent cent, dans
 une application qui en fait moins d'un et qui doit tourner hors-ligne. Donc
@@ -376,7 +433,7 @@ diffèrent que par leur graine donnent deux morceaux qui n'ont rien à voir.
 
 `compose()` est une **fonction pure** : elle ne fait aucun son, elle rend une
 liste d'évènements. C'est ce qui permet de vérifier sous `node --test`
-qu'aucune des soixante-quinze bandes n'est muette, qu'aucune note ne sort de
+qu'aucune des cent-une bandes n'est muette, qu'aucune note ne sort de
 sa gamme, et qu'il n'y en a pas deux identiques — sans jamais ouvrir un
 navigateur ni tendre l'oreille. `musique/joueur.js` se contente de programmer
 ces évènements dans le contexte audio, avec une horloge d'avance de 220 ms :
@@ -415,7 +472,7 @@ src/
   son.js            les bruitages, synthétisés
   musique.js        la façade des bandes-son
   musique/
-    table.js        les 75 fiches, huit champs chacune
+    table.js        les 101 fiches, huit champs chacune
     composition.js  fiche -> partition. Pure, donc testable sans navigateur
     joueur.js       partition -> contexte audio, avec horloge d'avance
   effets.js         gerbes, bulles de score, secousse d'écran
@@ -427,6 +484,8 @@ test/
   usine-banc.mjs    dix heures d'USINE en une seconde
   front-banc.mjs    des campagnes entières sans rendu
   breche-banc.mjs   un automate qui joue BRÈCHE, monde par monde
+  expedition-banc.mjs   mille traversées en Monte-Carlo, trois stratégies
+  <jeu>-banc.mjs    un par jeu LONG — mesuré, jamais deviné
 .github/workflows/
   test.yml          le banc d'essai, à chaque poussée
   web.yml           déploie la version web, à la demande
