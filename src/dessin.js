@@ -192,10 +192,19 @@ export function texte(ctx, s, x, y, taille, couleur = C.texte, poids = 700, larg
   if (espace) ctx.letterSpacing = '0px'
 }
 
-/** Largeur qu'occupera un texte, pour aligner autre chose a cote. */
-export function largeurTexte(ctx, s, taille, poids = 700) {
+/**
+ * Largeur qu'occupera un texte, pour aligner autre chose à côté.
+ *
+ * `espace` doit reprendre exactement l'interlettrage passé au `texte()`
+ * mesuré : sans lui, la largeur rendue déborde de la largeur mesurée, et ce
+ * qu'on aligne derrière chevauche la fin du texte au lieu de le suivre.
+ */
+export function largeurTexte(ctx, s, taille, poids = 700, espace) {
   ctx.font = `${poids} ${taille}px ${POLICE}`
-  return ctx.measureText(String(s)).width
+  if (espace) ctx.letterSpacing = espace + 'px'
+  const largeur = ctx.measureText(String(s)).width
+  if (espace) ctx.letterSpacing = '0px'
+  return largeur
 }
 
 // --- Ambiance ----------------------------------------------------------------

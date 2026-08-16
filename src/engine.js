@@ -232,7 +232,14 @@ export class Moteur {
 
     // À la densité réelle de l'écran : c'est ce qui rend le texte net. Le côté
     // pixel vient des formes, pas d'une toile basse résolution.
-    const dpr = Math.min(devicePixelRatio || 1, 3)
+    //
+    // La résolution de la toile doit suivre sa taille CSS, pas seulement la
+    // densité de l'écran : sans `echelle` ici, une toile agrandie sur un
+    // grand PC restait à sa résolution native (~640×360) et le navigateur
+    // l'étirait — flou, comme une image basse définition mise en plein
+    // écran. Multiplier par `echelle` donne un pixel de toile par pixel
+    // d'écran, quelle que soit la taille de la fenêtre.
+    const dpr = Math.min((devicePixelRatio || 1) * echelle, 4)
     this.canvas.width = Math.round(this.W * dpr)
     this.canvas.height = Math.round(this.H * dpr)
     this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
@@ -646,7 +653,7 @@ export class Moteur {
       texte(ctx, '< RET', BTN_RETOUR.x + 12, BTN_RETOUR.y + 17, 14, C.texte, 700)
       texte(ctx, titre, 104, 31, 24, C.accent, 700, 190, 2)
     } else {
-      const l = largeurTexte(ctx, titre, 26)
+      const l = largeurTexte(ctx, titre, 26, 700, 2)
       lueur(ctx, 20, 18, l, 24, C.accent, 3, 0.8)
       texte(ctx, titre, 20, 30, 26, C.accent, 700, undefined, 2)
       if (Math.floor(this.phaseT * 2) % 2 === 0) {
