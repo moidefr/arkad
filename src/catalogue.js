@@ -34,6 +34,12 @@ import dedale from './court/dedale.js'
 import demineur from './moyen/demineur.js'
 import mille from './moyen/mille.js'
 import taquin from './moyen/taquin.js'
+import picross from './moyen/picross.js'
+import sudoku from './moyen/sudoku.js'
+import lumieres from './moyen/lumieres.js'
+import code from './moyen/code.js'
+import solitaire from './moyen/solitaire.js'
+import flux from './moyen/flux.js'
 
 import usine from './long/usine/index.js'
 import expedition from './long/expedition/index.js'
@@ -85,7 +91,7 @@ export const CATEGORIES = [
     duree: '5 à 15 minutes',
     detail: 'une grille, une solution, on y réfléchit',
     couleur: C.vert,
-    jeux: [demineur, mille, taquin],
+    jeux: [demineur, mille, taquin, picross, sudoku, lumieres, code, solitaire, flux],
   },
   {
     id: 'long',
