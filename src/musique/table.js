@@ -134,6 +134,12 @@ export const JEUX = [
   t('expedition', 'NEUF CENTS KILOMÈTRES', 70, 'mineur', 11, 'calme', 0x9099aa),
   t('front', 'LA COMPAGNIE', 96, 'harmonique', 4, 'martial', 0xa0aabb),
   t('ruee', 'DROIT DEVANT', 150, 'mineur', 9, 'course', 0xb0bbcc),
+  t('colonie', 'CE QUI POUSSE', 88, 'dorien', 2, 'marche', 0xc0ccdd),
+  t('abyme', 'PLUS BAS ENCORE', 100, 'phrygien', 7, 'tendu', 0xd0dcee),
+  t('grimoire', 'PAGE SUIVANTE', 92, 'harmonique', 0, 'nocturne', 0xe0ecff),
+  t('caravane', 'ACHETER LOIN, VENDRE PRÈS', 90, 'mixolydien', 5, 'marche', 0x102030),
+  t('rempart', 'TENIR LA LIGNE', 118, 'phrygien', 10, 'martial', 0x203040),
+  t('vivier', 'LE BASSIN', 66, 'lydien', 3, 'calme', 0x304050),
 ]
 
 /**
