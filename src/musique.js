@@ -8,7 +8,7 @@
  */
 import { son } from './son.js'
 import { Joueur } from './musique/joueur.js'
-import { PAR_ID, pourJeu, pourPalier, TOUTES } from './musique/table.js'
+import { PAR_ID, pourJeu, pourMenu, pourPalier, TOUTES } from './musique/table.js'
 
 class Musique {
   constructor() {
@@ -50,4 +50,4 @@ class Musique {
 }
 
 export const musique = new Musique()
-export { pourJeu, pourPalier, TOUTES }
+export { pourJeu, pourMenu, pourPalier, TOUTES }

@@ -22,7 +22,7 @@ import { depuisChemin, cheminDe } from './route.js'
 import { Input } from './input.js'
 import { C, ton } from './palette.js'
 import { son } from './son.js'
-import { musique, pourJeu } from './musique.js'
+import { musique, pourJeu, pourMenu } from './musique.js'
 import { theme } from './theme.js'
 import { Effets } from './effets.js'
 import { lis, ecris } from './stockage.js'
@@ -219,6 +219,17 @@ export class Moteur {
     this.input.H = this.H
     this.canvas.style.aspectRatio = `${this.W} / ${this.H}`
 
+    // La taille CSS de la toile, en pixels : `max-width`/`max-height` dans
+    // style.css ne font que la brider, rien ne la fait grandir toute seule.
+    // Sans ce calcul elle retombe sur sa taille intrinsèque (celle de
+    // `canvas.width`/`height` ci-dessous), minuscule sur un écran de PC à
+    // densité 1 — le jeu s'y jouait dans un timbre-poste. On calcule ici
+    // l'agrandissement maximal qui tient dans la fenêtre en gardant les
+    // proportions exactes du gabarit.
+    const echelle = Math.min(innerWidth / this.W, innerHeight / this.H)
+    this.canvas.style.width = `${Math.floor(this.W * echelle)}px`
+    this.canvas.style.height = `${Math.floor(this.H * echelle)}px`
+
     // À la densité réelle de l'écran : c'est ce qui rend le texte net. Le côté
     // pixel vient des formes, pas d'une toile basse résolution.
     const dpr = Math.min(devicePixelRatio || 1, 3)
@@ -333,6 +344,10 @@ export class Moteur {
 
     if (options.neuve) j.efface()
     this.j = j
+    // On efface d'abord ce que voulait l'accueil (sa propre bande, voir
+    // `_musiqueMenu`) : sinon la garde qui suit la prendrait pour un choix du
+    // jeu qu'on démarre, et ne jouerait jamais sa bande.
+    musique.arrete()
     def.init?.(j)
     // La bande par défaut est celle du jeu ; `init` a pu en demander une autre
     // (BRÈCHE choisit selon le monde), et on ne l'écrase pas.
@@ -377,14 +392,19 @@ export class Moteur {
 
   _quitte() {
     this.def?.quitte?.(this.j)
-    musique.arrete()
     this.phase = this.cat ? 'categorie' : 'accueil'
     this.phaseT = 0
     this.def = null
     this.j = null
     this.suggere = null
     this._redim()
+    this._musiqueMenu()
     history.pushState(null, '', cheminDe(this.cat, null))
+  }
+
+  /** L'accueil et les catégories partagent une bande, tirée au hasard à chaque retour. */
+  _musiqueMenu() {
+    musique.joue(pourMenu())
   }
 
   /**
@@ -411,6 +431,7 @@ export class Moteur {
     this.suggere = null
     this._redim()
     if (arrivee.def) this.lance(arrivee.def)
+    else this._musiqueMenu()
   }
 
   _bascullePause() {

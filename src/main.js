@@ -2,13 +2,13 @@ import { Moteur } from './engine.js'
 import { depuisChemin } from './route.js'
 import { son } from './son.js'
 
-const arrivee = depuisChemin(location.pathname)
+const resolu = depuisChemin(location.pathname)
 // Chemin qui ne mène nulle part : on nettoie l'adresse avant de démarrer,
 // plutôt que de laisser un favori mort dans la barre pendant qu'on affiche
 // l'accueil.
-if (!arrivee) history.replaceState(null, '', '/')
+if (!resolu) history.replaceState(null, '', '/')
 
-const moteur = new Moteur(document.getElementById('scene'), arrivee)
+const moteur = new Moteur(document.getElementById('scene'), resolu ?? { cat: null, def: null })
 moteur.demarre()
 
 // Pratique pendant que tu bidouilles : depuis la console du navigateur,

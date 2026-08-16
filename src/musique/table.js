@@ -159,7 +159,19 @@ export const RUEE = [
   t('ruee8', 'TOUT EN MÊME TEMPS', 176, 'harmonique', 3, 'brasier', 0x88cc22),
 ]
 
-export const TOUTES = [...BRECHE, ...RUEE, ...JEUX]
+/**
+ * Trois bandes pour l'accueil et les catégories — le seul endroit de la
+ * borne qui restait muet. Ni trop calmes (c'est un choix qui se fait vite),
+ * ni trop denses (on peut y rester en hésitant) : le même ton que « veille »
+ * ou « calme » ailleurs dans la table, jamais « brasier » ou « course ».
+ */
+export const MENU = [
+  t('menu1', 'LA BORNE', 96, 'dorien', 4, 'calme', 0x445566),
+  t('menu2', 'ENTRE DEUX PARTIES', 88, 'lydien', 9, 'veille', 0x556677),
+  t('menu3', 'CHOISIR', 102, 'majeur', 2, 'calme', 0x667788),
+]
+
+export const TOUTES = [...BRECHE, ...RUEE, ...JEUX, ...MENU]
 export const PAR_ID = Object.fromEntries(TOUTES.map((x) => [x.id, x]))
 
 /**
@@ -176,3 +188,6 @@ export const pourPalier = (n) => BRECHE[(((n | 0) % BRECHE.length) + BRECHE.leng
 
 /** La bande d'un jeu, par son identifiant de catalogue. */
 export const pourJeu = (id) => JEUX.find((x) => x.id === id) ?? null
+
+/** Une bande d'accueil, tirée au hasard : l'accueil n'a pas de score à caler dessus. */
+export const pourMenu = () => MENU[Math.floor(Math.random() * MENU.length)]

@@ -21,7 +21,7 @@ import {
   accord,
   frequence,
 } from '../src/musique/composition.js'
-import { BRECHE, RUEE, JEUX, TOUTES, PAR_ID, pourPalier, pourJeu } from '../src/musique/table.js'
+import { BRECHE, RUEE, JEUX, MENU, TOUTES, PAR_ID, pourPalier, pourJeu, pourMenu } from '../src/musique/table.js'
 import { NIVEAUX } from '../src/long/ruee/donnees.js'
 import { PAR_PALIER } from '../src/long/breche/donnees.js'
 import { TOUS } from '../src/catalogue.js'
@@ -31,13 +31,18 @@ const MELODIQUES = ['basse', 'nappe', 'accords', 'arpege', 'chant']
 
 // --- La table -----------------------------------------------------------------
 
-test('cinquante bandes pour BRÈCHE, cinq pour RUÉE, une par jeu pour le reste', () => {
+test('cinquante bandes pour BRÈCHE, cinq pour RUÉE, une par jeu pour le reste, trois pour l’accueil', () => {
   assert.equal(BRECHE.length, 50)
   assert.equal(RUEE.length, NIVEAUX.length, 'chaque niveau de RUÉE a sa bande, et le niveau est calé dessus')
   // RUÉE a ses cinq bandes de niveau *et* une bande de menu dans JEUX ; BRÈCHE
   // est le seul jeu à ne pas en avoir, ses cinquante lui suffisent.
   assert.equal(JEUX.length, TOUS.length - 1, 'un jeu de la borne n’a pas sa bande')
-  assert.equal(TOUTES.length, BRECHE.length + RUEE.length + JEUX.length)
+  assert.equal(MENU.length, 3, 'l’accueil doit varier, pas toujours la même bande')
+  assert.equal(TOUTES.length, BRECHE.length + RUEE.length + JEUX.length + MENU.length)
+})
+
+test('pourMenu ne renvoie jamais rien d’autre qu’une bande de MENU', () => {
+  for (let i = 0; i < 30; i++) assert.ok(MENU.includes(pourMenu()))
 })
 
 test('chaque niveau de RUÉE pointe sur une bande qui existe', () => {
