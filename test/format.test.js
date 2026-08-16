@@ -96,7 +96,7 @@ test('l’accueil tient dans les deux formats', () => {
 test('les tuiles d’une grosse catégorie tiennent dans les deux formats', () => {
   const n = Math.max(...CATEGORIES.map((c) => c.jeux.length))
   for (const t of GABARITS) {
-    const d = dispoTuiles(t.W, t.H)
+    const d = dispoTuiles(t.W, t.H, n)
     verifie(
       Array.from({ length: n }, (_, i) => tuile(i, d)),
       t,
@@ -147,11 +147,13 @@ test('en paysage, l’accueil et les tuiles profitent vraiment de la largeur', (
   assert.equal(p.cols, 1)
   assert.equal(l.cols, 2, 'les catégories restent en colonne unique une fois couchées')
 
-  const tp = dispoTuiles(FORMATS.portrait.W, FORMATS.portrait.H)
-  const tl = dispoTuiles(FORMATS.paysage.W, FORMATS.paysage.H)
+  const n = Math.max(...CATEGORIES.map((c) => c.jeux.length))
+  const tp = dispoTuiles(FORMATS.portrait.W, FORMATS.portrait.H, n)
+  const tl = dispoTuiles(FORMATS.paysage.W, FORMATS.paysage.H, n)
   assert.ok(tl.cols > tp.cols, `${tl.cols} colonnes couché contre ${tp.cols} debout`)
-  // Dix-huit jeux doivent tenir sans sortir de l'écran.
-  const bas = tuile(17, tl)
+  // La plus grosse catégorie doit tenir sans sortir de l'écran, quel que soit
+  // son nombre de jeux — pas seulement dix-huit.
+  const bas = tuile(n - 1, tl)
   assert.ok(bas.y + bas.h <= FORMATS.paysage.H, 'la dernière tuile sort en bas')
 })
 

@@ -24,6 +24,12 @@ import tri from './court/tri.js'
 import memoire from './court/memoire.js'
 import couleur from './court/couleur.js'
 import calcul from './court/calcul.js'
+import visee from './court/visee.js'
+import geste from './court/geste.js'
+import trace from './court/trace.js'
+import eclair from './court/eclair.js'
+import paires from './court/paires.js'
+import dedale from './court/dedale.js'
 
 import demineur from './moyen/demineur.js'
 import mille from './moyen/mille.js'
@@ -65,6 +71,12 @@ export const CATEGORIES = [
       memoire,
       couleur,
       calcul,
+      visee,
+      geste,
+      trace,
+      eclair,
+      paires,
+      dedale,
     ],
   },
   {

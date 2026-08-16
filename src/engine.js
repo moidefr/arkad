@@ -68,14 +68,26 @@ const carteAccueil = (i, d) => ({
   h: d.h,
 })
 
-/** Les tuiles serrées, quand une catégorie a beaucoup de jeux. */
-function dispoTuiles(W, H) {
+/**
+ * Les tuiles serrées, quand une catégorie a beaucoup de jeux.
+ *
+ * La hauteur de tuile part de 70px, mais se resserre si le nombre de rangées
+ * qu'exige `n` déborderait l'écran — en paysage surtout, où il n'y a que
+ * 360px de haut. Sans ça, une catégorie qui grossit finit un jour par pousser
+ * ses dernières tuiles hors de portée sans que rien ne le signale, exactement
+ * la faute que `enRangees` évite déjà pour les rangées détaillées.
+ */
+function dispoTuiles(W, H, n = 0) {
   const w = 74
-  const h = 70
+  const hBase = 70
   const ecart = 8
   const cols = Math.max(3, Math.floor((W - 40 + ecart) / (w + ecart)))
+  const y = estLarge(W, H) ? 100 : 116
+  const disponible = H - y - 20
+  const rows = Math.max(1, Math.ceil(n / cols))
+  const h = Math.max(44, Math.min(hBase, Math.floor((disponible - (rows - 1) * ecart) / rows)))
   const large = cols * w + (cols - 1) * ecart
-  return { cols, w, h, ecart, x: Math.round((W - large) / 2), y: estLarge(W, H) ? 100 : 116 }
+  return { cols, w, h, ecart, x: Math.round((W - large) / 2), y }
 }
 
 const tuile = (i, d) => ({
@@ -635,7 +647,7 @@ export class Moteur {
   /** Tuile compacte, pour les catégories qui ont beaucoup de jeux. */
   _tuile(def, i) {
     const ctx = this.ctx
-    const t = tuile(i, dispoTuiles(this.W, this.H))
+    const t = tuile(i, dispoTuiles(this.W, this.H, this.cat.jeux.length))
     const { k, dy } = this._entree(i)
     if (k <= 0) return
     const { x, w, h } = t
@@ -648,9 +660,11 @@ export class Moteur {
     lueur(ctx, x, y, w, 4, def.couleur, 2, 0.7)
     bloc(ctx, x, y, w, 5, def.couleur, 2)
 
-    texte(ctx, def.nom, x + w / 2, y + 26, 13, C.texte, 700, w - 8)
+    // Les deux lignes de texte visent 26 et 50px, pensés pour une tuile de
+    // 70 — une tuile resserrée par une grosse catégorie les ramène dedans.
+    texte(ctx, def.nom, x + w / 2, y + Math.min(26, h * 0.4), 13, C.texte, 700, w - 8)
     const best = this.meilleur(def.id)
-    texte(ctx, best ? String(best) : '--', x + w / 2, y + 50, 17, best ? C.accent : C.bord, 700, w - 10)
+    texte(ctx, best ? String(best) : '--', x + w / 2, y + Math.min(50, h - 12), 17, best ? C.accent : C.bord, 700, w - 10)
     ctx.globalAlpha = 1
   }
 
@@ -685,7 +699,7 @@ export class Moteur {
   _indexJeu(p) {
     const jeux = this.cat.jeux
     if (!enRangees(this.W, this.H, jeux.length)) {
-      const d = dispoTuiles(this.W, this.H)
+      const d = dispoTuiles(this.W, this.H, jeux.length)
       const i = jeux.findIndex((_, k) => dans(p, tuile(k, d)))
       return i >= 0 ? i : null
     }
