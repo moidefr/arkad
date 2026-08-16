@@ -9,7 +9,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { FORMATS, HUD, orientationAppareil, formatPour, tailleDe, suggestion } from '../src/format.js'
+import { FORMATS, HUD, orientationAppareil, formatPour, tailleDe, suggestion, estTactile } from '../src/format.js'
 import {
   dispoAccueil,
   carteAccueil,
@@ -54,6 +54,20 @@ test('l’orientation a de la marge : un écran presque carré ne clignote pas',
   assert.equal(orientationAppareil(844, 390), 'paysage')
   assert.equal(orientationAppareil(800, 780), 'portrait', 'presque carré : on ne bascule pas')
   assert.equal(orientationAppareil(1280, 800), 'paysage')
+})
+
+test('estTactile lit le pointeur principal, pas la taille de la fenêtre', () => {
+  const avant = globalThis.matchMedia
+  try {
+    globalThis.matchMedia = (q) => ({ matches: q === '(pointer: coarse)' })
+    assert.equal(estTactile(), true, 'un doigt (pointeur grossier) doit se reconnaître')
+    globalThis.matchMedia = () => ({ matches: false })
+    assert.equal(estTactile(), false, 'une souris (pointeur fin) ne doit jamais passer pour un doigt')
+    delete globalThis.matchMedia
+    assert.equal(estTactile(), true, 'sans matchMedia, on ne prive personne de la suggestion par défaut')
+  } finally {
+    globalThis.matchMedia = avant
+  }
 })
 
 test('un jeu ne passe en paysage que s’il sait le faire', () => {

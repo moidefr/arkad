@@ -37,6 +37,18 @@ export function orientationAppareil(w, h) {
   return l > haut * 1.08 ? 'paysage' : 'portrait'
 }
 
+/**
+ * Vrai seulement si le pointeur principal est un doigt. Un PC dont la
+ * fenêtre est large n'est pas « couché » — il est juste large, et rien ne
+ * peut le faire tourner. C'est ce qui distingue « ce jeu se dessine en
+ * portrait » (vrai partout, la toile reste nette dans une fenêtre large) de
+ * « conseiller de tourner l'appareil » (n'a de sens que sur un appareil qui
+ * peut vraiment tourner).
+ */
+export function estTactile() {
+  return typeof matchMedia === 'function' ? matchMedia('(pointer: coarse)').matches : true
+}
+
 /** Le format dans lequel ce jeu doit tourner, compte tenu de l'appareil. */
 export function formatPour(def, orientation) {
   return orientation === 'paysage' && def?.paysage ? 'paysage' : 'portrait'

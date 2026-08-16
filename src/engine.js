@@ -25,7 +25,7 @@ import { musique, pourJeu } from './musique.js'
 import { theme } from './theme.js'
 import { Effets } from './effets.js'
 import { lis, ecris } from './stockage.js'
-import { FORMATS, HUD, orientationAppareil, formatPour, tailleDe, suggestion } from './format.js'
+import { FORMATS, HUD, orientationAppareil, formatPour, tailleDe, suggestion, estTactile } from './format.js'
 import { texte, rect, cadre, bloc, lueur, ombre, vignette, bandeTramee, scanlines, largeurTexte, PX } from './dessin.js'
 
 /** Le gabarit de référence — celui des tests et des jeux qui n'en changent pas. */
@@ -231,7 +231,10 @@ export class Moteur {
 
   /** Décide s'il faut conseiller une rotation, et la met à l'écran. */
   _verifieSuggestion() {
-    if (this.muet || !this.def || this.phase === 'accueil' || this.phase === 'categorie') {
+    // Sur PC, la fenêtre est large parce que c'est un écran, pas parce que
+    // quelqu'un l'a couché — et rien ne peut la faire tourner. Suggérer une
+    // rotation là bloquerait quasiment chaque jeu à chaque lancement.
+    if (this.muet || !this.def || !estTactile() || this.phase === 'accueil' || this.phase === 'categorie') {
       if (this.phase === 'tourne') this.phase = 'jeu'
       this.suggere = null
       return
