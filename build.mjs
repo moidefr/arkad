@@ -5,7 +5,7 @@
  */
 import { cp, rm, mkdir } from 'node:fs/promises'
 
-const FICHIERS = ['index.html', 'style.css', 'sw.js', 'manifest.webmanifest', 'icone.svg', 'src']
+const FICHIERS = ['index.html', 'style.css', 'sw.js', 'manifest.webmanifest', 'icone.svg', 'src', 'CNAME']
 
 await rm('www', { recursive: true, force: true })
 await mkdir('www', { recursive: true })
