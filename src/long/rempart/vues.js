@@ -1,8 +1,8 @@
 import { C, ton } from '../../palette.js'
 import { texte, rect, cadre, bloc, lueur, pastille, borne } from '../../dessin.js'
-import { ENNEMIS, TOURS, CARTES, AMELIORATIONS_META } from './donnees.js'
+import { ENNEMIS, TOURS, CARTES, AMELIORATIONS_META, NIVEAU_MAX } from './donnees.js'
 import * as L from './logique.js'
-import { zoneTourBoutique, zoneOnglet, zoneCarte, zoneLigne, toursBoutique } from './dispo.js'
+import { zoneTourBoutique, zoneOnglet, zoneCarte, zoneLigne, toursBoutique, zoneInspect } from './dispo.js'
 
 /**
  * Rien ici ne décide : on lit `logique.js`, on dessine, et `index.js` relit
@@ -49,7 +49,13 @@ export function dessinePlateau(ctx, d, carte, etat, selection) {
     const pos = carte.emplacements[tour.emplacement]
     lueur(ctx, ox + pos.x - 12, oy + pos.y - 12, 24, 24, tdef.couleur, 1, 0.5)
     bloc(ctx, ox + pos.x - 12, oy + pos.y - 12, 24, 24, tdef.couleur, 3)
-    for (let n = 0; n < tour.niveau; n++) pastille(ctx, ox + pos.x - 6 + n * 7, oy + pos.y + 16, 2, C.texte)
+    // Un point par niveau possible, pas seulement par niveau atteint : les
+    // points grisés qui restent montrent d'un coup d'œil qu'il y a encore une
+    // amélioration à prendre, sans avoir à ouvrir la fiche pour le savoir.
+    for (let n = 0; n < NIVEAU_MAX; n++) {
+      const atteint = n < tour.niveau
+      pastille(ctx, ox + pos.x - 6 + n * 7, oy + pos.y + 16, 2, atteint ? C.texte : ton(C.panneau, 0.3))
+    }
   }
 
   for (const en of etat.ennemis) {
@@ -105,6 +111,62 @@ export function dessinePanneau(ctx, d, meta, etat, selection) {
     const l = d.lancer
     texte(ctx, `${etat.ennemis.length + etat.aVenir.length} restants`, l.x + l.w / 2, l.y + l.h / 2, 12, C.faible, 700)
   }
+}
+
+/**
+ * La fiche d'une tour posée. `proposition: false` — appui tenu — ne montre
+ * que ce qu'elle vaut aujourd'hui ; `proposition: true` — appui bref — ajoute
+ * la prochaine étape en grisé et le bouton pour l'acheter. Les deux se lisent
+ * dans `L.previsionTour`, jamais recalculées ici.
+ */
+export function dessineInspection(ctx, j, etat, instanceId, proposition) {
+  const tour = etat.tours.find((t) => t.instanceId === instanceId)
+  if (!tour) return
+  const p = L.previsionTour(etat, tour)
+  const { box, bouton } = zoneInspect(j)
+
+  rect(ctx, box.x, box.y, box.w, box.h, ton(C.fond, 0.1))
+  cadre(ctx, box.x, box.y, box.w, box.h, p.def.couleur)
+
+  const cx = box.x + box.w / 2
+  let y = box.y + 22
+  texte(ctx, `${p.def.nom} · NIVEAU ${tour.niveau}/${NIVEAU_MAX}`, cx, y, 14, p.def.couleur, 700)
+  y += 24
+
+  const ligne = (nom, val) => {
+    texte(ctx, `${nom}   ${val}`, cx, y, 12, C.texte, 700)
+    y += 18
+  }
+  ligne('DÉGÂTS', Math.round(p.actuel.degat))
+  ligne('PORTÉE', Math.round(p.actuel.portee))
+  ligne('CADENCE', `${p.actuel.cadence.toFixed(1)}/s`)
+
+  if (!proposition) {
+    texte(ctx, 'appui ailleurs pour fermer', cx, box.y + box.h - 16, 10, C.faible, 700)
+    return
+  }
+
+  if (p.maxee) {
+    texte(ctx, 'NIVEAU MAXIMUM', cx, box.y + box.h - 26, 12, C.faible, 700)
+    return
+  }
+
+  // La prochaine étape, en grisé : ce que l'amélioration changerait si on
+  // l'achetait, avant de dépenser la ferraille dessus.
+  texte(
+    ctx,
+    `prochaine étape : ${Math.round(p.prochain.degat)} dég. · ${Math.round(p.prochain.portee)} portée · ${p.prochain.cadence.toFixed(1)}/s`,
+    cx,
+    y,
+    11,
+    ton(C.faible, -0.25),
+    700,
+    box.w - 20,
+  )
+
+  const possible = etat.ferraille >= p.cout
+  bloc(ctx, bouton.x, bouton.y, bouton.w, bouton.h, possible ? p.def.couleur : ton(C.panneau, 0.24), 3)
+  texte(ctx, `AMÉLIORER · ${p.cout} FERRAILLE`, bouton.x + bouton.w / 2, bouton.y + bouton.h / 2, 12, possible ? C.fond : C.faible, 700)
 }
 
 export function dessineDefaite(ctx, j, etat) {

@@ -17,10 +17,10 @@
  * vague par vague, pas à la fin.
  */
 import { C } from '../../palette.js'
-import { TOURS, CARTES, AMELIORATIONS_META } from './donnees.js'
+import { TOURS, CARTES, AMELIORATIONS_META, LONG_APPUI } from './donnees.js'
 import * as L from './logique.js'
 import * as V from './vues.js'
-import { dispo, dans, zoneCarte, zoneOnglet, zoneLigne, zoneTourBoutique, emplacementSous, toursBoutique } from './dispo.js'
+import { dispo, dans, zoneCarte, zoneOnglet, zoneLigne, zoneTourBoutique, emplacementSous, toursBoutique, zoneInspect } from './dispo.js'
 
 export default {
   id: 'rempart',
@@ -46,16 +46,47 @@ export default {
 
   init(j) {
     const meta = L.migre(j.charge()) ?? L.metaNeuve()
-    j.e = { meta, vue: 'menu', ongletMenu: 'tours', carteId: null, partie: null, selection: null }
+    j.e = {
+      meta,
+      vue: 'menu',
+      ongletMenu: 'tours',
+      carteId: null,
+      partie: null,
+      selection: null,
+      // La tour qu'on est en train de presser (durée du maintien), celle
+      // dont les stats s'affichent pendant qu'on la tient, et celle dont on
+      // propose l'amélioration après un appui bref — jamais deux à la fois.
+      appuiTour: null,
+      peekStats: null,
+      propose: null,
+    }
   },
 
   /** Le plateau ne se recalcule pas d'un format à l'autre : on efface juste le choix en cours. */
   redim(j) {
     j.e.selection = null
+    j.e.appuiTour = null
+    j.e.peekStats = null
+    j.e.propose = null
   },
 
   maj(j, dt) {
     const e = j.e
+
+    // Tenir le doigt sur une tour posée en affiche les stats ; le relâcher
+    // vite propose plutôt de l'améliorer — `appuiJeu`/`relacheJeu` décident,
+    // ici on ne fait qu'écouter la durée, comme la croix de PICROSS.
+    const a = e.appuiTour
+    if (a && !a.fait && j.maintenu) {
+      a.duree += dt
+      if (a.duree >= LONG_APPUI) {
+        a.fait = true
+        e.propose = null
+        e.peekStats = a.instanceId
+        j.son.rebond()
+      }
+    }
+
     if (e.vue !== 'jeu' || !e.partie) return
     const carte = L.carteParId(e.carteId)
     const rempart = carte.chemin[carte.chemin.length - 1]
@@ -99,12 +130,18 @@ export default {
     V.dessinePlateau(ctx, d, carte, e.partie, e.selection)
     V.dessinePanneau(ctx, d, e.meta, e.partie, e.selection)
     if (e.partie.phase === 'defaite') V.dessineDefaite(ctx, j, e.partie)
+    else if (e.peekStats) V.dessineInspection(ctx, j, e.partie, e.peekStats, false)
+    else if (e.propose) V.dessineInspection(ctx, j, e.partie, e.propose, true)
   },
 
   appui(j, p) {
     const d = dispo(j)
     if (j.e.vue === 'menu') return appuiMenu(j, p, d)
     return appuiJeu(j, p, d)
+  },
+
+  relache(j) {
+    if (j.e.vue === 'jeu') relacheJeu(j)
   },
 }
 
@@ -118,6 +155,9 @@ function appuiMenu(j, p, d) {
       e.carteId = carte.id
       e.partie = L.partieNeuve(carte.id, e.meta)
       e.selection = null
+      e.appuiTour = null
+      e.peekStats = null
+      e.propose = null
       e.vue = 'jeu'
       return j.son.clic()
     }
@@ -164,7 +204,27 @@ function appuiJeu(j, p, d) {
     e.vue = 'menu'
     e.partie = null
     e.selection = null
+    e.appuiTour = null
+    e.peekStats = null
+    e.propose = null
     return j.son.clic()
+  }
+
+  // Une proposition d'amélioration affichée n'attend que deux choses : le
+  // bouton pour l'acheter, ou n'importe quel autre appui pour se refermer —
+  // jamais les deux à la fois. Une fois refermée, l'appui continue son
+  // chemin normalement : retaper la même tour la rouvre, taper ailleurs fait
+  // ce que ça aurait fait sans la proposition ouverte.
+  if (e.propose) {
+    const tour = partie.tours.find((t) => t.instanceId === e.propose)
+    if (tour && dans(p, zoneInspect(j).bouton)) {
+      e.propose = null
+      if (!L.ameliorerTour(partie, tour.instanceId)) return j.son.rate()
+      j.son.niveau()
+      const pos = carte.emplacements[tour.emplacement]
+      return j.fx.eclat(d.plateau.x + pos.x, d.plateau.y + pos.y, L.tourParId(tour.tourId).couleur, { n: 10, vitesse: 140 })
+    }
+    e.propose = null
   }
 
   const enBoutique = toursBoutique(e.meta)
@@ -189,13 +249,29 @@ function appuiJeu(j, p, d) {
 
   const posee = partie.tours.find((t) => t.emplacement === iEmp)
   if (posee) {
-    if (!L.ameliorerTour(partie, posee.instanceId)) return j.son.rate()
-    j.son.niveau()
-    return j.fx.eclat(ax, ay, L.tourParId(posee.tourId).couleur, { n: 10, vitesse: 140 })
+    // Ni amélioration ni stats tout de suite : on attend de savoir si
+    // l'appui est bref (proposer d'améliorer) ou tenu (afficher les stats),
+    // décidé par `maj` et `relacheJeu` — comme la croix de PICROSS.
+    e.appuiTour = { instanceId: posee.instanceId, duree: 0, fait: false }
+    return
   }
 
   if (!e.selection) return
   if (!L.poseTour(partie, e.meta, e.selection, iEmp)) return j.son.rate()
   j.son.clic()
   j.fx.eclat(ax, ay, L.tourParId(e.selection).couleur, { n: 14, vitesse: 160 })
+}
+
+function relacheJeu(j) {
+  const e = j.e
+  const a = e.appuiTour
+  e.appuiTour = null
+  if (!a) return
+  if (a.fait) {
+    // Ce n'était qu'un coup d'œil pendant le maintien : il s'éteint au
+    // relâchement, sans rien proposer d'autre.
+    e.peekStats = null
+  } else {
+    e.propose = a.instanceId
+  }
 }

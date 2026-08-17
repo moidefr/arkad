@@ -41,6 +41,10 @@ export const RALENTI_DUREE = 1.4
 
 export const NIVEAU_MAX = 3
 
+// Comme dans PICROSS : au-delà, un appui devient un maintien — on affiche les
+// stats de la tour plutôt que de proposer de l'améliorer.
+export const LONG_APPUI = 0.35
+
 // L'écart entre deux apparitions dans une même vague, avant la gigue.
 export const ESPACEMENT_SPAWN = 0.85
 
@@ -161,15 +165,19 @@ export const CARTES = [
       { x: 300, y: 60 },
       { x: 490, y: 60 },
     ],
+    // C'est la carte d'apprentissage, ouverte d'office : chaque emplacement
+    // doit rester à portée de la SENTINELLE (92 px), la seule tour débloquée
+    // au tout premier lancement — sinon la moitié du plateau ne sert à rien
+    // tant qu'on n'a pas économisé pour le CANON ou le MORTIER.
     emplacements: [
-      { x: 60, y: 110 },
-      { x: 220, y: 100 },
-      { x: 220, y: 230 },
-      { x: 370, y: 110 },
-      { x: 370, y: 230 },
-      { x: 60, y: 230 },
-      { x: 400, y: 260 },
-      { x: 150, y: 270 },
+      { x: 50, y: 115 },
+      { x: 110, y: 20 },
+      { x: 95, y: 130 },
+      { x: 215, y: 110 },
+      { x: 230, y: 230 },
+      { x: 355, y: 200 },
+      { x: 355, y: 100 },
+      { x: 445, y: 105 },
     ],
   },
   {

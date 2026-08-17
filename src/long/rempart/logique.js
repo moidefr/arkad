@@ -225,6 +225,22 @@ export function statsTour(etat, tour) {
 
 export const coutAmeliorationTour = (def, niveau) => Math.round(def.cout * 0.75 * niveau)
 
+/**
+ * Ce qu'une tour posée vaut maintenant, et ce qu'elle vaudrait au niveau
+ * suivant — `prochain` et `cout` valent `null` une fois `NIVEAU_MAX` atteint.
+ * Fonction pure, comme le reste du fichier : c'est elle que l'écran
+ * d'inspection lit pour afficher la prochaine étape en grisé, sans dupliquer
+ * le calcul des stats.
+ */
+export function previsionTour(etat, tour) {
+  const def = tourParId(tour.tourId)
+  const actuel = statsTour(etat, tour)
+  const maxee = tour.niveau >= NIVEAU_MAX
+  const prochain = maxee ? null : statsTour(etat, { ...tour, niveau: tour.niveau + 1 })
+  const cout = maxee ? null : coutAmeliorationTour(def, tour.niveau)
+  return { def, actuel, prochain, cout, maxee }
+}
+
 export function poseTour(etat, meta, tourId, emplacement) {
   if (etat.phase === 'defaite') return false
   if (!meta.toursDeblocs.includes(tourId)) return false

@@ -11,7 +11,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { ENNEMIS, TOURS, CARTES, AMELIORATIONS_META, NIVEAU_MAX } from '../src/long/rempart/donnees.js'
 import * as L from '../src/long/rempart/logique.js'
-import { dispo, zoneCarte, zoneTourBoutique, zoneOnglet, zoneLigne, emplacementSous, toursBoutique } from '../src/long/rempart/dispo.js'
+import { dispo, zoneCarte, zoneTourBoutique, zoneOnglet, zoneLigne, emplacementSous, toursBoutique, zoneInspect, dans } from '../src/long/rempart/dispo.js'
 import rempart from '../src/long/rempart/index.js'
 import { graine, joue, fauxJeu } from './faux.js'
 
@@ -31,6 +31,47 @@ test('chaque chemin de carte est fait de segments horizontaux ou verticaux, jama
 
 test('chaque carte a au moins six emplacements, de quoi construire une vraie défense', () => {
   for (const c of CARTES) assert.ok(c.emplacements.length >= 6, `${c.nom} n’a que ${c.emplacements.length} emplacements`)
+})
+
+/** La distance d'un point au chemin le plus proche — même calcul que le ciblage des tours. */
+function distAuChemin(p, chemin) {
+  let meilleure = Infinity
+  for (let i = 0; i < chemin.length - 1; i++) {
+    const a = chemin[i]
+    const b = chemin[i + 1]
+    const dx = b.x - a.x
+    const dy = b.y - a.y
+    const long2 = dx * dx + dy * dy
+    let t = long2 > 0 ? ((p.x - a.x) * dx + (p.y - a.y) * dy) / long2 : 0
+    t = Math.max(0, Math.min(1, t))
+    meilleure = Math.min(meilleure, Math.hypot(p.x - (a.x + dx * t), p.y - (a.y + dy * t)))
+  }
+  return meilleure
+}
+
+test('sur LE PONT — la seule carte ouverte au tout premier lancement — chaque emplacement est à portée de la SENTINELLE, la seule tour débloquée d’office', () => {
+  const sentinelle = TOURS.find((t) => t.id === 'sentinelle')
+  const pont = CARTES.find((c) => c.id === 'pont')
+  for (const e of pont.emplacements) {
+    const d = distAuChemin(e, pont.chemin)
+    assert.ok(
+      d <= sentinelle.portee,
+      `emplacement (${e.x},${e.y}) à ${d.toFixed(1)}px du chemin — hors de portée (${sentinelle.portee}) de la seule tour du départ`,
+    )
+  }
+})
+
+test('sur chaque carte, tout emplacement est à portée d’au moins une tour de base — jamais un emplacement mort', () => {
+  const porteeMax = Math.max(...TOURS.map((t) => t.portee))
+  for (const c of CARTES) {
+    for (const e of c.emplacements) {
+      const d = distAuChemin(e, c.chemin)
+      assert.ok(
+        d <= porteeMax,
+        `${c.nom} : emplacement (${e.x},${e.y}) à ${d.toFixed(1)}px du chemin, hors de portée de toute tour (max ${porteeMax})`,
+      )
+    }
+  }
 })
 
 test('la première carte est ouverte d’office, les suivantes coûtent de plus en plus cher', () => {
@@ -66,6 +107,29 @@ test('toutes les pistes d’amélioration méta ont des coûts strictement crois
   for (const a of AMELIORATIONS_META) {
     assert.ok(a.couts.length >= 3, `${a.nom} n’a presque pas de niveaux`)
     for (let i = 1; i < a.couts.length; i++) assert.ok(a.couts[i] > a.couts[i - 1], `${a.nom} n’augmente pas de prix`)
+  }
+})
+
+test('previsionTour promet toujours mieux à l’étape suivante, jusqu’au niveau maximum', () => {
+  const meta = L.metaNeuve()
+  const partie = L.partieNeuve('pont', meta)
+  for (const def of TOURS) {
+    const tour = { instanceId: 1, tourId: def.id, emplacement: 0, niveau: 1, recharge: 0 }
+    for (let niveau = 1; niveau <= NIVEAU_MAX; niveau++) {
+      tour.niveau = niveau
+      const p = L.previsionTour(partie, tour)
+      assert.equal(p.def.id, def.id)
+      assert.equal(p.maxee, niveau >= NIVEAU_MAX)
+      if (p.maxee) {
+        assert.equal(p.prochain, null)
+        assert.equal(p.cout, null)
+      } else {
+        assert.ok(p.prochain.degat > p.actuel.degat, `${def.id} niveau ${niveau} : la prochaine étape ne fait pas plus de dégâts`)
+        assert.ok(p.prochain.portee > p.actuel.portee, `${def.id} niveau ${niveau} : la prochaine étape ne porte pas plus loin`)
+        assert.ok(p.prochain.cadence > p.actuel.cadence, `${def.id} niveau ${niveau} : la prochaine étape ne tire pas plus vite`)
+        assert.ok(p.cout > 0)
+      }
+    }
   }
 })
 
@@ -292,4 +356,75 @@ test('emplacementSous ne trouve rien loin d’un emplacement, et le bon près de
   assert.equal(proche, 0)
   const loin = emplacementSous(carte, d, { x: d.plateau.x + e0.x + 200, y: d.plateau.y + e0.y + 200 })
   assert.equal(loin, -1)
+})
+
+// --- Inspection d'une tour posée : appui court propose, appui long montre les stats ------
+
+/** Entre dans LE PONT et pose une SENTINELLE sur le premier emplacement libre. */
+function poseUneTour() {
+  const j = fauxJeu(rempart, { graine: 4, format: 'paysage' })
+  j.e.meta.eclats = 1000
+  const d = dispo(j)
+  rempart.appui(j, { x: zoneCarte(d, 0).x + 10, y: zoneCarte(d, 0).y + 10 })
+  rempart.appui(j, { x: zoneTourBoutique(d, 0).x + 5, y: zoneTourBoutique(d, 0).y + 5 })
+  const carte = L.carteParId(j.e.carteId)
+  const pos = carte.emplacements[0]
+  const p = { x: d.plateau.x + pos.x, y: d.plateau.y + pos.y }
+  rempart.appui(j, p)
+  const tour = j.e.partie.tours.find((t) => t.emplacement === 0)
+  assert.ok(tour, 'la tour n’a pas été posée — le test lui-même est cassé')
+  return { j, d, p, tour }
+}
+
+test('un appui bref sur une tour posée propose de l’améliorer, sans rien dépenser tout seul', () => {
+  const { j, p, tour } = poseUneTour()
+  const ferrailleAvant = j.e.partie.ferraille
+  const niveauAvant = tour.niveau
+
+  rempart.appui(j, p) // presse la tour posée
+  assert.equal(j.e.appuiTour.instanceId, tour.instanceId)
+  rempart.relache(j) // relâchée aussitôt, sans passer par `maj` : pas un maintien
+
+  assert.equal(j.e.appuiTour, null)
+  assert.equal(j.e.peekStats, null)
+  assert.equal(j.e.propose, tour.instanceId, 'l’appui bref devrait proposer l’amélioration, pas l’appliquer')
+  assert.equal(tour.niveau, niveauAvant, 'le niveau n’a pas dû bouger avant confirmation')
+  assert.equal(j.e.partie.ferraille, ferrailleAvant, 'la ferraille n’a pas dû bouger avant confirmation')
+
+  const bouton = zoneInspect(j).bouton
+  rempart.appui(j, { x: bouton.x + 5, y: bouton.y + 5 })
+  assert.equal(j.e.propose, null, 'confirmer referme la proposition')
+  assert.equal(tour.niveau, niveauAvant + 1, 'confirmer doit améliorer la tour')
+  assert.ok(j.e.partie.ferraille < ferrailleAvant, 'confirmer doit dépenser de la ferraille')
+})
+
+test('un appui tenu sur une tour posée montre ses stats et ne l’améliore jamais', () => {
+  const { j, p, tour } = poseUneTour()
+  const ferrailleAvant = j.e.partie.ferraille
+  const niveauAvant = tour.niveau
+
+  rempart.appui(j, p)
+  j.maintenu = true
+  for (let i = 0; i < 30; i++) rempart.maj(j, 1 / 60) // largement au-delà du seuil d'appui long
+
+  assert.equal(j.e.peekStats, tour.instanceId, 'le maintien devrait afficher les stats')
+  assert.equal(j.e.propose, null)
+
+  j.maintenu = false
+  rempart.relache(j)
+  assert.equal(j.e.peekStats, null, 'les stats s’éteignent au relâchement, comme un simple coup d’œil')
+  assert.equal(j.e.propose, null, 'un appui tenu ne doit jamais se transformer en proposition')
+  assert.equal(tour.niveau, niveauAvant, 'regarder les stats ne doit jamais améliorer la tour')
+  assert.equal(j.e.partie.ferraille, ferrailleAvant)
+})
+
+test('la proposition d’amélioration se referme sur un appui ailleurs, sans rien changer', () => {
+  const { j, p, tour } = poseUneTour()
+  rempart.appui(j, p)
+  rempart.relache(j)
+  assert.equal(j.e.propose, tour.instanceId)
+
+  rempart.appui(j, { x: 2, y: 2 }) // loin du bouton, loin de tout
+  assert.equal(j.e.propose, null)
+  assert.equal(tour.niveau, 1)
 })

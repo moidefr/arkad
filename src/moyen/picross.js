@@ -92,7 +92,22 @@ export default {
     texte(ctx, `${Math.floor(j.t)} s`, j.W - 14, 76, 14, C.faible, 700)
     texte(ctx, 'appui long = croix', j.W - 14, 100, 13, C.faible, 700)
     ctx.textAlign = 'center'
-    texte(ctx, 'noircis les cases indiquées par les indices', j.W / 2, y0 + n * CASE + 26, 13, C.faible, 700)
+    // La règle elle-même, pas juste le geste : un nombre isolé ne dit rien
+    // tant qu'on n'a pas compris qu'il compte des cases noires à la suite.
+    // Largeur bornée à l'écran : sur un téléphone étroit, une phrase de cette
+    // longueur déborderait sans elle.
+    const largeurHint = j.W - 24
+    texte(ctx, 'un nombre = un bloc de cases noires à la suite, dans l’ordre', j.W / 2, y0 + n * CASE + 26, 12, C.faible, 700, largeurHint)
+    texte(
+      ctx,
+      'plusieurs nombres = plusieurs blocs séparés par au moins une case vide',
+      j.W / 2,
+      y0 + n * CASE + 46,
+      11,
+      C.faible,
+      700,
+      largeurHint,
+    )
 
     if (j.e.fanfare > 0) {
       ctx.fillStyle = `rgba(11, 14, 13, ${Math.min(0.8, j.e.fanfare)})`

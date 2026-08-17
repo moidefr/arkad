@@ -93,6 +93,10 @@ export default {
     ctx.textAlign = 'right'
     texte(ctx, `${j.e.essais.length}/${j.e.tentatives}`, j.W - 14, 74, 14, C.faible, 700)
     ctx.textAlign = 'center'
+    // Les petits carrés d'indice ne se comprennent pas d'eux-mêmes : sans
+    // cette ligne, un nouveau joueur devine le mastermind au hasard plutôt
+    // que de le déduire.
+    texte(ctx, 'indice : clair = bien placé · terne = couleur présente ailleurs', j.W / 2, 88, 10, C.faible, 700, j.W - 24)
 
     const rayon = Math.max(8, Math.min(15, d.rowH / 2 - 8))
 

@@ -37,6 +37,25 @@ export function dispo(j) {
 
 export const dans = (p, z) => z && p.x >= z.x && p.x <= z.x + z.w && p.y >= z.y && p.y <= z.y + z.h
 
+const INSPECT_W = 300
+const INSPECT_H = 148
+const INSPECT_BOUTON_H = 32
+
+/**
+ * La fiche d'inspection d'une tour posée (stats en survol, proposition
+ * d'amélioration en appui court) : centrée sur l'écran, comme l'écran de
+ * défaite — indépendante de la position de la tour, pour ne jamais déborder
+ * du plateau ni se cacher derrière le panneau.
+ */
+export function zoneInspect(j) {
+  const x = Math.round(j.W / 2 - INSPECT_W / 2)
+  const y = Math.round(j.H / 2 - INSPECT_H / 2)
+  return {
+    box: { x, y, w: INSPECT_W, h: INSPECT_H },
+    bouton: { x: x + 20, y: y + INSPECT_H - INSPECT_BOUTON_H - 14, w: INSPECT_W - 40, h: INSPECT_BOUTON_H },
+  }
+}
+
 export const zoneTourBoutique = (d, k) => ({ x: d.boutique.x, y: d.boutique.y0 + k * d.boutique.pas, w: d.boutique.w, h: d.boutique.h })
 export const zoneOnglet = (d, k) => ({ x: d.onglets.x + k * d.onglets.pas, y: d.onglets.y, w: d.onglets.pas - 4, h: d.onglets.h })
 export const zoneCarte = (d, k) => ({
