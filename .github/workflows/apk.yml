@@ -32,7 +32,12 @@ jobs:
       - name: Dépendances
         run: npm install
 
+      # Comme pour le web : sans ces secrets, l'APK se construit et se joue,
+      # mais ses classements restent hors ligne.
       - name: Assemble www/
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         run: npm run build
 
       # Le dossier android/ n'est pas versionné : Capacitor le régénère à

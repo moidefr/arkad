@@ -444,6 +444,109 @@ si.
 Le moteur lance la bande du jeu au démarrage ; un jeu à paliers appelle
 `j.musique('crue2')` pour en changer. BRÈCHE le fait à chaque monde.
 
+## Les classements
+
+Un classement par jeu, et un général. Ils tiennent sur un compte : pseudo, mot
+de passe, et c'est tout.
+
+### Le barème, et pourquoi il en faut un
+
+Un point de PAIRES et un point de CARAVANE ne valent pas la même chose : le
+premier se gagne trente fois par partie, le second se compte en dizaines de
+milliers. Un classement général qui additionnerait les scores bruts
+couronnerait celui qui a joué à CARAVANE, pas le meilleur joueur.
+
+Alors on ne compare pas des scores, on compare des **fractions de référence**.
+Chaque jeu déclare, dans `src/classement/coefficients.js`, le score d'un très
+bon joueur ; l'atteindre vaut 1000 points, quel que soit le jeu. Une
+pondération par catégorie corrige ce que la référence ne dit pas — une partie
+de MOYEN demande dix minutes, une de COURT en demande deux, une de LONG peut en
+demander dix heures :
+
+```
+points = ponderation × 1000 × min(score / reference, 2.5)
+                       COURT 1 · MOYEN 1,4 · LONG 2 · MASSIF 2
+```
+
+Le plafond de 2,5 garde le général un classement de joueur et non de record
+isolé. Et le **général retient les cinq meilleurs jeux de chacun**, pas la
+somme de tout : sans ça, celui qui a tout essayé battrait celui qui joue mieux.
+
+Le classement **par jeu**, lui, ignore ces points : il trie sur le score brut,
+celui qu'on avait sous les yeux pendant la partie. Traduire un classement de
+SERPENT en points normalisés n'aurait aucun sens pour celui qui vient de finir.
+
+Les six jeux `sansScore` — USINE, RUÉE, COLONIE, GRIMOIRE, REMPART, FRONT —
+n'ont pas de classement. Le nombre qu'ils affichent est un état de partie, pas
+un score ; leur inventer une référence serait mentir sur ce qu'ils sont.
+
+### Le top 3, qu'on ne peut pas rater
+
+Le podium n'est pas rangé derrière un menu. Il s'impose à deux endroits, et ce
+sont les deux moments où il intéresse quelqu'un :
+
+- **sur l'accueil**, sous les catégories — le premier écran de la borne montre
+  les trois premiers du général à qui n'a rien demandé ;
+- **sur l'écran de fin**, sous les boutons — on vient de faire un score, c'est
+  le seul instant où l'on veut vraiment savoir à quoi il se compare.
+
+Dans les deux cas le podium est aussi le bouton : on appuie dessus et on entre
+dans l'écran complet, à `/classement/` (ou `/classement/<jeu>/`). Trois marches
+debout, une bande d'une ligne couché — 360 px de haut ne laissent pas la place
+d'une estrade.
+
+### Le compte
+
+Pseudo, mot de passe, et un champ **Snap facultatif — une option espérée par
+Greg Boulard**. Il est vraiment facultatif, et vraiment privé : aucune vue de
+classement ne l'expose, et un test le vérifie sur le SQL lui-même.
+
+Pas d'adresse électronique : personne ne tape la sienne au pouce sur une borne,
+et ARKAD n'a rien à envoyer à personne. Supabase en veut une, alors on lui en
+fabrique une à partir du pseudo (`greg` → `greg@joueurs.arkad.fr`, un domaine
+qui ne reçoit rien). La contrepartie est réelle, et l'écran d'inscription le
+dit plutôt que de la laisser découvrir au premier oubli : **un mot de passe
+perdu est perdu**.
+
+C'est le seul endroit d'ARKAD qui pose du HTML sur la toile. Un clavier dessiné
+à la main serait laid, lent, sans gestionnaire de mots de passe et
+catastrophique au lecteur d'écran ; pour ces deux champs, et pour eux seuls, on
+ouvre de vrais `<input>`.
+
+### Le dos de la borne
+
+Supabase, **sans la bibliothèque Supabase** : GoTrue et PostgREST sont deux API
+REST ordinaires, `fetch` suffit, et le projet garde sa promesse de n'avoir
+aucune dépendance ni étape de compilation.
+
+Le serveur ne croit pas le navigateur sur parole. Aucune politique d'écriture
+n'existe sur la table des scores : le seul chemin est la fonction
+`poser_score()`, qui recalcule les points depuis sa propre table de barème.
+C'est pour ça que `supabase/schema.sql` est **généré** depuis
+`coefficients.js` :
+
+```
+node outils/schema-supabase.mjs     # puis coller le SQL dans Supabase
+```
+
+Un test rejoue la génération et compare au fichier versionné. Le jour où l'on
+change une référence sans régénérer, `npm test` le dit — plutôt que deux
+totaux différents pour une même partie, et personne pour savoir lequel croire.
+
+### Hors ligne, ça marche pareil
+
+`src/classement/config.js` est vide dans le dépôt ; `build.mjs` le réécrit dans
+`www/` depuis `SUPABASE_URL` et `SUPABASE_ANON_KEY` (des secrets GitHub, lus
+par les deux workflows). Sans eux, la borne se construit, se joue et garde ses
+records locaux : les écrans de classement disent simplement qu'ils sont hors
+ligne.
+
+Et avec eux, poser un score n'attend jamais : l'écran de fin s'affiche à la
+même image, réseau ou pas. Ce qui n'est pas parti est mis de côté et repart à
+la prochaine occasion — **y compris les scores marqués avant d'avoir un
+compte**, qui partent au moment où il en existe un. Une borne se joue dans le
+métro.
+
 ## Les règles qui font que ça marche
 
 1. **Une seule action.** Appuyer, ou glisser. C'est ce qui rend PC et mobile
@@ -477,6 +580,14 @@ src/
     joueur.js       partition -> contexte audio, avec horloge d'avance
   effets.js         gerbes, bulles de score, secousse d'écran
   catalogue.js      les quatre catégories, et rien d'autre à toucher
+  classement/
+    coefficients.js le barème — la seule source de vérité des points
+    config.js       l'adresse Supabase, vide ici, écrite par build.mjs
+    supabase.js     GoTrue + PostgREST en `fetch`, sans bibliothèque
+    compte.js       inscription, connexion, session qui survit à la visite
+    scores.js       poser sans attendre, lire sans écran vide
+    ecran.js        podium et listes : des rectangles, aucun DOM
+    formulaire.js   le seul HTML de la borne — deux champs, un mot de passe
   court/  moyen/  long/  massif/     les jeux, rangés par durée
 test/
   faux.js           un canvas qui enregistre, un moteur qui ne dessine pas
@@ -486,6 +597,11 @@ test/
   breche-banc.mjs   un automate qui joue BRÈCHE, monde par monde
   expedition-banc.mjs   mille traversées en Monte-Carlo, trois stratégies
   <jeu>-banc.mjs    un par jeu LONG — mesuré, jamais deviné
+outils/
+  console-bandes.mjs    la console d'écoute des bandes-son
+  schema-supabase.mjs   engendre supabase/schema.sql depuis le barème
+supabase/
+  schema.sql        généré — tables, RLS, poser_score(), les deux vues
 .github/workflows/
   test.yml          le banc d'essai, à chaque poussée
   web.yml           déploie la version web, à la demande
@@ -522,9 +638,11 @@ d'un `.find()`, et trois combats qui ne se terminaient jamais.
 - FRONT : des sièges et des objectifs à plusieurs étapes, et une campagne
   qui se souvient des compagnies adverses qu'on a croisées
 - une interface pour publier des jeux sans passer par git
-- des scores en ligne
+- la modération : signaler un pseudo, retirer un score aberrant
+- des classements sur une fenêtre glissante (le mois en cours), en plus de
+  celui de toujours
 
-Note pour plus tard : le code des jeux reste dans git — c'est lui qui donne
-l'historique et le retour arrière gratuits. Un backend (Supabase ou autre) ne
-servira que pour ce que des fichiers statiques ne savent pas faire : les
-comptes, les classements, la modération.
+Note tenue : le code des jeux reste dans git — c'est lui qui donne l'historique
+et le retour arrière gratuits. Supabase ne sert qu'à ce que des fichiers
+statiques ne savent pas faire : les comptes, les classements, et un jour la
+modération.

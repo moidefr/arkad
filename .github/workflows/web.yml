@@ -27,7 +27,16 @@ jobs:
         with:
           node-version: 22
 
+      # Les classements ont besoin de savoir où poser leurs scores. La clé
+      # « anon » de Supabase est publique par construction (c'est le RLS du
+      # schéma qui protège les données), mais elle reste hors du dépôt : elle
+      # arrive en secret GitHub, déposée une fois dans Settings → Secrets and
+      # variables → Actions. Sans elle, le site se déploie quand même — les
+      # classements se disent simplement hors ligne.
       - name: Assemble www/
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         run: node build.mjs
 
       - uses: actions/configure-pages@v5
