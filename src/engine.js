@@ -18,7 +18,7 @@
  * bouton décalé de huit pixels.
  */
 import { CATEGORIES } from './catalogue.js'
-import { depuisChemin, cheminDe } from './route.js'
+import { depuisChemin, cheminDe, cheminClassement } from './route.js'
 import { Input } from './input.js'
 import { C, ton } from './palette.js'
 import { son } from './son.js'
@@ -28,6 +28,26 @@ import { Effets } from './effets.js'
 import { lis, ecris } from './stockage.js'
 import { FORMATS, HUD, orientationAppareil, formatPour, tailleDe, suggestion, estTactile } from './format.js'
 import { texte, rect, cadre, bloc, lueur, ombre, vignette, bandeTramee, scanlines, largeurTexte, PX } from './dessin.js'
+import { enLigne } from './classement/config.js'
+import { classable } from './classement/coefficients.js'
+import { session, reprends, surChangement } from './classement/compte.js'
+import * as classement from './classement/scores.js'
+import { ouvre } from './classement/formulaire.js'
+import {
+  dessinePodium,
+  hauteurPodium,
+  dispoOnglets,
+  onglet,
+  dispoListe,
+  ligneListe,
+  dispoCompte,
+  dispoPodiumClassement,
+  dispoGrilleJeux,
+  caseJeu,
+  dessineLigne,
+  messageVide,
+  MEDAILLES,
+} from './classement/ecran.js'
 
 /** Le gabarit de référence — celui des tests et des jeux qui n'en changent pas. */
 export const W = FORMATS.portrait.W
@@ -59,7 +79,10 @@ const BTN_RETOUR = { x: 16, y: 14, w: 74, h: 34 }
 function dispoAccueil(W, H) {
   if (!estLarge(W, H)) return { cols: 1, x: 20, y: 96, w: W - 40, h: 88, pasX: 0, pasY: 102 }
   const w = Math.floor((W - 60) / 2)
-  return { cols: 2, x: 20, y: 84, w, h: 112, pasX: w + 20, pasY: 124 }
+  // Couché, les cartes se resserrent d'une douzaine de pixels : c'est ce qui
+  // libère la bande du podium en bas d'écran (voir `dispoPodiumAccueil`).
+  // Debout, il y avait déjà la place, et le portrait ne bouge pas d'un pixel.
+  return { cols: 2, x: 20, y: 78, w, h: 100, pasX: w + 20, pasY: 112 }
 }
 
 const carteAccueil = (i, d) => ({
@@ -125,6 +148,24 @@ export function enRangees(W, H, n) {
   return dernier.y + dernier.h <= H - 20
 }
 
+/**
+ * Où se pose le podium général, sur l'accueil.
+ *
+ * Sous la dernière carte de catégorie, et au-dessus du pied de page. Il est
+ * calculé à partir de `dispoAccueil` plutôt qu'écrit en dur : ajouter une
+ * cinquième catégorie le fera descendre tout seul, ou disparaître s'il ne
+ * tient plus — plutôt que de se peindre par-dessus les cartes.
+ */
+function dispoPodiumAccueil(W, H) {
+  const d = dispoAccueil(W, H)
+  const derniere = carteAccueil(CATEGORIES.length - 1, d)
+  const h = hauteurPodium(W, H)
+  const y = derniere.y + derniere.h + (estLarge(W, H) ? 14 : 26)
+  const marge = estLarge(W, H) ? 8 : 30
+  if (y + h > H - marge) return null
+  return { x: 20, y, w: W - 40, h }
+}
+
 /** Les menus empilés de la pause et de la fin. */
 function dispoMenu(W, H, n) {
   const large = estLarge(W, H)
@@ -135,6 +176,35 @@ function dispoMenu(W, H, n) {
 }
 
 const boutonMenu = (i, d) => ({ x: d.x, y: d.y + i * d.pas, w: d.w, h: d.h })
+
+/** Les deux boutons de l'écran de fin. */
+function dispoFin(W, H) {
+  const large = estLarge(W, H)
+  const d = dispoMenu(W, H, 2)
+  const y = large ? Math.round(H * 0.62) : 404
+  return [
+    { x: d.x, y, w: d.w, h: large ? 46 : 62 },
+    { x: d.x, y: y + (large ? 56 : 76), w: d.w, h: large ? 40 : 54 },
+  ]
+}
+
+/**
+ * Où se pose le top 3 du jeu, sur l'écran de fin : sous les deux boutons, ou
+ * nulle part s'il n'y tient pas. C'est le second endroit où le podium
+ * s'impose — on vient de faire un score, c'est le seul moment où l'on a
+ * vraiment envie de savoir à quoi il se compare.
+ */
+function dispoPodiumFin(W, H) {
+  const b = dispoFin(W, H)
+  const bas = b[1].y + b[1].h
+  const h = hauteurPodium(W, H)
+  // Debout, l'estrade porte son titre **au-dessus** d'elle : il faut lui
+  // laisser sa ligne, sinon « TOP 3 CORDE » vient mordre le bouton QUITTER.
+  // Couché, le titre est écrit *dans* la bande, et six pixels suffisent — il
+  // n'en reste de toute façon que quarante sous les boutons.
+  const y = bas + (estLarge(W, H) ? 6 : 20)
+  return y + h > H - 4 ? null : { x: 20, y, w: W - 40, h }
+}
 
 /**
  * Le menu de pause. Une seule liste, lue par le dessin **et** par l'appui :
@@ -160,7 +230,7 @@ export class Moteur {
     this.input.onPress = (p) => this._appui(p)
     this.input.onRelease = (p) => this._relache(p)
 
-    this.phase = 'accueil' // accueil | categorie | depart | jeu | reprise | pause | fin | tourne
+    this.phase = 'accueil' // accueil | categorie | classement | depart | jeu | reprise | pause | fin | tourne
     this.phaseT = 0
     this.cat = null
     this.def = null
@@ -171,6 +241,20 @@ export class Moteur {
     /** Le sens qu'on conseille de prendre, ou null si tout va bien.  */
     this.suggere = null
     this.muet = lis(CLE_MUET, '0') === '1'
+
+    // L'écran de classement : quel onglet ('general' ou un identifiant de
+    // catégorie), quel jeu si l'on est descendu jusqu'à un jeu, et d'où l'on
+    // vient — le retour doit ramener là où on a appuyé, pas à l'accueil.
+    this.vue = { onglet: 'general', jeu: null, retour: 'accueil' }
+
+    // La session de la dernière visite, et ce qui n'a pas pu partir : le
+    // joueur a pu marquer son record dans le métro.
+    reprends()
+    classement.videLaFile()
+    surChangement(() => classement.videLaFile())
+    // Le podium de l'accueil est le premier écran de la borne : on le demande
+    // avant même que quiconque ait appuyé.
+    classement.demande('general')
 
     addEventListener('keydown', (e) => {
       if (e.code === 'Escape') this._bascullePause()
@@ -389,6 +473,11 @@ export class Moteur {
 
   _termine() {
     this.record = this.def.sansScore ? false : this._enregistre(this.def.id, this.j.score)
+    // Le score part vers le classement sans qu'on l'attende : l'écran de fin
+    // s'affiche à la même image, réseau ou pas. Ce qui ne passe pas est mis
+    // de côté et repartira (voir scores.js).
+    classement.pose(this.def, this.j.score)
+    if (classable(this.def)) classement.demande(this.def.id, { force: true })
     this.phase = 'fin'
     this.phaseT = 0
     son.mort()
@@ -426,6 +515,18 @@ export class Moteur {
    */
   _appliqueRoute(arrivee) {
     if (!arrivee) return
+    // `/classement/` arrive comme un écran, pas comme une catégorie : on ne
+    // touche ni au jeu en cours ni à la catégorie affichée derrière.
+    if (arrivee.classement) {
+      const jeu = arrivee.jeu && classable(arrivee.jeu) ? arrivee.jeu : null
+      this.vue = { onglet: jeu ? (this._categorieDe(jeu)?.id ?? 'general') : 'general', jeu, retour: 'accueil' }
+      this.phase = 'classement'
+      this.phaseT = 0
+      const cle = this._cleVue()
+      if (cle) classement.demande(cle)
+      else for (const def of this._jeuxClassables(this.vue.onglet)) classement.demande(def.id)
+      return
+    }
     if (this.def && this.def !== arrivee.def) {
       this.def.quitte?.(this.j)
       musique.arrete()
@@ -439,6 +540,46 @@ export class Moteur {
     this._redim()
     if (arrivee.def) this.lance(arrivee.def)
     else this._musiqueMenu()
+  }
+
+  // --- Classements ----------------------------------------------------------
+
+  /** Les jeux d'une catégorie qui peuvent figurer à un classement. */
+  _jeuxClassables(id) {
+    return CATEGORIES.find((c) => c.id === id)?.jeux.filter(classable) ?? []
+  }
+
+  /** La clé du classement affiché : 'general', ou l'identifiant d'un jeu. */
+  _cleVue() {
+    return this.vue.jeu ? this.vue.jeu.id : this.vue.onglet === 'general' ? 'general' : null
+  }
+
+  /**
+   * Ouvre l'écran de classement. `jeu` renseigné y entre directement — c'est
+   * ce que fait l'écran de fin, où l'on veut voir *ce* classement-là.
+   */
+  _ouvreClassement({ onglet: ong = 'general', jeu = null } = {}) {
+    this.vue = { onglet: jeu ? this._categorieDe(jeu)?.id ?? ong : ong, jeu, retour: this.phase }
+    this.phase = 'classement'
+    this.phaseT = 0
+    const cle = this._cleVue()
+    if (cle) classement.demande(cle)
+    else for (const def of this._jeuxClassables(this.vue.onglet)) classement.demande(def.id)
+    history.pushState(null, '', cheminClassement(jeu))
+  }
+
+  _categorieDe(def) {
+    return CATEGORIES.find((c) => c.jeux.includes(def))
+  }
+
+  /** Le formulaire de compte, puis on renvoie chercher ce qui a changé. */
+  async _ouvreCompte() {
+    const change = await ouvre(session.pseudo ? 'compte' : 'connexion')
+    if (!change) return
+    await classement.videLaFile()
+    const cle = this._cleVue()
+    classement.demande('general', { force: true })
+    if (cle && cle !== 'general') classement.demande(cle, { force: true })
   }
 
   _bascullePause() {
@@ -505,6 +646,13 @@ export class Moteur {
 
     if (this.phase === 'accueil') {
       if (dans(p, dispoSon(this.W))) return (son.bascule(), musique.accorde())
+      // Le podium n'est pas qu'une décoration : c'est la porte du classement.
+      // Un bouton de plus aurait dit la même chose en prenant plus de place.
+      const pod = dispoPodiumAccueil(this.W, this.H)
+      if (pod && dans(p, { ...pod, y: pod.y - 18, h: pod.h + 18 })) {
+        son.clic()
+        return this._ouvreClassement({ onglet: 'general' })
+      }
       const d = dispoAccueil(this.W, this.H)
       const i = CATEGORIES.findIndex((_, k) => dans(p, carteAccueil(k, d)))
       if (i >= 0) {
@@ -518,6 +666,10 @@ export class Moteur {
     }
 
     if (this.phase === 'categorie') {
+      if (dans(p, dispoSon(this.W))) {
+        son.clic()
+        return this._ouvreClassement({ onglet: this.cat.id })
+      }
       if (dans(p, BTN_RETOUR)) {
         son.clic()
         this.cat = null
@@ -535,6 +687,8 @@ export class Moteur {
       }
       return
     }
+
+    if (this.phase === 'classement') return this._appuiClassement(p)
 
     // L'écran d'orientation : un appui reprend, le bouton du bas le fait taire
     // pour de bon.
@@ -586,6 +740,11 @@ export class Moteur {
     }
 
     if (this.phase === 'fin' && this.phaseT > 0.4) {
+      const pod = this._dispoPodiumFin()
+      if (pod && dans(p, pod)) {
+        son.clic()
+        return this._ouvreClassement({ jeu: this.def })
+      }
       const b = this._dispoFin()
       const i = b.findIndex((z) => dans(p, z))
       if (i === 0) return (son.clic(), this.lance(this.def, { neuve: true }))
@@ -606,6 +765,7 @@ export class Moteur {
 
     if (this.phase === 'accueil') this._accueil()
     else if (this.phase === 'categorie') this._categorie()
+    else if (this.phase === 'classement') this._classement()
     else {
       // La dernière image du jeu reste visible sous la pause et sous l'écran
       // de fin : on ne perd jamais de vue ce qui vient de se passer.
@@ -701,13 +861,42 @@ export class Moteur {
       ctx.globalAlpha = 1
     })
 
-    const total = CATEGORIES.reduce((n, c) => n + c.jeux.length, 0)
-    texte(ctx, `${total} jeux · une seule touche`, this.W / 2, this.H - 28, 12, C.faible, 700)
+    // Le podium général, sous les catégories : c'est le premier écran de la
+    // borne, et on veut que les trois noms du haut soient vus par quelqu'un
+    // qui n'a rien demandé. Il est aussi le bouton qui mène au classement.
+    const pod = dispoPodiumAccueil(this.W, this.H)
+    if (pod) {
+      const { k, dy } = this._entree(CATEGORIES.length)
+      if (k > 0) {
+        ctx.globalAlpha = k
+        dessinePodium(ctx, pod.x, pod.y + dy, pod.w, this.W, this.H, classement.podium('general'), {
+          titre: 'CLASSEMENT GÉNÉRAL',
+          valeur: (l) => l.points,
+        })
+        ctx.globalAlpha = 1
+      }
+    }
+
+    // En paysage, la bande du podium occupe déjà le bas : le décompte des
+    // jeux passerait par-dessus, et il se lit de toute façon sur les cartes.
+    if (!estLarge(this.W, this.H)) {
+      const total = CATEGORIES.reduce((n, c) => n + c.jeux.length, 0)
+      texte(ctx, `${total} jeux · une seule touche`, this.W / 2, this.H - 28, 12, C.faible, 700)
+    }
   }
 
   _categorie() {
+    const ctx = this.ctx
     const cat = this.cat
     this._entete(cat.nom, `${cat.duree} · ${cat.detail}`, true)
+    // Le classement de la catégorie, en haut à droite — la place qu'occupe le
+    // bouton du son sur l'accueil, pour que le pouce n'ait rien à réapprendre.
+    if (cat.jeux.some(classable)) {
+      const { x, y, w, h } = dispoSon(this.W)
+      rect(ctx, x, y, w, h, C.panneau)
+      cadre(ctx, x, y, w, h, C.faible)
+      texte(ctx, 'CLST', x + w / 2, y + h / 2, 11, C.accent, 700, w - 6)
+    }
     if (enRangees(this.W, this.H, cat.jeux.length)) cat.jeux.forEach((def, i) => this._rangee(def, i))
     else cat.jeux.forEach((def, i) => this._tuile(def, i))
   }
@@ -926,14 +1115,247 @@ export class Moteur {
     texte(ctx, 'appuie n’importe où pour continuer', cx, this.H * 0.74 + d.h + 22, 11, C.faible, 700, this.W - 60)
   }
 
-  _dispoFin() {
-    const large = estLarge(this.W, this.H)
-    const d = dispoMenu(this.W, this.H, 2)
-    const y = large ? Math.round(this.H * 0.62) : 404
+  // --- L'écran de classement -------------------------------------------------
+
+  /**
+   * Les onglets : le général, puis les catégories qui ont au moins un jeu
+   * classable. MASSIF n'en a aucun — FRONT ne produit pas de score — et
+   * n'apparaît donc pas plutôt que d'ouvrir sur une liste vide.
+   */
+  _onglets() {
     return [
-      { x: d.x, y, w: d.w, h: large ? 46 : 62 },
-      { x: d.x, y: y + (large ? 56 : 76), w: d.w, h: large ? 40 : 54 },
+      { id: 'general', nom: 'GÉNÉRAL', couleur: C.accent },
+      ...CATEGORIES.filter((c) => c.jeux.some(classable)).map((c) => ({ id: c.id, nom: c.nom, couleur: c.couleur })),
     ]
+  }
+
+  /** Ce que la liste affiche en ce moment : des joueurs, ou des jeux. */
+  _lignesClassement() {
+    const cle = this._cleVue()
+    if (cle) {
+      const etat = classement.connu(cle)
+      const general = cle === 'general'
+      return {
+        type: 'joueurs',
+        etat,
+        lignes: etat.lignes.map((l) => ({
+          rang: l.rang,
+          pseudo: l.pseudo,
+          valeur: general ? `${Math.round(l.points)} pts` : `${Math.round(l.score)}`,
+          moi: l.pseudo === session.pseudo,
+        })),
+      }
+    }
+    // Le niveau intermédiaire : les jeux de la catégorie, chacun avec son
+    // meneur. C'est ce qui donne envie d'entrer dans un classement précis.
+    const jeux = this._jeuxClassables(this.vue.onglet)
+    return {
+      type: 'jeux',
+      etat: { charge: false, erreur: null, lignes: jeux },
+      lignes: jeux.map((def, i) => {
+        const tete = classement.podium(def.id)[0]
+        return {
+          rang: i + 1,
+          pseudo: def.nom,
+          valeur: tete ? `${tete.pseudo}` : '--',
+          moi: tete?.pseudo === session.pseudo,
+          def,
+        }
+      }),
+    }
+  }
+
+  _appuiClassement(p) {
+    // Retour : d'abord d'un jeu vers sa catégorie, ensuite vers l'écran d'où
+    // l'on vient. Un seul bouton pour deux crans — c'est ce qu'attend le
+    // pouce, et c'est ce que fait le bouton « précédent » du téléphone.
+    if (dans(p, BTN_RETOUR)) {
+      son.clic()
+      if (this.vue.jeu) {
+        this.vue.jeu = null
+        this.phaseT = 0
+        return
+      }
+      this.phase = this.vue.retour === 'categorie' && this.cat ? 'categorie' : this.vue.retour === 'fin' ? 'fin' : 'accueil'
+      this.phaseT = 0
+      // L'adresse suit l'écran, comme partout ailleurs dans la borne.
+      history.pushState(null, '', this.phase === 'fin' ? cheminDe(this.cat, this.def) : cheminDe(this.cat, null))
+      return
+    }
+
+    // Deux portes vers le même formulaire : le pseudo en haut à droite, où
+    // le pouce a l'habitude de trouver un réglage, et le grand bouton du bas.
+    if (dans(p, dispoCompte(this.W, this.H)) || dans(p, dispoSon(this.W))) {
+      son.clic()
+      return void this._ouvreCompte()
+    }
+
+    const onglets = this._onglets()
+    const dO = dispoOnglets(this.W, this.H, onglets.length)
+    const i = onglets.findIndex((_, k) => dans(p, onglet(k, dO)))
+    if (i >= 0) {
+      son.touche(4)
+      this.vue.onglet = onglets[i].id
+      this.vue.jeu = null
+      this.phaseT = 0
+      const cle = this._cleVue()
+      if (cle) classement.demande(cle)
+      // On amorce aussi les classements des jeux listés : sans eux, la
+      // colonne « meneur » resterait à des tirets jusqu'à ce qu'on entre
+      // dans chacun.
+      else for (const def of this._jeuxClassables(this.vue.onglet)) classement.demande(def.id)
+      return
+    }
+
+    const contenu = this._lignesClassement()
+    if (contenu.type !== 'jeux') return
+    const dG = dispoGrilleJeux(this.W, this.H, contenu.lignes.length)
+    const k = contenu.lignes.findIndex((_, n) => dans(p, caseJeu(n, dG)))
+    if (k >= 0) {
+      son.clic()
+      this.vue.jeu = contenu.lignes[k].def
+      this.phaseT = 0
+      classement.demande(this.vue.jeu.id)
+    }
+  }
+
+  _classement() {
+    const ctx = this.ctx
+    const cle = this._cleVue()
+    const jeu = this.vue.jeu
+    const titre = jeu ? jeu.nom : 'CLASSEMENT'
+    const sous = jeu
+      ? `record ${jeu.unite || 'pts'} · le meilleur de chacun`
+      : this.vue.onglet === 'general'
+        ? 'les 5 meilleurs jeux de chacun, ramenés au même barème'
+        : 'un classement par jeu — choisis lequel'
+    this._entete(titre, sous, true)
+
+    // Le bouton du haut à droite reste à sa place d'un écran à l'autre : ici
+    // il ne coupe pas le son, il dit qui joue.
+    this._boutonPseudo()
+
+    const onglets = this._onglets()
+    const dO = dispoOnglets(this.W, this.H, onglets.length)
+    onglets.forEach((o, i) => {
+      const z = onglet(i, dO)
+      const actif = o.id === this.vue.onglet
+      rect(ctx, z.x, z.y, z.w, z.h, actif ? ton(o.couleur, -0.72) : C.panneau)
+      cadre(ctx, z.x, z.y, z.w, z.h, actif ? o.couleur : C.bord)
+      texte(ctx, o.nom, z.x + z.w / 2, z.y + z.h / 2, 12, actif ? o.couleur : C.faible, 700, z.w - 8)
+    })
+
+    const contenu = this._lignesClassement()
+    const avecPodium = contenu.type === 'joueurs'
+    if (avecPodium) {
+      const pod = dispoPodiumClassement(this.W, this.H)
+      dessinePodium(ctx, pod.x, pod.y, pod.w, this.W, this.H, classement.podium(cle), {
+        titre: jeu ? `PODIUM ${jeu.nom}` : 'PODIUM GÉNÉRAL',
+        valeur: (l) => (jeu ? l.score : l.points),
+      })
+    }
+
+    // La grille des jeux remplace la liste des joueurs — mais pas le bas de
+    // l'écran : le bouton de compte se dessine dans les deux cas, plus bas.
+    if (contenu.type === 'jeux') this._grilleJeux(contenu.lignes)
+
+    const dL = dispoListe(this.W, this.H, { avecPodium })
+    const visibles = contenu.type === 'jeux' ? [] : contenu.lignes.slice(0, dL.max)
+    visibles.forEach((l, i) => {
+      const { k, dy } = this._entree(i)
+      if (k <= 0) return
+      ctx.globalAlpha = k
+      const z = ligneListe(i, dL)
+      // L'or, l'argent et le bronze ne colorent que de vrais rangs : sur la
+      // liste des jeux, « 3 » n'est qu'un numéro d'ordre.
+      dessineLigne(ctx, { ...z, y: z.y + dy }, { ...l, teinte: l.rang <= 3 ? MEDAILLES[l.rang - 1] : C.faible })
+      ctx.globalAlpha = 1
+    })
+
+    if (contenu.type !== 'jeux' && visibles.length === 0) {
+      texte(ctx, messageVide(contenu.etat, !enLigne()), this.W / 2, dL.y + 30, 13, C.faible, 700, this.W - 48)
+    }
+
+    // Sa propre place, quand elle est plus bas que ce que l'écran montre :
+    // vingtième d'un classement de cent, c'est une information, pas une
+    // absence.
+    if (contenu.type === 'joueurs' && session.pseudo) {
+      const moi = classement.maPlace(cle)
+      const vu = visibles.some((l) => l.moi)
+      if (moi && !vu) {
+        const z = ligneListe(Math.min(dL.max, visibles.length), dL)
+        dessineLigne(ctx, z, {
+          rang: moi.rang,
+          pseudo: moi.pseudo,
+          valeur: cle === 'general' ? `${Math.round(moi.points)} pts` : `${Math.round(moi.score)}`,
+          moi: true,
+        })
+      }
+    }
+
+    const b = dispoCompte(this.W, this.H)
+    bouton(ctx, b, session.pseudo ? `MON COMPTE : ${session.pseudo}` : 'SE CONNECTER', !session.pseudo)
+    const attente = classement.enAttente()
+    if (attente > 0 && !estLarge(this.W, this.H)) {
+      texte(
+        ctx,
+        session.pseudo ? `${attente} score(s) en attente de réseau` : `${attente} score(s) t’attendent — crée un compte`,
+        this.W / 2,
+        b.y - 12,
+        11,
+        C.accent,
+        700,
+        this.W - 40,
+      )
+    }
+  }
+
+  /**
+   * Les jeux d'une catégorie, en autant de colonnes qu'il en faut pour que
+   * tous tiennent. Sur une colonne, on annonce en plus le meneur — c'est ce
+   * qui donne envie d'entrer dans un classement précis.
+   */
+  _grilleJeux(lignes) {
+    const ctx = this.ctx
+    const d = dispoGrilleJeux(this.W, this.H, lignes.length)
+    lignes.forEach((l, i) => {
+      const { k, dy } = this._entree(i)
+      if (k <= 0) return
+      ctx.globalAlpha = k
+      const z = caseJeu(i, d)
+      const y = z.y + dy
+      rect(ctx, z.x, y, z.w, z.h, C.panneau)
+      cadre(ctx, z.x, y, z.w, z.h, C.bord)
+      bloc(ctx, z.x, y, 4, z.h, l.def.couleur, 2)
+      ctx.textAlign = 'left'
+      texte(ctx, l.pseudo, z.x + 14, y + z.h / 2, 14, C.texte, 700, z.w - (d.avecMeneur ? 130 : 24))
+      if (d.avecMeneur) {
+        ctx.textAlign = 'right'
+        const tete = l.valeur !== '--'
+        texte(ctx, tete ? `1. ${l.valeur}` : '--', z.x + z.w - 12, y + z.h / 2, 12, tete ? C.accent : C.bord, 700, 108)
+      }
+      ctx.textAlign = 'center'
+      ctx.globalAlpha = 1
+    })
+  }
+
+  /** Le pseudo en haut à droite, à la place du bouton de son. */
+  _boutonPseudo() {
+    const ctx = this.ctx
+    const { x, y, w, h } = dispoSon(this.W)
+    rect(ctx, x, y, w, h, C.panneau)
+    cadre(ctx, x, y, w, h, session.pseudo ? C.accent : C.bord)
+    texte(ctx, session.pseudo ? session.pseudo.slice(0, 5) : '?', x + w / 2, y + h / 2, 12, session.pseudo ? C.accent : C.faible, 700, w - 8)
+  }
+
+  _dispoFin() {
+    return dispoFin(this.W, this.H)
+  }
+
+  /** Le podium de l'écran de fin — `null` si ce jeu ne se classe pas. */
+  _dispoPodiumFin() {
+    if (!this.def || !classable(this.def)) return null
+    return dispoPodiumFin(this.W, this.H)
   }
 
   _fin() {
@@ -964,6 +1386,14 @@ export class Moteur {
     const b = this._dispoFin()
     bouton(ctx, b[0], 'REJOUER', true)
     bouton(ctx, b[1], 'QUITTER', false)
+
+    const pod = this._dispoPodiumFin()
+    if (pod) {
+      dessinePodium(ctx, pod.x, pod.y, pod.w, this.W, this.H, classement.podium(this.def.id), {
+        titre: `TOP 3 ${this.def.nom}`,
+        valeur: (l) => l.score,
+      })
+    }
   }
 }
 
@@ -981,4 +1411,17 @@ function bouton(ctx, z, libelle, primaire, teinte) {
   texte(ctx, libelle, z.x + z.w / 2, z.y + z.h / 2, 19, vif ?? C.texte, 700, z.w - 24, 1)
 }
 
-export { dispoAccueil, carteAccueil, dispoTuiles, tuile, dispoRangees, rangee, dispoMenu, boutonMenu, dispoSon }
+export {
+  dispoAccueil,
+  carteAccueil,
+  dispoTuiles,
+  tuile,
+  dispoRangees,
+  rangee,
+  dispoMenu,
+  boutonMenu,
+  dispoSon,
+  dispoFin,
+  dispoPodiumAccueil,
+  dispoPodiumFin,
+}

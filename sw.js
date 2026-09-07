@@ -13,6 +13,10 @@ self.addEventListener('activate', (e) => {
 
 self.addEventListener('fetch', (e) => {
   if (e.request.method !== 'GET') return
+  // Les appels au dos de la borne (Supabase) ne passent pas par ici : un
+  // classement servi depuis le cache serait un classement d'hier, et
+  // `scores.js` sait déjà garder la dernière image qu'il a reçue.
+  if (new URL(e.request.url).origin !== self.location.origin) return
   e.respondWith(
     fetch(e.request)
       .then((rep) => {
