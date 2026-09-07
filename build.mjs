@@ -11,6 +11,7 @@
 import { cp, rm, mkdir, writeFile } from 'node:fs/promises'
 import { CATEGORIES } from './src/catalogue.js'
 import { classable } from './src/classement/coefficients.js'
+import { origineSeule } from './outils/adresse.mjs'
 
 const FICHIERS = ['index.html', 'style.css', 'sw.js', 'manifest.webmanifest', 'icone.svg', 'src', 'CNAME']
 
@@ -28,7 +29,7 @@ for (const f of FICHIERS) {
 // copie, à partir de l'environnement — et sans elle tout marche pareil, les
 // classements se disent simplement hors ligne.
 
-const SUPABASE_URL = (process.env.SUPABASE_URL ?? '').replace(/\/$/, '')
+const SUPABASE_URL = origineSeule(process.env.SUPABASE_URL)
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY ?? ''
 const litteral = (s) => JSON.stringify(String(s))
 

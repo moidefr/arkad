@@ -33,6 +33,7 @@ import { depuisChemin, cheminClassement } from '../src/route.js'
 import { identifiantDe, PSEUDO_VALIDE, SNAP_VALIDE, nettoie } from '../src/classement/compte.js'
 import { dessinePodium, dessineLigne } from '../src/classement/ecran.js'
 import { schema } from '../outils/schema-supabase.mjs'
+import { origineSeule } from '../outils/adresse.mjs'
 import { FORMATS, HUD } from '../src/format.js'
 import { fauxCtx, peint } from './faux.js'
 
@@ -144,6 +145,46 @@ test('les pseudos et les snaps acceptés sont exactement ceux du schéma', () =>
   for (const bon of ['greg', 'Greg_Boulard', 'a-b-c', 'x12']) assert.ok(PSEUDO_VALIDE.test(bon), bon)
   for (const mauvais of ['ab', 'a'.repeat(17), 'greg boulard', 'greg@x', '']) {
     assert.equal(PSEUDO_VALIDE.test(mauvais), false, mauvais)
+  }
+})
+
+// --- L'adresse du serveur ------------------------------------------------------
+
+test('l’adresse du projet est ramenée à son origine, quoi qu’on ait collé', () => {
+  // Le vrai piège, rencontré en production : la console de Supabase montre
+  // ses exemples en `.../rest/v1/`, et c'est cette ligne-là qu'on copie dans
+  // le secret. Le client recollant `/rest/v1/…` derrière, l'adresse se
+  // doublait et la passerelle répondait « Invalid path specified in request
+  // URL » — un message que personne ne sait interpréter.
+  const bonne = 'https://abcdefghijklm.supabase.co'
+  for (const colle of [
+    bonne,
+    `${bonne}/`,
+    `${bonne}/rest/v1`,
+    `${bonne}/rest/v1/`,
+    `${bonne}/auth/v1/`,
+    `  ${bonne}/rest/v1/  `,
+    `${bonne}\n`,
+    `${bonne}//`,
+  ]) {
+    assert.equal(origineSeule(colle), bonne, `mal nettoyé : ${JSON.stringify(colle)}`)
+  }
+  // Vide reste vide : c'est ce qui fait dire « hors ligne » plutôt que de
+  // lancer des requêtes vers nulle part.
+  assert.equal(origineSeule(''), '')
+  assert.equal(origineSeule(undefined), '')
+  assert.equal(origineSeule('   '), '')
+  // Et une valeur inanalysable ne fait pas échouer la construction.
+  assert.equal(origineSeule('n’importe quoi/'), 'n’importe quoi')
+})
+
+test('les pannes de serveur les plus probables sont dites en français', async () => {
+  // `lisible` n'est pas exportée — on la lit à la source, pour vérifier que
+  // les trois messages qu'on rencontre vraiment sont traduits plutôt que
+  // relayés en anglais brut sur un écran qui n'en a pas.
+  const source = readFileSync(fileURLToPath(new URL('../src/classement/supabase.js', import.meta.url)), 'utf8')
+  for (const cas of ['invalid path', 'invalid api key', 'does not exist', 'invalid login']) {
+    assert.ok(source.includes(cas), `message non traduit : ${cas}`)
   }
 })
 

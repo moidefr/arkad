@@ -34,6 +34,12 @@ function lisible(message, statut) {
   if (m.includes('duplicate key') && m.includes('pseudo')) return 'ce pseudo est déjà pris'
   if (m.includes('password')) return 'mot de passe trop court (6 caractères minimum)'
   if (m.includes('rate limit') || statut === 429) return 'trop d’essais, réessaie dans un instant'
+  // La passerelle de Supabase, quand la requête n'atteint aucune route : neuf
+  // fois sur dix, SUPABASE_URL porte un chemin en trop. Le message d'origine
+  // est en anglais et ne dit pas quoi faire.
+  if (m.includes('invalid path')) return 'adresse du serveur mal réglée (SUPABASE_URL)'
+  if (m.includes('invalid api key')) return 'clé du serveur refusée (SUPABASE_ANON_KEY)'
+  if (m.includes('does not exist')) return 'le schéma n’a pas été installé sur le serveur'
   if (m.includes('profils_pseudo_check')) return 'pseudo : 3 à 16 lettres, chiffres, - ou _'
   if (m.includes('profils_snap_check')) return 'snap : 1 à 32 lettres, chiffres, . - ou _'
   return message || 'le serveur n’a pas répondu'
