@@ -527,6 +527,16 @@ export class Moteur {
       else for (const def of this._jeuxClassables(this.vue.onglet)) classement.demande(def.id)
       return
     }
+    // Revenir sur le jeu qu'on venait de quitter pour aller voir un
+    // classement : la partie tourne toujours, on rend simplement l'écran
+    // qu'on avait laissé. La relancer effaçait le score qu'on venait de
+    // faire — et c'est précisément ce score qu'on était allé comparer.
+    if (this.phase === 'classement' && this.j && this.def && this.def === arrivee.def) {
+      this.cat = arrivee.cat
+      this.phase = this.vue.retour === 'fin' ? 'fin' : 'jeu'
+      this.phaseT = 0
+      return
+    }
     if (this.def && this.def !== arrivee.def) {
       this.def.quitte?.(this.j)
       musique.arrete()
@@ -549,6 +559,20 @@ export class Moteur {
     return CATEGORIES.find((c) => c.id === id)?.jeux.filter(classable) ?? []
   }
 
+  /**
+   * Cette catégorie a-t-elle un classement à montrer ?
+   *
+   * Lue par le dessin **et** par l'appui. MASSIF n'a que FRONT, qui est
+   * `sansScore` : son bouton n'était pas dessiné, mais sa zone répondait
+   * quand même — un appui dans un coin vide ouvrait un classement sur un
+   * onglet « massif » qui n'existe pas, sans rien à afficher. Exactement la
+   * désynchronisation entre l'image et le toucher que le reste du moteur
+   * s'interdit.
+   */
+  _aUnClassement(cat) {
+    return Boolean(cat?.jeux.some(classable))
+  }
+
   /** La clé du classement affiché : 'general', ou l'identifiant d'un jeu. */
   _cleVue() {
     return this.vue.jeu ? this.vue.jeu.id : this.vue.onglet === 'general' ? 'general' : null
@@ -559,7 +583,14 @@ export class Moteur {
    * ce que fait l'écran de fin, où l'on veut voir *ce* classement-là.
    */
   _ouvreClassement({ onglet: ong = 'general', jeu = null } = {}) {
-    this.vue = { onglet: jeu ? this._categorieDe(jeu)?.id ?? ong : ong, jeu, retour: this.phase }
+    const voulu = jeu ? (this._categorieDe(jeu)?.id ?? ong) : ong
+    // Un onglet qu'on ne sait pas dessiner retombe sur le général : mieux
+    // vaut le classement général que quatre onglets dont aucun n'est allumé.
+    const connu = this._onglets().some((o) => o.id === voulu)
+    // `direct` retient qu'on est entré droit sur un jeu (depuis l'écran de
+    // fin). Le retour doit alors ressortir d'un coup, et non remonter
+    // d'abord à la liste des jeux de la catégorie — on n'y est jamais passé.
+    this.vue = { onglet: connu ? voulu : 'general', jeu, retour: this.phase, direct: Boolean(jeu) }
     this.phase = 'classement'
     this.phaseT = 0
     const cle = this._cleVue()
@@ -666,7 +697,7 @@ export class Moteur {
     }
 
     if (this.phase === 'categorie') {
-      if (dans(p, dispoSon(this.W))) {
+      if (this._aUnClassement(this.cat) && dans(p, dispoSon(this.W))) {
         son.clic()
         return this._ouvreClassement({ onglet: this.cat.id })
       }
@@ -891,7 +922,7 @@ export class Moteur {
     this._entete(cat.nom, `${cat.duree} · ${cat.detail}`, true)
     // Le classement de la catégorie, en haut à droite — la place qu'occupe le
     // bouton du son sur l'accueil, pour que le pouce n'ait rien à réapprendre.
-    if (cat.jeux.some(classable)) {
+    if (this._aUnClassement(cat)) {
       const { x, y, w, h } = dispoSon(this.W)
       rect(ctx, x, y, w, h, C.panneau)
       cadre(ctx, x, y, w, h, C.faible)
@@ -1171,7 +1202,9 @@ export class Moteur {
     // pouce, et c'est ce que fait le bouton « précédent » du téléphone.
     if (dans(p, BTN_RETOUR)) {
       son.clic()
-      if (this.vue.jeu) {
+      // Un cran seulement si l'on est descendu soi-même de la liste des jeux
+      // à un jeu. Entré droit sur un jeu, on ressort droit.
+      if (this.vue.jeu && !this.vue.direct) {
         this.vue.jeu = null
         this.phaseT = 0
         return

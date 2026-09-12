@@ -18,6 +18,8 @@ import { fileURLToPath } from 'node:url'
 import { CATEGORIES, TOUS } from '../src/catalogue.js'
 import { REFERENCES, PONDERATIONS, BASE, PLAFOND, RETENUS, points, general, classable } from '../src/classement/coefficients.js'
 import {
+  dispoGrilleJeux,
+  caseJeu,
   dispoPodium,
   hauteurPodium,
   dispoOnglets,
@@ -325,6 +327,29 @@ test('le texte d’une ligne de classement reste dans sa rangée', () => {
         textes[i - 1].x + textes[i - 1].w <= textes[i].x,
         `${t.W}×${t.H} : deux colonnes de la ligne se recouvrent`,
       )
+    }
+  }
+})
+
+test('la grille des jeux tient debout même pour une catégorie sans classement', () => {
+  // MASSIF n'a que FRONT, qui est `sansScore` : zéro jeu classable. Un bouton
+  // fantôme y ouvrait le classement sur un onglet inexistant — il est mort,
+  // mais la grille doit rester sûre pour zéro jeu, sinon la prochaine
+  // catégorie vide plantera au lieu d'être simplement vide.
+  const massif = CATEGORIES.find((c) => c.id === 'massif')
+  assert.ok(massif, 'la catégorie MASSIF a disparu du catalogue')
+  assert.equal(massif.jeux.filter(classable).length, 0)
+
+  for (const t of GABARITS) {
+    for (const n of [0, 1, 5, 9, 24]) {
+      const d = dispoGrilleJeux(t.W, t.H, n)
+      assert.ok(d, `${t.W}×${t.H} : pas de grille pour ${n} jeux`)
+      assert.ok(d.cols >= 1 && d.h > 0 && d.w > 0, `${t.W}×${t.H} : grille absurde pour ${n}`)
+      if (n === 0) continue
+      // Chaque jeu doit rester atteignable : c'est ce qui a imposé la grille.
+      const dernier = caseJeu(n - 1, d)
+      assert.ok(dedans(dernier, t), `${t.W}×${t.H} : le ${n}e jeu sort de l’écran`)
+      assert.ok(dernier.y + dernier.h <= dispoCompte(t.W, t.H).y, `${t.W}×${t.H} : le ${n}e jeu passe sous le bouton`)
     }
   }
 })

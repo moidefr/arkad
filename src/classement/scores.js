@@ -90,15 +90,32 @@ async function charge(cle) {
 
 // --- Poser un score ----------------------------------------------------------
 
+/**
+ * La file est relue depuis le stockage, mais son **compte** est gardé en
+ * mémoire : l'écran de classement l'affiche, donc il le demandait soixante
+ * fois par seconde — soixante `localStorage.getItem` et autant de
+ * `JSON.parse` par seconde, pour un nombre qui ne change qu'à la fin d'une
+ * partie. Sur un téléphone, c'est le genre de détail qui fait tomber des
+ * images.
+ */
+let compte = null
+
 const file = () => {
   try {
     const f = JSON.parse(lis(CLE_FILE, '[]'))
-    return Array.isArray(f) ? f : []
+    const liste = Array.isArray(f) ? f : []
+    compte = liste.length
+    return liste
   } catch {
+    compte = 0
     return []
   }
 }
-const ecrisFile = (f) => ecris(CLE_FILE, JSON.stringify(f.slice(-40)))
+const ecrisFile = (f) => {
+  const garde = f.slice(-40)
+  compte = garde.length
+  ecris(CLE_FILE, JSON.stringify(garde))
+}
 
 /**
  * Pose un score. Ne rend rien et n'attend rien : c'est appelé depuis l'écran
@@ -157,4 +174,4 @@ export async function videLaFile() {
 }
 
 /** Combien de scores attendent le réseau (ou un compte). */
-export const enAttente = () => file().length
+export const enAttente = () => (compte === null ? file().length : compte)
