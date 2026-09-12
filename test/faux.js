@@ -229,6 +229,17 @@ export function fauxJeu(def, options = {}) {
     son: RIEN,
     fx: RIEN,
     musique: () => {},
+    /**
+     * Le doigt est-il posé ?
+     *
+     * Le moteur en fait un accesseur branché sur l'entrée réelle ; ici c'est
+     * `joue()` qui le tient à jour au rythme du pilote. Il valait `false`
+     * pour toujours, ce qui rendait **huit jeux intestables** : VOLTIGE,
+     * FUSÉE, TRACÉ, VISÉE et DÉDALE se jouent au doigt maintenu, DÉMINEUR,
+     * FLUX et PICROSS s'en servent pour leur appui long. Les tests les
+     * faisaient tourner sans jamais leur donner la seule chose qu'ils
+     * attendent.
+     */
     maintenu: false,
     e: {},
     hasard,
@@ -272,8 +283,16 @@ export function joue(def, { duree = 30, pilote, dessine = false, ...options } = 
 
   while (j.t < duree && !j.fini) {
     const geste = pilote?.(j, j.t)
-    if (geste === 'appui') def.appui?.(j, j.pointer)
-    else if (geste === 'relache') def.relache?.(j, j.pointer)
+    // `maintenu` suit le pilote, comme il suivrait le doigt : un « appui »
+    // pose le doigt, un « relâche » le lève, et rien ne le bouge entre les
+    // deux. Sans ça, un jeu qui se joue en maintenant ne voit jamais rien.
+    if (geste === 'appui') {
+      j.maintenu = true
+      def.appui?.(j, j.pointer)
+    } else if (geste === 'relache') {
+      j.maintenu = false
+      def.relache?.(j, j.pointer)
+    }
 
     def.maj?.(j, PAS)
     if (ctx) {

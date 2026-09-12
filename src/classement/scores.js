@@ -145,32 +145,95 @@ let enCours = false
  * Vide la file d'attente. Appelée après chaque partie et à la connexion —
  * les scores posés avant d'avoir un compte partent au moment où il en existe
  * un, ce qui évite de perdre la partie qui a donné envie de s'inscrire.
+ *
+ * **Ce qui arrive pendant l'envoi reste.** La version d'avant relisait la
+ * file une fois, envoyait, puis réécrivait ce qui restait — écrasant au
+ * passage tout score posé entre-temps. Une partie finie pendant que la
+ * précédente montait encore disparaissait sans un mot, et c'est exactement ce
+ * qui arrive quand on enchaîne deux parties courtes sur un réseau lent. On
+ * relit donc la file à la fin, et on n'en retire que ce qu'on a vraiment
+ * réussi à poser.
  */
 export async function videLaFile() {
   if (enCours || !enLigne() || !connecte()) return
-  const attente = file()
-  if (attente.length === 0) return
+  if (file().length === 0) return
   enCours = true
   try {
-    const j = await jeton()
-    if (!j) return
-    const restants = []
-    for (const s of attente) {
-      const { erreur } = await api.fonction('poser_score', { p_jeu: s.jeu, p_score: s.score }, j)
-      // Un refus du serveur (jeu inconnu, score invalide) ne repartira jamais :
-      // le garder ferait une file qui grossit sans fin. Une panne réseau, si.
-      if (erreur && (erreur.includes('réseau') || erreur.includes('trop de temps'))) restants.push(s)
-    }
-    ecrisFile(restants)
-    if (restants.length < attente.length) {
-      // Ce qui vient de partir change les classements : la prochaine demande
-      // ne doit pas servir un cache d'avant.
-      for (const cle of cache.keys()) cache.set(cle, { ...connu(cle), quand: 0 })
-      previens(null)
-    }
+    await unePassee()
   } finally {
     enCours = false
   }
+}
+
+/**
+ * Une passée d'envoi. Rend le nombre de scores partis — zéro veut dire qu'il
+ * n'y a plus rien à faire pour l'instant.
+ */
+async function unePassee(profondeur = 0) {
+  const attente = file()
+  if (attente.length === 0) return 0
+  const j = await jeton()
+  if (!j) return 0
+
+  /** Ce qu'on a réussi à poser : jeu -> score envoyé. */
+  const envoyes = new Map()
+  /** Ce qui a buté sur le réseau et doit repartir plus tard. */
+  const areprendre = new Set()
+
+  for (const s of attente) {
+    const { erreur } = await api.fonction('poser_score', { p_jeu: s.jeu, p_score: s.score }, j)
+    // Un refus du serveur (jeu inconnu, score invalide) ne repartira jamais :
+    // le garder ferait une file qui grossit sans fin. Une panne réseau, si.
+    if (erreur && (erreur.includes('réseau') || erreur.includes('trop de temps'))) areprendre.add(s.jeu)
+    else envoyes.set(s.jeu, s.score)
+  }
+
+  // On relit : la file a pu grossir pendant que les requêtes montaient.
+  const restants = ceQuiReste(file(), envoyes, areprendre)
+  ecrisFile(restants)
+
+  if (envoyes.size > 0) {
+    // Ce qui vient de partir change les classements : la prochaine demande
+    // ne doit pas servir un cache d'avant.
+    for (const cle of cache.keys()) cache.set(cle, { ...connu(cle), quand: 0 })
+    previens(null)
+  }
+
+  // Ce qui est arrivé pendant l'envoi part tout de suite plutôt que d'attendre
+  // la prochaine partie. La profondeur borne la reprise : un serveur qui
+  // refuse sans être une panne réseau ne doit pas faire tourner une boucle.
+  if (restants.length > 0 && envoyes.size > 0 && areprendre.size === 0 && profondeur < 3) {
+    return envoyes.size + (await unePassee(profondeur + 1))
+  }
+  return envoyes.size
+}
+
+/**
+ * Ce qui doit rester dans la file après une passée d'envoi.
+ *
+ * Le cœur du problème, et la raison d'être de cette fonction : entre le
+ * moment où l'on lit la file et celui où le dernier envoi revient, il se
+ * passe des centaines de millisecondes de réseau — largement de quoi finir
+ * une partie de plus. L'ancienne version réécrivait la file à partir de
+ * l'instantané pris *avant* les envois, et effaçait donc ce qui était arrivé
+ * entre-temps : sur un réseau à 350 ms, près d'un score sur deux disparaissait
+ * sans un mot.
+ *
+ * On repart donc de la file **telle qu'elle est maintenant**, et on n'en
+ * retire que ce qu'on a vraiment réussi à poser, au score près : un même jeu
+ * rejoué mieux pendant l'envoi doit repartir.
+ *
+ * @param maintenant la file relue après les envois
+ * @param envoyes    jeu -> score effectivement accepté par le serveur
+ * @param areprendre jeux dont l'envoi a buté sur le réseau
+ */
+export function ceQuiReste(maintenant, envoyes, areprendre = new Set()) {
+  return maintenant.filter((s) => {
+    if (areprendre.has(s.jeu)) return true
+    const envoye = envoyes.get(s.jeu)
+    // Jamais envoyé (arrivé entre-temps), ou battu depuis : il reste.
+    return envoye === undefined || s.score > envoye
+  })
 }
 
 /** Combien de scores attendent le réseau (ou un compte). */

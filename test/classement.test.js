@@ -36,6 +36,7 @@ import { identifiantDe, PSEUDO_VALIDE, SNAP_VALIDE, nettoie } from '../src/class
 import { dessinePodium, dessineLigne } from '../src/classement/ecran.js'
 import { schema } from '../outils/schema-supabase.mjs'
 import { origineSeule } from '../outils/adresse.mjs'
+import { ceQuiReste } from '../src/classement/scores.js'
 import { FORMATS, HUD } from '../src/format.js'
 import { fauxCtx, peint } from './faux.js'
 
@@ -190,6 +191,38 @@ test('les pannes de serveur les plus probables sont dites en français', async (
   }
 })
 
+// --- La file d'attente des scores ----------------------------------------------
+
+test('un score posé pendant l’envoi du précédent ne disparaît pas', () => {
+  // Le bug, mesuré : à 350 ms de latence, neuf scores sur vingt et un se
+  // perdaient. La file était réécrite à partir de l'instantané pris *avant*
+  // les envois, donc tout ce qui arrivait pendant était effacé — et deux
+  // parties courtes s'enchaînent en moins de temps qu'un aller-retour réseau.
+  const envoyes = new Map([['corde', 120]])
+
+  // La partie d'ESQUIVE finie pendant que CORDE montait : elle reste.
+  assert.deepEqual(
+    ceQuiReste([{ jeu: 'corde', score: 120 }, { jeu: 'esquive', score: 900 }], envoyes),
+    [{ jeu: 'esquive', score: 900 }],
+  )
+  // Le même jeu rejoué *mieux* pendant l'envoi repart, il n'est pas avalé.
+  assert.deepEqual(
+    ceQuiReste([{ jeu: 'corde', score: 260 }], envoyes),
+    [{ jeu: 'corde', score: 260 }],
+  )
+  // Rejoué moins bien, il s'en va : le serveur a déjà le meilleur.
+  assert.deepEqual(ceQuiReste([{ jeu: 'corde', score: 80 }], envoyes), [])
+  // Une panne réseau garde la ligne, quoi qu'il arrive.
+  assert.deepEqual(
+    ceQuiReste([{ jeu: 'corde', score: 120 }], envoyes, new Set(['corde'])),
+    [{ jeu: 'corde', score: 120 }],
+  )
+  // Rien envoyé du tout : rien ne doit être jeté.
+  const file = [{ jeu: 'tri', score: 10 }, { jeu: 'pile', score: 4 }]
+  assert.deepEqual(ceQuiReste(file, new Map()), file)
+  assert.deepEqual(ceQuiReste([], envoyes), [])
+})
+
 // --- Les écrans ---------------------------------------------------------------
 
 test('le podium a trois marches, le vainqueur au centre et plus haut', () => {
@@ -280,6 +313,36 @@ test('les onglets, la liste et le bouton de compte tiennent dans les deux format
       assert.ok(premiere.y >= (avecPodium ? pod.y + pod.h : dO.y + dO.h), `${t.W}×${t.H} : la liste remonte trop haut`)
     }
   }
+})
+
+test('chaque marche du podium contient ce qu’elle porte', () => {
+  // Le score de la troisième marche était peint sous elle, dans le vide : les
+  // trois textes étaient posés à hauteur fixe (22, 42, 58) alors que les
+  // marches mesuraient 76, 62 et 54. Une marche doit contenir son rang, son
+  // pseudo et son score — c'est le seul contenu du podium.
+  const lignes = [
+    { pseudo: 'Greg', points: 7919, score: 260 },
+    { pseudo: 'XxDarkSniper_99', points: 7619, score: 240 },
+    { pseudo: 'Lea', points: 4417, score: 140 },
+  ]
+  const t = FORMATS.portrait
+  const ctx = fauxCtx()
+  dessinePodium(ctx, 20, 100, t.W - 40, t.W, t.H, lignes, { titre: 'PODIUM' })
+  const marches = dispoPodium(20, 100, t.W - 40, t.W, t.H)
+  const textes = ctx.ops.filter((o) => o.type === 'texte' && o.s !== 'PODIUM').map(peint)
+  assert.equal(textes.length, 9, 'trois marches × rang, pseudo, score')
+  for (const r of textes) {
+    const sienne = marches.find((m) => r.x >= m.x - 1 && r.x + r.w <= m.x + m.w + 1)
+    assert.ok(sienne, `un texte du podium n’appartient à aucune marche (x=${Math.round(r.x)})`)
+    assert.ok(
+      r.y >= sienne.y && r.y + r.h <= sienne.y + sienne.h,
+      `« ${Math.round(r.y)} » déborde de sa marche (${sienne.y}..${sienne.y + sienne.h})`,
+    )
+  }
+  // Et l'estrade reste une estrade : même sol, le vainqueur le plus haut.
+  const bas = new Set(marches.map((m) => m.y + m.h))
+  assert.equal(bas.size, 1, 'les marches ne reposent pas sur le même sol')
+  assert.equal(Math.max(...marches.map((m) => m.h)), marches.find((m) => m.place === 0).h)
 })
 
 test('rien de ce que le podium peint ne sort de la place qu’on lui donne', () => {

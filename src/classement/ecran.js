@@ -37,12 +37,21 @@ export function dispoPodium(x, y, w, W, H) {
   if (estLarge(W, H)) return null // couché : une seule bande, voir dessinePodium
   const large = Math.floor((w - 16) / 3)
   const ordre = [1, 0, 2] // 2e, 1er, 3e : le vainqueur au centre
+  // Hauteurs et décalages vont par paires : la somme fait toujours 76, donc
+  // les trois marches reposent sur le même sol. La plus basse ne descend pas
+  // sous 64 px — c'est ce qu'il faut pour tenir un rang, un pseudo et un
+  // score sans qu'aucun ne sorte du cadre, ce que 54 px ne permettait pas.
+  const MARCHES = [
+    { h: 76, dy: 0 },
+    { h: 68, dy: 8 },
+    { h: 64, dy: 12 },
+  ]
   return ordre.map((place, colonne) => ({
     place,
     x: x + colonne * (large + 8),
-    y: y + (place === 0 ? 0 : place === 1 ? 14 : 22),
+    y: y + MARCHES[place].dy,
     w: large,
-    h: (place === 0 ? 76 : place === 1 ? 62 : 54),
+    h: MARCHES[place].h,
   }))
 }
 
@@ -84,9 +93,12 @@ export function dessinePodium(ctx, x, y, w, W, H, lignes, { titre = 'TOP 3', val
     if (l) lueur(ctx, m.x, m.y, m.w, 4, teinte, 2, 0.8)
     bloc(ctx, m.x, m.y, m.w, 5, teinte, 2)
     cadre(ctx, m.x, m.y, m.w, m.h, ton(teinte, -0.45))
-    texte(ctx, String(m.place + 1), m.x + m.w / 2, m.y + 22, 20, teinte, 700)
-    texte(ctx, l ? l.pseudo : '--', m.x + m.w / 2, m.y + 42, 12, l ? C.texte : C.bord, 700, m.w - 8)
-    if (l) texte(ctx, String(Math.round(valeur(l))), m.x + m.w / 2, m.y + 58, 13, C.accent, 700, m.w - 8)
+    // Le rang se cale en haut, le pseudo et le score **sur le bas de leur
+    // propre marche** : à hauteur fixe, le score de la troisième était peint
+    // sous elle, dans le vide. Une marche porte ce qu'elle mesure.
+    texte(ctx, String(m.place + 1), m.x + m.w / 2, m.y + 18, 18, teinte, 700)
+    texte(ctx, l ? l.pseudo : '--', m.x + m.w / 2, m.y + m.h - 30, 12, l ? C.texte : C.bord, 700, m.w - 8)
+    if (l) texte(ctx, String(Math.round(valeur(l))), m.x + m.w / 2, m.y + m.h - 12, 13, C.accent, 700, m.w - 8)
   }
 }
 
